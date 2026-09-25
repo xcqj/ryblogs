@@ -452,6 +452,13 @@
                 <version>${revision}</version>
             </dependency>
 
+            <!-- 博客模块blog -->
+            <dependency>
+                <groupId>org.dromara</groupId>
+                <artifactId>sd-blog</artifactId>
+                <version>${revision}</version>
+            </dependency>
+
             <!--  工作流模块  -->
             <dependency>
                 <groupId>org.dromara</groupId>

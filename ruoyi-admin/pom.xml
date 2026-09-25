@@ -98,6 +98,12 @@
             <artifactId>ruoyi-demo</artifactId>
         </dependency>
 
+        <!--  博客模块  -->
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>sd-blog</artifactId>
+        </dependency>
+
         <!--  工作流模块  -->
         <dependency>
             <groupId>org.dromara</groupId>
