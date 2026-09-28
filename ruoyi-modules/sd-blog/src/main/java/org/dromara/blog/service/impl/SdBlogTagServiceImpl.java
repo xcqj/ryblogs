@@ -14,8 +14,11 @@ import org.springframework.stereotype.Service;
 import org.dromara.blog.domain.bo.SdBlogTagBo;
 import org.dromara.blog.domain.vo.SdBlogTagVo;
 import org.dromara.blog.domain.SdBlogTag;
+import org.dromara.blog.enums.BlogTagStatus;
 import org.dromara.blog.mapper.SdBlogTagMapper;
 import org.dromara.blog.service.ISdBlogTagService;
+import org.dromara.blog.util.TagNormalizer;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -141,6 +144,38 @@ public class SdBlogTagServiceImpl implements ISdBlogTagService {
             // 可在此扩展删除前业务校验
         }
         return sdBlogTagMapper.deleteByIds(ids) > 0;
+    }
+
+    /**
+     * 按规范化规则将标签名列表解析为标签实体：同 slug 复用，不存在则自动入库
+     *
+     * @param rawNames 原始标签名列表
+     * @return 规范化去重后的标签实体列表（含新建的）
+     */
+    @Override
+    public List<SdBlogTag> resolveOrCreateByNames(List<String> rawNames) {
+        List<SdBlogTag> result = new ArrayList<>();
+        for (String name : TagNormalizer.normalizeNames(rawNames)) {
+            String slug = TagNormalizer.toSlug(name);
+            SdBlogTag tag = sdBlogTagMapper.lambda().eq(SdBlogTag::getSlug, slug).one();
+            if (ObjectUtil.isNull(tag)) {
+                tag = new SdBlogTag();
+                tag.setName(name);
+                tag.setSlug(slug);
+                tag.setStatus(BlogTagStatus.ACTIVE.getCode());
+                // 默认非精选、排序 0；精选由管理员手动设置（契约 §7.1）
+                tag.setIsFeatured("0");
+                tag.setSortOrder(0);
+                try {
+                    sdBlogTagMapper.insert(tag);
+                } catch (DuplicateKeyException e) {
+                    // 并发创建同 slug 标签：回查既有记录复用
+                    tag = sdBlogTagMapper.lambda().eq(SdBlogTag::getSlug, slug).one();
+                }
+            }
+            result.add(tag);
+        }
+        return result;
     }
 
 }

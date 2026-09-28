@@ -4,8 +4,10 @@
 -- 说明：
 -- 1. 主键均由应用侧生成，不使用 AUTO_INCREMENT。
 -- 2. 不建立 MySQL FOREIGN KEY，实体关系由应用层维护。
--- 3. 所有博客表统一保留 RuoYi BaseEntity 对应的基础审计字段与 del_flag。
+-- 3. 除纯关系表 article_tag 外，所有博客表统一保留 RuoYi BaseEntity 对应的基础审计字段与 del_flag。
 -- 4. article_version 业务上为不可变历史快照，只允许 INSERT。
+-- 5. article_tag 为纯关系表：物理删除、无 del_flag（S2 决议，2026-09-28）；
+--    已建库的环境请执行 docs/blog_s2_migration.sql 完成结构迁移。
 -- =========================================================
 
 -- ----------------------------
@@ -133,12 +135,10 @@ create table sd_blog_article_tag
     create_time        datetime                                   comment '创建时间',
     update_by          bigint(20)      default null               comment '更新者',
     update_time         datetime                                   comment '更新时间',
-    del_flag             char(1)         not null default '0'      comment '删除标志（0代表存在 1代表删除）',
     primary key (article_tag_id),
-    unique key uq_blog_article_tag (article_id, tag_id, del_flag),
-    key idx_blog_article_tag_tag_article (tag_id, article_id, del_flag),
-    key idx_blog_article_tag_article (article_id, tag_id, del_flag)
-) engine=innodb comment = '博客文章标签关系表';
+    unique key uq_blog_article_tag (article_id, tag_id),
+    key idx_blog_article_tag_tag (tag_id)
+) engine=innodb comment = '博客文章标签关系表（纯关系表，物理删除，无del_flag）';
 
 -- ----------------------------
 -- 7、博客评论表

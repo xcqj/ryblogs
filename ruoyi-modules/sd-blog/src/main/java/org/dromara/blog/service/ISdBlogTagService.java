@@ -1,5 +1,6 @@
 package org.dromara.blog.service;
 
+import org.dromara.blog.domain.SdBlogTag;
 import org.dromara.blog.domain.vo.SdBlogTagVo;
 import org.dromara.blog.domain.bo.SdBlogTagBo;
 import org.dromara.common.core.domain.PageResult;
@@ -69,4 +70,14 @@ public interface ISdBlogTagService {
      */
     Boolean deleteWithValidByIds(Collection<Long> ids, Boolean isValid);
 
+    /**
+     * 按规范化规则将标签名列表解析为标签实体（契约 §3.1，PRD TAG-02/03）：
+     * 同 slug 已存在则复用；不存在则自动入库（无需预审核）。
+     * <p>
+     * 已删除标签的恢复、MERGED/alias 跟随与跨表 slug 唯一性校验属 S6 标签治理切片接入。
+     *
+     * @param rawNames 原始标签名列表
+     * @return 规范化去重后的标签实体列表（含新建的）
+     */
+    List<SdBlogTag> resolveOrCreateByNames(List<String> rawNames);
 }

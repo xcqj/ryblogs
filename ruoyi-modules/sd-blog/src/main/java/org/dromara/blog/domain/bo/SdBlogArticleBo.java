@@ -47,7 +47,7 @@ public class SdBlogArticleBo implements Serializable {
      * 文章状态（0草稿 1已发布）
      */
     @NotNull(message = "文章状态（0草稿 1已发布）不能为空", groups = { AddGroup.class, EditGroup.class })
-    private Boolean status;
+    private String status;
 
     /**
      * 可见性（0公开 1用户隐藏 2管理员下线）

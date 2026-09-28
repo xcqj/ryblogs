@@ -63,7 +63,7 @@ public class SdBlogArticleVersion extends BaseEntity {
      * 删除标志（0代表存在 1代表删除），业务层禁止删除版本
      */
     @TableLogic
-    private Boolean delFlag;
+    private String delFlag;
 
 
 }

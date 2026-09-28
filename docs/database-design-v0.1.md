@@ -68,7 +68,7 @@
 - 合并标签不删除源标签；源标签保持 `status = MERGED`，通过 `merged_into` 指向目标标签。
 - 合并目标必须是当前有效的 `ACTIVE` 标签。
 - 合并关系一次性展平，禁止形成 A → B → C 的长期链；当 B → C 时，原本指向 B 的 merged 标签和 alias 直接更新为指向 C。
-- 合并文章标签关系时“先迁移，再去重”：目标关系不存在则迁移；目标关系已经存在则保留目标关系并逻辑删除重复关系。
+- 合并文章标签关系时“先迁移，再去重”：目标关系不存在则迁移；目标关系已经存在则保留目标关系并物理删除重复关系。
 - 合并与相关标签关系迁移、alias 更新必须在同一个事务中完成。
 - 标签重命名和合并会保存旧 slug / 旧名字为 alias；旧 URL 由 alias 解析到当前有效标签，并由路由层实现 301。
 - 普通垃圾标签删除不产生 alias；不存在对应当前标签时旧 URL 直接返回 404。
@@ -104,7 +104,7 @@ RuoYi 现有表：`sys_user`、`sys_role`、`sys_user_role` 等直接复用，�
 
 ## 4. 通用表结构规范
 
-除 `blog_article_version` 的“不可变历史记录”业务约束外，所有博客表统一遵循 RuoYi 风格：
+除 `blog_article_version` 的“不可变历史记录”业务约束外，所有博客表统一遵循 RuoYi 风格（例外：`blog_article_tag` 为纯关系表，采用物理删除、不设 `del_flag`，对齐 `sys_user_role` 框架惯例，S2 决议）：
 
 ```text
 主键：BIGINT NOT NULL，应用侧生成，不 AUTO_INCREMENT
@@ -436,23 +436,25 @@ blog_tag_alias.alias_slug
 | `create_time` | DATETIME | 是 | NULL | 创建时间 |
 | `update_by` | BIGINT | 是 | NULL | 更新者 |
 | `update_time` | DATETIME | 是 | NULL | 更新时间 |
-| `del_flag` | CHAR(1) | 否 | `'0'` | 逻辑删除 |
+
+纯关系表，不设 `del_flag`（S2 决议，物理删除）。
 
 ### 10.3 索引/约束
 
 ```text
 PRIMARY KEY (article_tag_id)
-UNIQUE KEY uq_blog_article_tag (article_id, tag_id, del_flag)
-KEY idx_blog_article_tag_tag_article (tag_id, article_id, del_flag)
-KEY idx_blog_article_tag_article (article_id, tag_id, del_flag)
+UNIQUE KEY uq_blog_article_tag (article_id, tag_id)
+KEY idx_blog_article_tag_tag (tag_id)
 ```
+
+`article_id` 查询走唯一键最左前缀，无需额外索引。
 
 ### 10.4 业务约束
 
 - 一篇文章关联标签数必须为 1～6，由 Service 层控制。
-- 不能创建相同 `(article_id, tag_id)` 的有效重复关系。
-- 删除关系：逻辑删除。
-- 再次添加原标签：优先恢复历史关系记录，而不是新建重复记录。
+- 不能创建相同 `(article_id, tag_id)` 的重复关系（唯一键保证）。
+- 删除关系：物理删除（纯关系表，S2 决议；对齐 `sys_user_role` 惯例）。
+- 再次添加原标签：直接新建关系记录。
 - 文章软删除时，不处理、不删除、不修改既有标签关系。
 
 ### 10.5 标签合并
@@ -461,7 +463,7 @@ A → B 时：
 
 1. 查找所有有效 `A` 关系。
 2. 将其迁移到 B。
-3. 若 `(article_id, B)` 已存在，则保留 B 的有效关系并将 A 的重复关系逻辑删除。
+3. 若 `(article_id, B)` 已存在，则保留 B 的有效关系并将 A 的重复关系物理删除。
 4. 最终保证每篇文章不会产生重复标签。
 5. 与 Tag 状态更新、Alias 更新放在同一事务中。
 

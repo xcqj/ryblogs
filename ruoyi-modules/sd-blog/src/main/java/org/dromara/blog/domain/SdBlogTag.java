@@ -40,9 +40,9 @@ public class SdBlogTag extends BaseEntity {
     private String slug;
 
     /**
-     * 标签状态（0正常 1已合并）
+     * 标签状态（0有效 1已合并），取值见 BlogTagStatus
      */
-    private Boolean status;
+    private String status;
 
     /**
      * 合并目标标签ID，正常状态时为空
@@ -52,7 +52,7 @@ public class SdBlogTag extends BaseEntity {
     /**
      * 是否精选（0否 1是）
      */
-    private Boolean isFeatured;
+    private String isFeatured;
 
     /**
      * 精选标签展示顺序
@@ -63,7 +63,7 @@ public class SdBlogTag extends BaseEntity {
      * 删除标志（0代表存在 1代表删除）
      */
     @TableLogic
-    private Boolean delFlag;
+    private String delFlag;
 
 
 }

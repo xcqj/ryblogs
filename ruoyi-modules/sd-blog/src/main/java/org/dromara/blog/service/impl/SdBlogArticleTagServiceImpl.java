@@ -1,5 +1,6 @@
 package org.dromara.blog.service.impl;
 
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.ObjectUtil;
 import org.dromara.common.core.utils.MapstructUtils;
 import org.dromara.common.core.utils.StringUtils;
@@ -18,9 +19,12 @@ import org.dromara.blog.mapper.SdBlogArticleTagMapper;
 import org.dromara.blog.service.ISdBlogArticleTagService;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Collection;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 博客文章标签关系Service业务层处理
@@ -138,6 +142,42 @@ public class SdBlogArticleTagServiceImpl implements ISdBlogArticleTagService {
             // 可在此扩展删除前业务校验
         }
         return sdBlogArticleTagMapper.deleteByIds(ids) > 0;
+    }
+
+    /**
+     * 同步文章标签关系：差集维护，缺的补、多的物理删，已有行保持不动
+     *
+     * @param articleId 文章ID
+     * @param tagIds    目标标签ID集合
+     */
+    @Override
+    public void syncArticleTags(Long articleId, List<Long> tagIds) {
+        List<SdBlogArticleTag> existing = sdBlogArticleTagMapper.lambda()
+            .eq(SdBlogArticleTag::getArticleId, articleId)
+            .list();
+        Set<Long> existingTagIds = existing.stream().map(SdBlogArticleTag::getTagId).collect(Collectors.toSet());
+        Set<Long> targetTagIds = new LinkedHashSet<>(tagIds);
+        // 物理删除多余关系（纯关系表无逻辑删除）
+        List<Long> removeIds = existing.stream()
+            .filter(rel -> !targetTagIds.contains(rel.getTagId()))
+            .map(SdBlogArticleTag::getArticleTagId)
+            .toList();
+        if (CollUtil.isNotEmpty(removeIds)) {
+            sdBlogArticleTagMapper.deleteByIds(removeIds);
+        }
+        // 补入缺失关系
+        List<SdBlogArticleTag> adds = targetTagIds.stream()
+            .filter(tagId -> !existingTagIds.contains(tagId))
+            .map(tagId -> {
+                SdBlogArticleTag rel = new SdBlogArticleTag();
+                rel.setArticleId(articleId);
+                rel.setTagId(tagId);
+                return rel;
+            })
+            .toList();
+        if (CollUtil.isNotEmpty(adds)) {
+            sdBlogArticleTagMapper.insertBatch(adds);
+        }
     }
 
 }

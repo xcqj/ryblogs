@@ -53,7 +53,7 @@ public class SdBlogArticleVo implements Serializable {
      */
     @ExcelProperty(value = "文章状态", converter = ExcelDictConvert.class)
     @ExcelDictFormat(readConverterExp = "0=草稿,1=已发布")
-    private Boolean status;
+    private String status;
 
     /**
      * 可见性（0公开 1用户隐藏 2管理员下线）

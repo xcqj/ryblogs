@@ -11,6 +11,9 @@ import java.io.Serial;
 
 /**
  * 博客文章标签关系对象 sd_blog_article_tag
+ * <p>
+ * 纯关系表：采用物理删除（对齐 sys_user_role 框架惯例），不保留删除历史。
+ * 唯一键 (article_id, tag_id) 由数据库保证关系不重复。
  *
  * @author Xu
  * @date 2026-09-28 02:13:20
@@ -38,12 +41,6 @@ public class SdBlogArticleTag extends BaseEntity {
      * 标签ID
      */
     private Long tagId;
-
-    /**
-     * 删除标志（0代表存在 1代表删除）
-     */
-    @TableLogic
-    private Boolean delFlag;
 
 
 }

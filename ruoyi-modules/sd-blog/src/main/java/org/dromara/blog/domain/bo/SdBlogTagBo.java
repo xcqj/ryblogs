@@ -47,7 +47,7 @@ public class SdBlogTagBo implements Serializable {
     /**
      * 标签状态（0正常 1已合并）
      */
-    private Boolean status;
+    private String status;
 
     /**
      * 合并目标标签ID，正常状态时为空
@@ -58,7 +58,7 @@ public class SdBlogTagBo implements Serializable {
      * 是否精选（0否 1是）
      */
     @NotNull(message = "是否精选（0否 1是）不能为空", groups = { AddGroup.class, EditGroup.class })
-    private Boolean isFeatured;
+    private String isFeatured;
 
     /**
      * 精选标签展示顺序

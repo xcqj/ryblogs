@@ -53,7 +53,7 @@ public class SdBlogTagVo implements Serializable {
      */
     @ExcelProperty(value = "标签状态", converter = ExcelDictConvert.class)
     @ExcelDictFormat(readConverterExp = "0=正常,1=已合并")
-    private Boolean status;
+    private String status;
 
     /**
      * 合并目标标签ID，正常状态时为空
@@ -66,7 +66,7 @@ public class SdBlogTagVo implements Serializable {
      */
     @ExcelProperty(value = "是否精选", converter = ExcelDictConvert.class)
     @ExcelDictFormat(readConverterExp = "0=否,1=是")
-    private Boolean isFeatured;
+    private String isFeatured;
 
     /**
      * 精选标签展示顺序

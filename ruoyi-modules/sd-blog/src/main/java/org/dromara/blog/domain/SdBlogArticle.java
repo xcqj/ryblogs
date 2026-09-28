@@ -40,9 +40,9 @@ public class SdBlogArticle extends BaseEntity {
     private String slug;
 
     /**
-     * 文章状态（0草稿 1已发布）
+     * 文章状态（0草稿 1已发布），取值见 BlogArticleStatus
      */
-    private Boolean status;
+    private String status;
 
     /**
      * 可见性（0公开 1用户隐藏 2管理员下线）
@@ -83,7 +83,7 @@ public class SdBlogArticle extends BaseEntity {
      * 删除标志（0代表存在 1代表删除）
      */
     @TableLogic
-    private Boolean delFlag;
+    private String delFlag;
 
 
 }

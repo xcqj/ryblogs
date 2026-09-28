@@ -21,9 +21,9 @@
 
 | # | 切片 | 主要契约章节 | 对应 PRD 切片 | 状态 | 粗估 |
 |---|------|-------------|--------------|------|------|
-| S0 | 基线固化 | — | — | 🔄 部分完成 | 0.5d |
-| S1 | 账号与个人资料 | §8、§9 | 1 | 🔄 代码完成，待 Apifox 验收 | 0.5d |
-| S2 | 文章 + 版本核心 | §3.1~3.5、§4 | 2 | ⬜ | 2~3d |
+| S0 | 基线固化 | — | — | ✅（遗留：Apifox 覆盖导入清除陈旧 ArticleTag 接口，待执行人工确认） | 0.5d |
+| S1 | 账号与个人资料 | §8、§9 | 1 | ✅ 已验收（2026-09-28） | 0.5d |
+| S2 | 文章 + 版本核心 | §3.1~3.5、§4 | 2 | 🔄 代码完成，待 Apifox 验收 | 2~3d |
 | S3 | 编辑器与上传 | §2.4、§18.9 | 3 | ⬜ | 1d |
 | S4 | 编辑 = 新版本 | §3.4、§4.1/4.2 | 4 | ⬜ | 1d |
 | S5 | 治理状态机 | §3.6~3.8、§11 | 5 | ⬜ | 1~2d |
@@ -82,6 +82,8 @@
 
 决策点（开工前必须关闭，见 §6 待决 D6）：净化库与 Safelist 白名单范围；RuoYi 全局 XssFilter 对富文本字段的豁免方式（避免双重转义）。
 
+S2 遗留接入：本切片上线净化时，需清洗或删除 S2 期间 Apifox 造的裸 HTML 测试文章（Q4 决议）。
+
 完成标准：编辑器传图成功；含 `<script>`/`on*=`/危险协议的内容保存后被剥离；正常排版保留。
 
 ### S4 编辑 = 新版本 ⬜
@@ -105,6 +107,10 @@
 范围：契约 §7 公共标签接口组（featured/hot/list+联想/{slug}/tag articles）、§13 管理端 rename/merge/运营更新/删除、§18.10 规范化实现。
 
 关键点：合并事务六步（契约 §13.5）+ 链式展平（A→B→C 归一为 A→C、B→C）；跨表 slug 唯一性由 Service 保证（database-design §9.5）；删除后重输同 slug 恢复原标签。
+
+S2 遗留接入（必须做，否则功能不自洽）：
+- `ISdBlogTagService.resolveOrCreateByNames` 补三件事：① MERGED 标签沿 `merged_into` 跟随到 canonical；② 已软删标签同 slug 恢复原记录而非新建；③ 新建/恢复前做 tag.slug 与 tag_alias.alias_slug 跨表冲突检查。
+- 标签合并迁移 ArticleTag 关系时注意：该表已是纯物理删除关系表（S2 决议），"重复关系逻辑删除"按新语义改为物理删除。
 
 完成标准：合并后无重复 ArticleTag、无多级合并链、alias 全部直指 canonical；热门标签统计只算公共可见文章。
 
@@ -144,6 +150,14 @@ S0 → S1 → S2 → S3 → S4 → S5 → S6 → S7 → S8   （后端关键路�
 4. 关键权限/删除逻辑经人工复核（PRD §12.3）。
 5. git commit，提交信息标注切片号。
 
+### Agent 自测协议（每次编码完成后 Agent 自动执行，人不用催）
+
+| 档位 | 内容 |
+|------|------|
+| 每次必跑 | ① `mvn compile`（受影响模块 -am）② 静态断言 grep 自查 ③ `git diff` 自审越界改动 |
+| 切片按需 | ④ `mvn test`（D7 四类纯逻辑单测，Agent 写且 Agent 跑）⑤ 后台启动应用 + curl 冒烟（公共接口正向、鉴权接口负向 401）⑥ `docker exec blog-mysql` 只读 SELECT 核验状态流转/版本数等落库结果 |
+| 明确不做 | 带真实登录态的 Apifox 五类全量用例、前端联调、视觉验收（留给人工） |
+
 ## 6. 决策记录
 
 ### 已确认
@@ -167,6 +181,9 @@ S0 → S1 → S2 → S3 → S4 → S5 → S6 → S7 → S8   （后端关键路�
 | 2026-09-28 | D9：注册用框架自带能力（`POST /auth/register` + sys_config 参数 `sys.account.registerUser`），S1 时在后台参数管理置 `true`，零代码改动 | S1 |
 | 2026-09-28 | D10：SQL 最小集 = `ry_vue.sql` + `docs/blog_schema_v0.1.sql`（workflow/job/ai 三份属独立服务，博客不导）；前端仓库自管环境文档；Apifox 直连 `http://localhost:8081` | docs/SETUP.md |
 | 2026-09-28 | S1-D1：MVP 管理员不停用用户（**裁剪 PRD USER-02 P0 项，产品负责人决定**）。公共资料直接复用 `UserService.selectById`（带 status 过滤，不停用前提下无害），仅增量扩展 `UserDTO.avatar` 字段；不新增 api 方法。⚠️ 到期提醒：将来若恢复"停用用户"功能，停用者的公共资料接口会 404（其文章仍可见），届时须为 api 补无状态过滤的查询方法 | S1 实施 |
+| 2026-09-28 | S2 决议：`sd_blog_article_tag` 转纯关系表——物理删除、去 `del_flag`、唯一键 `(article_id, tag_id)`，对齐 `sys_user_role` 框架惯例；schema/database-design §2.3、§4、§10 已同步修订，存量库迁移脚本 `docs/blog_s2_migration.sql` 已执行（0 行数据，安全） | S2 实施 |
+| 2026-09-28 | S2-D1：char(1) 状态列类型治理 = String + 枚举（`BlogArticleStatus/BlogVisibility/BlogTagStatus`），本切片覆盖 Article/Version/ArticleTag/Tag 四表及连带 Bo/Vo；Comment/UserProfile 的 `delFlag` 在各自切片治理 | S2 实施 |
+| 2026-09-28 | S2-Q1~Q5：发布前校验 currentVersionId 非空；作者自助接口管理员判定 = `LoginHelper.isSuperAdmin()`（治理走 S5 admin 接口）；我的列表排序 `update_time DESC, article_id DESC` 且 tags 两段式批量填充；HTML 净化确认后置 S3；MERGED 标签跟随确认后置 S6 | S2 实施 |
 
 ### 待决策（当前无）
 
