@@ -30,8 +30,10 @@ import org.dromara.common.core.domain.PageResult;
  */
 @Validated
 @RequiredArgsConstructor
-@RestController
-@RequestMapping("/blog/blogArticleVersion")
+// 按 docs/blog-api.md §14：Version 为 append-only 历史快照，不作为普通 CRUD 资源暴露。
+// 生成器产物 Controller 停用，Service/Mapper 保留供领域业务操作复用；后续按契约实现只读 Version 查询接口。
+//@RestController
+//@RequestMapping("/blog/blogArticleVersion")
 public class SdBlogArticleVersionController extends BaseController {
 
     private final ISdBlogArticleVersionService sdBlogArticleVersionService;

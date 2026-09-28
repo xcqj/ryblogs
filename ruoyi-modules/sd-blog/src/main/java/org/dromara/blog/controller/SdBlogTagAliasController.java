@@ -30,8 +30,10 @@ import org.dromara.common.core.domain.PageResult;
  */
 @Validated
 @RequiredArgsConstructor
-@RestController
-@RequestMapping("/blog/blogTagAlias")
+// 按 docs/blog-api.md §14：TagAlias 由标签 Rename/Merge 等领域操作维护，不作为普通 CRUD 资源暴露。
+// 生成器产物 Controller 停用，Service/Mapper 保留供领域业务操作复用。
+//@RestController
+//@RequestMapping("/blog/blogTagAlias")
 public class SdBlogTagAliasController extends BaseController {
 
     private final ISdBlogTagAliasService sdBlogTagAliasService;

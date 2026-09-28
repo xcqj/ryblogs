@@ -30,8 +30,10 @@ import org.dromara.common.core.domain.PageResult;
  */
 @Validated
 @RequiredArgsConstructor
-@RestController
-@RequestMapping("/blog/blogArticleTag")
+// 按 docs/blog-api.md §14：ArticleTag 关系由保存文章/标签合并等领域操作维护，不作为普通 CRUD 资源暴露。
+// 生成器产物 Controller 停用，Service/Mapper 保留供领域业务操作复用。
+//@RestController
+//@RequestMapping("/blog/blogArticleTag")
 public class SdBlogArticleTagController extends BaseController {
 
     private final ISdBlogArticleTagService sdBlogArticleTagService;
