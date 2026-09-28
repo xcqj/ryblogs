@@ -41,6 +41,11 @@ public class UserDTO implements Serializable {
     private String nickName;
 
     /**
+     * 用户头像（OSS ID）
+     */
+    private Long avatar;
+
+    /**
      * 用户类型（sys_user系统用户）
      */
     private String userType;

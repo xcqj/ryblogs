@@ -110,6 +110,8 @@ security:
     - /warm-flow-ui/config
     - /snail-chat/**
     - /api/snail/chat/**
+    # 博客公共前台 API（契约 blog-api.md §17：匿名接口统一 /blog/public/ 前缀）
+    - /blog/public/**
 
 # MyBatisPlus配置
 # https://baomidou.com/config/
