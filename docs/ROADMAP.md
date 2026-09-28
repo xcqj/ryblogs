@@ -39,14 +39,17 @@
 
 ### S0 基线固化 🔄
 
-已完成：sd-blog 模块 Maven 接入并被反应堆识别；7 张表代码生成（BO 主键齐全）；违反契约 §14 的 3 个生成 Controller 已停用；`blog-api.md` 升级 v0.2 冻结；AGENTS.md 重构。
+已完成：sd-blog 模块 Maven 接入并被反应堆识别；7 张表代码生成（BO 主键齐全）；违反契约 §14 的 3 个生成 Controller 已停用；`blog-api.md` 升级 v0.2 冻结；AGENTS.md 重构；`application.yml` springdoc 已加博客分组（packages-to-scan: org.dromara.blog）。
 
 待办：
 
-- [ ] `application.yml` springdoc `group-configs` 增加博客分组（`packages-to-scan: org.dromara.blog`）
-- [ ] 执行保留的 4 组 CRUD 菜单 SQL（已停用的 Version/TagAlias/ArticleTag 菜单不执行或清理）
-- [ ] 建 Apifox 项目，冒烟保留的 4 组生成 CRUD
+- [x] 注册开关 `sys.account.registerUser` 已置 true（2026-09-28 后台参数设置操作）
+- [x] Apifox 项目已建、Windows 侧连通验证通过；运行时 21 路径与保留 4 组 Controller 一致（2026-09-28 curl 核验）；需在 Apifox 覆盖导入清除陈旧的 ArticleTag 接口
 - [ ] git commit
+
+延后事项（不阻塞，转入 S5）：
+
+- ⏸ 停用 Controller 的 3 组残留菜单暂不清理（点击 404 属视觉噪音，无功能影响；勿分配给非管理员角色）。S5 做正式 Admin 菜单规划时与 `docs/blog_s0_cleanup.sql` 一并执行。
 
 完成标准：Swagger「博客模块」分组可见全部接口且可调用。
 
