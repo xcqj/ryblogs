@@ -91,6 +91,12 @@ Generator 定位是生成 RuoYi 风格骨架，不是完成博客业务。Entity
 - 复制模块目录时不要带上 `target/` 与 `.flattened-pom.xml` 残留；模块改名后必须 clean。
 - IDEA Maven 同步报错（未解析插件等）时，先对齐 IDEA 与命令行的 Maven home / settings.xml，再判断是不是代码问题。
 
+测试策略（切片级约定）：
+
+- 单元测试只覆盖纯逻辑（不碰数据库、不启 Spring 容器）：标签规范化、文章状态转换校验、内容变化比对（title/summary/coverUrl/content）、标签合并展平与去重的纯计算部分。这些逻辑必须实现为独立可测类（如 `TagNormalizer`、`ArticleStateMachine`），不得揉进 ServiceImpl 大方法。
+- CRUD / HTTP 链路不写 Java 单测，由 Apifox 五类用例覆盖（正向 / 鉴权失败 / 参数校验 / 资源不存在 / 越权）；Controller 层不做 mock 测试。
+- 单测与被测代码同模块 `src/test/java`，依赖根 pom 统一的 spring-boot-starter-test（JUnit5 + Mockito）。
+
 ## 9. 安全红线
 
 - 不信任前端传入的 `authorId`、权限字段、关键状态字段；作者数据权限必须后端强制校验，隔离靠服务端过滤而非前端隐藏按钮。
@@ -117,9 +123,12 @@ Generator 定位是生成 RuoYi 风格骨架，不是完成博客业务。Entity
 
 | 文档 | 内容 | 备注 |
 |---|---|---|
+| `docs/ROADMAP.md` | 开发切片排期 + 决策记录（已确认/待决策） | 开工前先查当前切片状态与待决事项；决策变更写入其 §6 |
+| `docs/SETUP.md` | 开发环境搭建：容器、SQL 最小集、启动与冒烟清单 | 新环境照此 30 分钟可跑通 |
+| `docs/architecture.md` | 系统架构：模块图、请求链路、部署拓扑、扩展边界 | 只讲结构不讲业务 |
 | `docs/PRD博客MVP需求文档_v0.2.docx` | 产品需求基线：范围、业务规则、功能需求、验收标准、已确认决策 | Word 二进制，可用 python/unzip 解出 `word/document.xml` 阅读，或转 Markdown |
 | `docs/blog-api.md` | 博客 MVP API 契约 v0.2：三层 API 边界、接口清单、权限标识、状态动作规则 | 接口实现与文档冲突时，先报告冲突再修订，不得默默偏离契约 |
 | `docs/database-design-v0.1.md` | 数据库设计：字段语义、约束、索引、生命周期、实体映射 | 文中表名为 `blog_*` 逻辑命名 |
 | `docs/blog_schema_v0.1.sql` | 实际建表 SQL | **表前缀 `sd_blog_`，以此与实际库为准** |
-| `.codex/skills/ruoyi-plus-ai-coding/` | 编码规范 skill（SKILL.md + references） | 后端/前端任务动手前先读对应 reference |
+| `.codex/skills/ruoyi-plus-ai-coding/` | 编码规范 skill（SKILL.md + references）；`.qoder/skills/` 下同名条目是指向它的符号链接（Qoder 自动加载用，勿复制出第二份） | 后端/前端任务动手前先读对应 reference |
 | `.claude/agents/backend-*.md` | 后端任务型子代理规则 | 按任务类型选用 |
