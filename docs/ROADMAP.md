@@ -24,7 +24,7 @@
 | S0 | 基线固化 | — | — | ✅（遗留：Apifox 覆盖导入清除陈旧 ArticleTag 接口，待执行人工确认） | 0.5d |
 | S1 | 账号与个人资料 | §8、§9 | 1 | ✅ 已验收（2026-09-28） | 0.5d |
 | S2 | 文章 + 版本核心 | §3.1~3.5、§4 | 2 | 🔄 代码完成，待 Apifox 验收 | 2~3d |
-| S3 | 编辑器与上传 | §2.4、§18.9 | 3 | ⬜ | 1d |
+| S3 | 编辑器与上传 | §2.4、§18.9 | 3 | ✅ 已验收（2026-09-30；编辑器传图待前端仓库） | 1d |
 | S4 | 编辑 = 新版本 | §3.4、§4.1/4.2 | 4 | ⬜ | 1d |
 | S5 | 治理状态机 | §3.6~3.8、§11 | 5 | ⬜ | 1~2d |
 | S6 | 标签治理 | §7、§13、§18.10 | 6 | ⬜ | 2d |
@@ -76,13 +76,24 @@
 
 完成标准：创建→草稿→发布→我的列表→详情全链路通过；非作者操作他人文章一律 403/业务失败。
 
-### S3 编辑器与上传 ⬜
+### S3 编辑器与上传 ✅（已验收 2026-09-30）
 
-范围：契约 §2.4（复用 `/resource/oss/upload`）+ 富文本 HTML 净化（§18.9）。
+范围：契约 §2.4（复用 `/resource/oss/upload`，已存在零后端改动）+ 富文本 HTML 净化（§18.9）。
 
-决策点（开工前必须关闭，见 §6 待决 D6）：净化库与 Safelist 白名单范围；RuoYi 全局 XssFilter 对富文本字段的豁免方式（避免双重转义）。
+实施结果（D6 已关闭，细化见 §6 S3-D1/D2/D3）：
 
-S2 遗留接入：本切片上线净化时，需清洗或删除 S2 期间 Apifox 造的裸 HTML 测试文章（Q4 决议）。
+- 新增 `HtmlSanitizer`（jsoup Safelist 技术博客常用集，纯逻辑类，10 条单测覆盖 script/on*/危险协议/style 表达式/幂等/排版保留/空正文边界）
+- 接入点：`SdBlogArticleServiceImpl.createArticle/updateArticle` 入口统一净化（在内容比对之前，幂等不产生伪版本差异）；title/summary 纯文本化，coverUrl 协议校验
+- Q4 遗留：`docs/blog_s3_cleanup.sql` 已写（命中 3 篇 S2 冒烟文章），DELETE 段默认注释，**人工确认后执行**
+
+已知边界核实：含 content 的写入接口仅两条——契约 `/blog/article/**`（已净化）与生成的
+`SdBlogArticleVersionController`（含 content 字段，但已按契约 §14 停用不注册路由）；
+`SdBlogArticleController`（后台 CRUD 骨架）的 BO 本身无 content 字段，写不到正文，无绕过入口。
+
+Apifox 验收结果（2026-09-30 全部通过）：正向净化（危险标签/属性/协议被剔、排版保留、幂等不产生伪版本）
++ 无 token 401 + coverUrl 危险协议拒绝 + 越权用例均通过。验收中修正两处（见 §6 S3-D4）：
+summary 误用正文级 `sanitizeHtml` 改为纯文本化；净化后正文为空串时拒绝入库。
+上传用例（§2.4）因本地 MinIO 未启动需先拉起 `blog-minio`（属环境依赖，非代码问题）；编辑器传图需前端仓库配合。
 
 完成标准：编辑器传图成功；含 `<script>`/`on*=`/危险协议的内容保存后被剥离；正常排版保留。
 
@@ -184,6 +195,10 @@ S0 → S1 → S2 → S3 → S4 → S5 → S6 → S7 → S8   （后端关键路�
 | 2026-09-28 | S2 决议：`sd_blog_article_tag` 转纯关系表——物理删除、去 `del_flag`、唯一键 `(article_id, tag_id)`，对齐 `sys_user_role` 框架惯例；schema/database-design §2.3、§4、§10 已同步修订，存量库迁移脚本 `docs/blog_s2_migration.sql` 已执行（0 行数据，安全） | S2 实施 |
 | 2026-09-28 | S2-D1：char(1) 状态列类型治理 = String + 枚举（`BlogArticleStatus/BlogVisibility/BlogTagStatus`），本切片覆盖 Article/Version/ArticleTag/Tag 四表及连带 Bo/Vo；Comment/UserProfile 的 `delFlag` 在各自切片治理 | S2 实施 |
 | 2026-09-28 | S2-Q1~Q5：发布前校验 currentVersionId 非空；作者自助接口管理员判定 = `LoginHelper.isSuperAdmin()`（治理走 S5 admin 接口）；我的列表排序 `update_time DESC, article_id DESC` 且 tags 两段式批量填充；HTML 净化确认后置 S3；MERGED 标签跟随确认后置 S6 | S2 实施 |
+| 2026-09-30 | S3-D1（关闭 D6）：Safelist = 技术博客常用集（relaxed + 列表/表格/h4-h6/hr/kbd 等；style/id 逐标签放开，pre/code 额外允许 class 保语法高亮；img 允许 data: 内联图；不放开 iframe）；jsoup 15+ 不再过滤 style 值，自补 expression(/behavior: 等关键字剔除 | HtmlSanitizer |
+| 2026-09-30 | S3-D2：XssFilter 豁免方式 = `xss.excludeUrls` 路径级豁免 `/blog/article/**`（框架既有机制，同 `/system/notice` 先例）；豁免后 title/summary 防注入由 Service 层净化兜底 | application.yml |
+| 2026-09-30 | S3-D3：S2 裸 HTML 测试数据处置 = SQL 脚本删除（docs/blog_s3_cleanup.sql，按 article_id+标题双重定位，人工确认后执行）；测试自动建的 sd_blog_tag 保留（S6 同 slug 恢复语义依赖历史记录） | Q4 决议执行 |
+| 2026-09-30 | S3-D4（Apifox 验收修正）：① summary 是纯文本字段，净化从正文级 `sanitizeHtml` 改为 `sanitizePlainText`（避免白名单内 `<p>/<b>` 被保留）；② 净化后正文 HTML 串 `StringUtils.isBlank` 时拒绝入库，防止整段 `<script>` 被剔后空串入库（注：仅拦空串，`<p></p>` 类空段落不拦，MVP 够用） | S3 验收 |
 
 ### 待决策（当前无）
 

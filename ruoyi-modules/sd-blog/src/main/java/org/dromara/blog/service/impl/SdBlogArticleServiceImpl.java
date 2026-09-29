@@ -37,6 +37,7 @@ import org.dromara.blog.service.ISdBlogArticleTagService;
 import org.dromara.blog.service.ISdBlogTagService;
 import org.dromara.blog.service.support.ArticleGuards;
 import org.dromara.blog.service.support.VersionPolicy;
+import org.dromara.blog.util.HtmlSanitizer;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -188,6 +189,7 @@ public class SdBlogArticleServiceImpl implements ISdBlogArticleService {
     @Transactional(rollbackFor = Exception.class)
     @Override
     public Long createArticle(BlogArticleSaveBo bo, Long userId) {
+        sanitizeIncoming(bo);
         List<SdBlogTag> tags = sdBlogTagService.resolveOrCreateByNames(bo.getTagNames());
         validateTagCount(tags);
         SdBlogArticle article = new SdBlogArticle();
@@ -217,6 +219,7 @@ public class SdBlogArticleServiceImpl implements ISdBlogArticleService {
     @Transactional(rollbackFor = Exception.class)
     @Override
     public Boolean updateArticle(Long articleId, BlogArticleSaveBo bo, Long userId) {
+        sanitizeIncoming(bo);
         SdBlogArticle article = sdBlogArticleMapper.selectById(articleId);
         ArticleGuards.requireEditable(article, userId);
         List<SdBlogTag> tags = sdBlogTagService.resolveOrCreateByNames(bo.getTagNames());
@@ -348,6 +351,32 @@ public class SdBlogArticleServiceImpl implements ISdBlogArticleService {
             throw new ServiceException("该版本不存在");
         }
         return toVersionVo(version);
+    }
+
+    /**
+     * 入库前净化（契约 §18.9 / D6）：正文白名单清洗、标题摘要纯文本化、封面协议校验。
+     * 在内容比对之前执行；jsoup 净化幂等，不会对合法内容产生伪版本差异。
+     */
+    private void sanitizeIncoming(BlogArticleSaveBo bo) {
+        bo.setTitle(HtmlSanitizer.sanitizePlainText(bo.getTitle()));
+        bo.setSummary(HtmlSanitizer.sanitizePlainText(bo.getSummary()));
+        bo.setContent(HtmlSanitizer.sanitizeHtml(bo.getContent()));
+        validateCoverUrl(bo.getCoverUrl());
+        // 净化后正文可能只剩危险标签（如整段 <script>），剥离后为空则拒绝入库
+        if (StringUtils.isBlank(bo.getContent())) {
+            throw new ServiceException("文章正文有效内容为空，请检查内容是否仅含不安全标签");
+        }
+    }
+
+    /**
+     * 封面地址仅允许 http/https 或站内相对路径，拒绝 javascript: 等危险协议
+     */
+    private void validateCoverUrl(String coverUrl) {
+        if (StringUtils.isNotBlank(coverUrl)
+            && !coverUrl.startsWith("/")
+            && !StringUtils.startsWithAny(coverUrl, "http://", "https://")) {
+            throw new ServiceException("封面地址格式不合法");
+        }
     }
 
     /**

@@ -64,6 +64,8 @@
         <!-- 工作流配置 -->
         <warm-flow.version>1.8.9</warm-flow.version>
         <liteflow.version>2.16.1.2</liteflow.version>
+        <!-- 博客富文本 HTML 净化 -->
+        <jsoup.version>1.19.1</jsoup.version>
         <!-- mqtt客户端 -->
         <mica-mqtt.version>2.6.8</mica-mqtt.version>
 
@@ -415,6 +417,13 @@
                 <groupId>org.lionsoul</groupId>
                 <artifactId>ip2region</artifactId>
                 <version>${ip2region.version}</version>
+            </dependency>
+
+            <!-- HTML 解析与净化 jsoup -->
+            <dependency>
+                <groupId>org.jsoup</groupId>
+                <artifactId>jsoup</artifactId>
+                <version>${jsoup.version}</version>
             </dependency>
 
             <!-- 系统模块 -->

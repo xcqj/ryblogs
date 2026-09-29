@@ -26,14 +26,14 @@ public class BlogArticleSaveBo implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 文章标题
+     * 文章标题（Service 层纯文本化，剥离一切标签）
      */
     @NotBlank(message = "文章标题不能为空")
     @Size(max = 200, message = "文章标题长度不能超过200个字符")
     private String title;
 
     /**
-     * 文章摘要
+     * 文章摘要（纯文本字段，Service 层纯文本化，列表/meta 场景直接当文本渲染）
      */
     @Size(max = 500, message = "文章摘要长度不能超过500个字符")
     private String summary;
@@ -45,7 +45,7 @@ public class BlogArticleSaveBo implements Serializable {
     private String coverUrl;
 
     /**
-     * 正文 HTML（净化处理在 S3 切片接入，当前原样保存）
+     * 正文 HTML（Service 层入库前经 HtmlSanitizer 白名单净化，契约 §18.9 / D6）
      */
     @NotBlank(message = "文章正文不能为空")
     private String content;

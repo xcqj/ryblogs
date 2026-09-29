@@ -125,6 +125,12 @@
             <artifactId>ruoyi-common-mcp</artifactId>
         </dependency>
 
+        <!-- 富文本 HTML 净化（契约 §18.9 / D6 决策） -->
+        <dependency>
+            <groupId>org.jsoup</groupId>
+            <artifactId>jsoup</artifactId>
+        </dependency>
+
     </dependencies>
 
 </project>

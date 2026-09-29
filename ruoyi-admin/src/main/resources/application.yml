@@ -197,6 +197,8 @@ xss:
   excludeUrls:
     - /system/notice
     - /warm-flow/save-json
+    # 博客富文本正文需要原始 HTML 直达 Service 层，由 HtmlSanitizer 白名单净化（D6），避免双重剥标签
+    - /blog/article/**
 
 --- # 分布式锁 lock4j 全局配置
 lock4j:
