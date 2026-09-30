@@ -25,7 +25,7 @@
 | S1 | 账号与个人资料 | §8、§9 | 1 | ✅ 已验收（2026-09-28） | 0.5d |
 | S2 | 文章 + 版本核心 | §3.1~3.5、§4 | 2 | 🔄 代码完成，待 Apifox 验收 | 2~3d |
 | S3 | 编辑器与上传 | §2.4、§18.9 | 3 | ✅ 已验收（2026-09-30；编辑器传图待前端仓库） | 1d |
-| S4 | 编辑 = 新版本 | §3.4、§4.1/4.2 | 4 | ⬜ | 1d |
+| S4 | 编辑 = 新版本 | §3.4、§4.1/4.2 | 4 | 🔄 代码完成，待 Apifox 验收 | 1d |
 | S5 | 治理状态机 | §3.6~3.8、§11 | 5 | ⬜ | 1~2d |
 | S6 | 标签治理 | §7、§13、§18.10 | 6 | ⬜ | 2d |
 | S7 | 评论 | §10、§12 | 8（提前） | ⬜ | 1d |
@@ -97,11 +97,19 @@ summary 误用正文级 `sanitizeHtml` 改为纯文本化；净化后正文为�
 
 完成标准：编辑器传图成功；含 `<script>`/`on*=`/危险协议的内容保存后被剥离；正常排版保留。
 
-### S4 编辑 = 新版本 ⬜
+### S4 编辑 = 新版本 🔄
 
 范围：契约 §3.4 Version 规则完整化、§4.1/4.2 历史只读、`published_at` 不随编辑更新。
 
-决策点：`version_no` 并发策略（§18.12：唯一键兜底 + 重试或提示）。
+实际盘点：§3.4/§4 的绝大部分规则已在 S2 落地（四字段比对、无变化不建版本、新版本立即生效、
+published_at 不受编辑影响、版本只读接口），S4 真正的增量是：
+
+- D11 关闭：`updateArticle` 事务内 FOR UPDATE 锁定文章行（校验通过后加锁，后续版本读取在拿锁之后），
+  消除 version_no 查-max-插竞态；DB 层双会话实证锁语义通过
+- append-only 红线护栏：`SdBlogArticleVersionServiceImpl.updateByBo/deleteWithValidByIds` 改为直接抛
+  ServiceException（无调用方的生成死代码，防将来误用复活 UPDATE/DELETE 路径；insertByBo 合法不改）
+
+验收待办（人工）：Apifox 重复保存不产生新版本、编辑已发布立即生效且 published_at 不变、旧版本内容不可变可查。
 
 完成标准：重复保存不产生新版本；编辑保存立即生效为新版本；旧版本内容不可变可查。
 
@@ -199,6 +207,7 @@ S0 → S1 → S2 → S3 → S4 → S5 → S6 → S7 → S8   （后端关键路�
 | 2026-09-30 | S3-D2：XssFilter 豁免方式 = `xss.excludeUrls` 路径级豁免 `/blog/article/**`（框架既有机制，同 `/system/notice` 先例）；豁免后 title/summary 防注入由 Service 层净化兜底 | application.yml |
 | 2026-09-30 | S3-D3：S2 裸 HTML 测试数据处置 = SQL 脚本删除（docs/blog_s3_cleanup.sql，按 article_id+标题双重定位，人工确认后执行）；测试自动建的 sd_blog_tag 保留（S6 同 slug 恢复语义依赖历史记录） | Q4 决议执行 |
 | 2026-09-30 | S3-D4（Apifox 验收修正）：① summary 是纯文本字段，净化从正文级 `sanitizeHtml` 改为 `sanitizePlainText`（避免白名单内 `<p>/<b>` 被保留）；② 净化后正文 HTML 串 `StringUtils.isBlank` 时拒绝入库，防止整段 `<script>` 被剔后空串入库（注：仅拦空串，`<p></p>` 类空段落不拦，MVP 够用） | S3 验收 |
+| 2026-09-30 | D11（关闭，S4）：version_no 并发策略 = 悲观锁——`updateArticle` 事务内 `SELECT ... FOR UPDATE` 锁定文章行，同文章并发保存串行排队、拿锁后重读最新版本再比对（彻底消除竞态且不会重复建版本）；否决“撞键重试”（事务内 catch 后继续用同一事务有风险）与“撞键提示刷新”（双击即报错体验差）；DB 唯一键 `uq_blog_article_version_no` 保留作最后兜底；同时 VersionService 生成死代码 update/delete 改为抛异常护栏（append-only 红线） | S4 实施 |
 
 ### 待决策（当前无）
 

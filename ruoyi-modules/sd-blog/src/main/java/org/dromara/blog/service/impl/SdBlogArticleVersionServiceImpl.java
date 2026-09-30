@@ -1,6 +1,7 @@
 package org.dromara.blog.service.impl;
 
 import cn.hutool.core.util.ObjectUtil;
+import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.MapstructUtils;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.core.domain.PageResult;
@@ -106,15 +107,16 @@ public class SdBlogArticleVersionServiceImpl implements ISdBlogArticleVersionSer
 
     /**
      * 修改博客文章版本历史
+     * <p>
+     * ⚠️ append-only 红线护栏（AGENTS.md §5 / 契约 §4.2）：版本快照一经写入不可修改。
+     * 本方法无业务调用方（Controller 已按契约 §14 停用），保留签名仅为防止将来误用。
      *
      * @param bo 博客文章版本历史
-     * @return 是否修改成功
+     * @return 永远抛出异常
      */
     @Override
     public Boolean updateByBo(SdBlogArticleVersionBo bo) {
-        SdBlogArticleVersion update = MapstructUtils.convert(bo, SdBlogArticleVersion.class);
-        validEntityBeforeSave(update);
-        return sdBlogArticleVersionMapper.updateById(update) > 0;
+        throw new ServiceException("文章版本为 append-only 快照，禁止修改");
     }
 
 
@@ -129,17 +131,17 @@ public class SdBlogArticleVersionServiceImpl implements ISdBlogArticleVersionSer
 
     /**
      * 校验并批量删除博客文章版本历史信息
+     * <p>
+     * ⚠️ append-only 红线护栏（AGENTS.md §5 / 契约 §4.2）：版本快照禁止删除。
+     * 本方法无业务调用方（Controller 已按契约 §14 停用），保留签名仅为防止将来误用。
      *
      * @param ids     待删除的主键集合
      * @param isValid 是否进行有效性校验
-     * @return 是否删除成功
+     * @return 永远抛出异常
      */
     @Override
     public Boolean deleteWithValidByIds(Collection<Long> ids, Boolean isValid) {
-        if (isValid) {
-            // 可在此扩展删除前业务校验
-        }
-        return sdBlogArticleVersionMapper.deleteByIds(ids) > 0;
+        throw new ServiceException("文章版本为 append-only 快照，禁止删除");
     }
 
 }

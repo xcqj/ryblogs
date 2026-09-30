@@ -209,7 +209,10 @@ public class SdBlogArticleServiceImpl implements ISdBlogArticleService {
     }
 
     /**
-     * 保存文章：内容实际变化才创建新版本并立即生效；标签始终同步（契约 §3.4）
+     * 保存文章：内容实际变化才创建新版本并立即生效；标签始终同步（契约 §3.4）。
+     * 并发策略（D11）：事务内先 FOR UPDATE 锁定文章行，同一文章的并发保存串行排队，
+     * 后一个事务拿锁后重新读到最新 currentVersionId/最大版本号，消除 version_no 竞态（§18.12）；
+     * 不同文章互不阻塞，MVP 单作者场景锁竞争几乎不存在。
      *
      * @param articleId 文章ID
      * @param bo        保存参数
@@ -222,6 +225,11 @@ public class SdBlogArticleServiceImpl implements ISdBlogArticleService {
         sanitizeIncoming(bo);
         SdBlogArticle article = sdBlogArticleMapper.selectById(articleId);
         ArticleGuards.requireEditable(article, userId);
+        // 校验通过后锁文章行，锁持有到事务提交；后续版本读取必须在拿锁之后
+        article = sdBlogArticleMapper.lambda()
+            .eq(SdBlogArticle::getArticleId, articleId)
+            .last("FOR UPDATE")
+            .one();
         List<SdBlogTag> tags = sdBlogTagService.resolveOrCreateByNames(bo.getTagNames());
         validateTagCount(tags);
         SdBlogArticleVersion current = Objects.isNull(article.getCurrentVersionId())
