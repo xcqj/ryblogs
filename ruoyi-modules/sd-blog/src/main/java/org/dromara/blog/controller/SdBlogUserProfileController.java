@@ -30,8 +30,11 @@ import org.dromara.common.core.domain.PageResult;
  */
 @Validated
 @RequiredArgsConstructor
-@RestController
-@RequestMapping("/blog/blogUserProfile")
+// 按 docs/ROADMAP.md §6 D16 决议（S7）：契约 §8 用户资料仅自助接口（/blog/user/profile），
+// 管理员裸 CRUD 改任意用户 bio 不在 MVP 范围且无审计场景，停用并清菜单（blog_s7_menu.sql）；
+// Service/Mapper 保留供 S1 资料链路复用。
+//@RestController
+//@RequestMapping("/blog/blogUserProfile")
 public class SdBlogUserProfileController extends BaseController {
 
     private final ISdBlogUserProfileService sdBlogUserProfileService;

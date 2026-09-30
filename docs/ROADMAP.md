@@ -26,9 +26,9 @@
 | S2 | 文章 + 版本核心 | §3.1~3.5、§4 | 2 | ✅ 已验收并 commit（49a8620） | 2~3d |
 | S3 | 编辑器与上传 | §2.4、§18.9 | 3 | ✅ 已验收（2026-09-30；编辑器传图待前端仓库） | 1d |
 | S4 | 编辑 = 新版本 | §3.4、§4.1/4.2 | 4 | ✅ 已验收（2026-09-30） | 1d |
-| S5 | 治理状态机 | §3.6~3.8、§11 | 5 | 🔄 代码完成，待执行菜单 SQL + Apifox 验收 | 1~2d |
-| S6 | 标签治理 | §7、§13、§18.10 | 6 | 🔄 代码完成，待执行菜单 SQL + Apifox 验收（含 §5.1，D14） | 2d |
-| S7 | 评论 | §10、§12 | 8（提前） | ⬜ | 1d |
+| S5 | 治理状态机 | §3.6~3.8、§11 | 5 | ✅ 已验收（2026-10-01，commit 9db0752） | 1~2d |
+| S6 | 标签治理 | §7、§13、§18.10 | 6 | ✅ 已验收（2026-10-01，commit 7620186；含 §5.1，D14） | 2d |
+| S7 | 评论 | §10、§12 | 8（提前） | 🔄 代码完成，待执行菜单 SQL + Apifox 验收 | 1d |
 | S8 | 搜索与阅读量 | §5.2、§6 | 9 | ⬜ | 1d |
 | S9 | 前台站 | §15 边界 | 7（后移） | ⬜（独立前端仓库） | — |
 
@@ -113,7 +113,7 @@ published_at 不受编辑影响、版本只读接口），S4 真正的增量是�
 
 完成标准：重复保存不产生新版本；编辑保存立即生效为新版本；旧版本内容不可变可查。
 
-### S5 治理状态机 🔄
+### S5 治理状态机 ✅（已验收 2026-10-01）
 
 范围：契约 §3.6 hide、§3.7 show、§3.8 delete、§11 管理员下线/恢复；publish 前置校验补全（USER_HIDDEN/ADMIN_HIDDEN 不可借 publish 公开）。
 
@@ -129,7 +129,7 @@ published_at 不受编辑影响、版本只读接口），S4 真正的增量是�
 
 完成标准：状态转换矩阵（四状态 × 六动作 × 三种角色）全部符合契约 §14 动作式 API 原则；ADMIN_HIDDEN 文章作者不可编辑不可恢复、仍可删除。
 
-### S6 标签治理 🔄
+### S6 标签治理 ✅（已验收 2026-10-01）
 
 范围：契约 §7 公共标签接口组（featured/hot/list+联想/{slug}/tag articles）、§13 管理端 rename/merge/运营更新/删除、§18.10 规范化实现；另含 §5.1 公共文章列表（D14 决议并入，与 §7.4 共用查询底座）。
 
@@ -151,9 +151,19 @@ S2 遗留接入（已落地）：
 
 完成标准：合并后无重复 ArticleTag、无多级合并链、alias 全部直指 canonical；热门标签统计只算公共可见文章。
 
-### S7 评论 ⬜
+### S7 评论 🔄
 
 范围：契约 §10 发表/公共列表、§12 管理员列表/删除。
+
+实施结果（D12/D16/D17 已关闭）：
+- 发表 `POST /blog/article/{id}/comments`（BlogArticleController）：目标文章必须 PUBLISHED+PUBLIC+未删（复用 ArticleGuards.isPublicVisible，软删自然落入"文章不存在"）；content 过 sanitizePlainText（评论纯文本口径）、净化后空拒绝；归属全部服务端固定，parent_id 恒 NULL；@RepeatSubmit 防双击
+- 公共列表 `GET /blog/public/articles/{id}/comments`：先验文章可见性防评论探测；时间升序分页（D17）；昵称翻译不复制
+- 管理端 `BlogAdminCommentController`：list（articleId/userId/keyword，无 Map params）+ 单条逻辑删；`blog:comment:list/remove` 按钮
+- Comment 生成 insert/update/delete 三写方法护栏抛异常（§10.2 不可改/不可自删）；`SdBlogCommentController` 停用（D12）；`SdBlogUserProfileController` 停用（D16）；`blog_s7_menu.sql` 含两组菜单清理，清理后全模块生成裸 CRUD 菜单归零
+- 类型治理收尾：`SdBlogComment`/`SdBlogUserProfile` 的 delFlag Boolean→String（S2-D1 最后尾巴）
+- 冒烟踩坑复现：IDEA 后台增量编译把带错 class 写进 target 使 jar 混入坏产物（运行期 Unresolved compilation problem），按 AGENTS.md §8 处方 clean 全量重编后 7/7 用例全过
+
+验收待办（人工）：① 执行 `docs/blog_s7_menu.sql` 并重新登录；② 重启 8081（IDEA 先 Rebuild）；③ Apifox 用例。
 
 完成标准：仅 PUBLISHED+PUBLIC+未删 文章可评；`parent_id` 恒为 NULL；评论不可修改；仅管理员可逻辑删除。
 
@@ -230,6 +240,8 @@ S0 → S1 → S2 → S3 → S4 → S5 → S6 → S7 → S8   （后端关键路�
 | 2026-09-30 | D13（S5 产品决议，收窄契约未写死部分）：草稿不参与隐藏/下线——作者 hide/show 仅对 PUBLISHED 生效（草稿本不进公共列表），管理员下线仅对 PUBLISHED+PUBLIC 生效；同态幂等放行（重复 hide/show/下线返回成功不改数据，adminHide 对已下线文章允许更新下线记录）；治理动作的可见性转换不改 status | S5 开工前用户确认 |
 | 2026-09-30 | D14（关闭，S6）：§5.1 公共文章列表未分配切片，经确认并入 S6 实现（与 §7.4 共用 selectPublicPage 底座，三条件内建不可绕过）；S8 只剩 §5.2 详情+§6 搜索 | S6 开工前用户确认 |
 | 2026-09-30 | D15（S6 自决项备案）：§7.4/§5.1 排序 published_at DESC, article_id DESC；§7.2 hot 默认 10 封顶 50；featured/hot 为保留路径；adminDelete 仅允许 ACTIVE 标签（MERGED 历史节点不可删，保护 alias/合并链）；重命名后同 slug 再输入经 resolveOrCreate 的 alias 分支复用 canonical | S6 实施 |
+| 2026-10-01 | D16（关闭，S7）：UserProfile 生成 CRUD 无契约接口取代——停用 `SdBlogUserProfileController`（裸 edit 可改任意用户 bio，MVP 无此场景无审计），菜单随 blog_s7_menu.sql 清理；将来若需后台查资料再按契约补接口；Service/Mapper 保留供 S1 自助链路复用 | S7 开工前用户确认 |
+| 2026-10-01 | D17（S7 自决项备案）：公共评论列表排序 create_time ASC, comment_id ASC（一级评论流时间序）；管理列表 create_time DESC；adminDelete 对已删评论报"评论不存在"（@TableLogic 过滤后不可见，不做幂等伪成功）；评论内容按纯文本 sanitizePlainText 处理（非富文本链路，与 title 同口径） | S7 实施 |
 
 ### 待决策（当前无）
 

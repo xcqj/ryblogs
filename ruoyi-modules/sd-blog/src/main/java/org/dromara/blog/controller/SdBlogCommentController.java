@@ -30,8 +30,11 @@ import org.dromara.common.core.domain.PageResult;
  */
 @Validated
 @RequiredArgsConstructor
-@RestController
-@RequestMapping("/blog/blogComment")
+// 按 docs/ROADMAP.md §6 D12 决议（S7）：生成器裸 CRUD 违反契约 §10.2（评论不可修改、用户不可自删、
+// 裸 insert 可伪造归属），已被契约接口取代——发表/公共列表 /blog/article|public/**/comments + 治理 /blog/admin/comments。
+// Controller 停用，Service/Mapper 保留复用；菜单随 blog_s7_menu.sql 清理。
+//@RestController
+//@RequestMapping("/blog/blogComment")
 public class SdBlogCommentController extends BaseController {
 
     private final ISdBlogCommentService sdBlogCommentService;

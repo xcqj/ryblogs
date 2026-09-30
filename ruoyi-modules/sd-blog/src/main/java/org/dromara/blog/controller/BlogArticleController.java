@@ -4,6 +4,8 @@ import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.dromara.blog.domain.bo.BlogArticleMyQueryBo;
 import org.dromara.blog.domain.bo.BlogArticleSaveBo;
+import org.dromara.blog.domain.bo.BlogCommentAddBo;
+import org.dromara.blog.service.ISdBlogCommentService;
 import org.dromara.blog.domain.vo.BlogArticleDetailVo;
 import org.dromara.blog.domain.vo.BlogArticleListItemVo;
 import org.dromara.blog.domain.vo.SdBlogArticleVersionVo;
@@ -45,6 +47,7 @@ import java.util.List;
 public class BlogArticleController extends BaseController {
 
     private final ISdBlogArticleService sdBlogArticleService;
+    private final ISdBlogCommentService sdBlogCommentService;
 
     /**
      * 创建文章（草稿）
@@ -169,6 +172,21 @@ public class BlogArticleController extends BaseController {
     public R<SdBlogArticleVersionVo> version(@NotNull(message = "文章ID不能为空") @PathVariable("articleId") Long articleId,
                                              @NotNull(message = "版本ID不能为空") @PathVariable("versionId") Long versionId) {
         return R.ok(sdBlogArticleService.queryVersionDetail(articleId, versionId, LoginHelper.getUserId(), LoginHelper.isSuperAdmin()));
+    }
+
+    /**
+     * 发表评论（仅要求登录；目标文章必须公共可见，归属服务端固定，parent_id 恒 NULL）
+     *
+     * @param articleId 文章ID
+     * @param bo        评论内容
+     * @return 新评论ID
+     */
+    @RepeatSubmit
+    @Log(title = "博客评论", businessType = BusinessType.INSERT)
+    @PostMapping("/{articleId}/comments")
+    public R<Long> comment(@NotNull(message = "文章ID不能为空") @PathVariable("articleId") Long articleId,
+                           @Validated @RequestBody BlogCommentAddBo bo) {
+        return R.ok(sdBlogCommentService.addComment(articleId, bo.getContent(), LoginHelper.getUserId()));
     }
 
 }
