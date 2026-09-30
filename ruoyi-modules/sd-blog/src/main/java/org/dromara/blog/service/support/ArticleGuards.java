@@ -67,7 +67,8 @@ public final class ArticleGuards {
     }
 
     /**
-     * 校验发布前置条件：仅 DRAFT 可发布，且必须已有生效版本（USER_HIDDEN/ADMIN_HIDDEN 不得借发布重新公开）
+     * 校验发布前置条件：仅 DRAFT 可发布，且必须已有生效版本且当前可见性为 PUBLIC
+     * （USER_HIDDEN/ADMIN_HIDDEN 不得借发布重新公开，只能分别由作者 show / 管理员 restore 恢复）
      *
      * @param article 文章
      * @param userId  当前登录用户ID
@@ -79,6 +80,69 @@ public final class ArticleGuards {
         }
         if (Objects.isNull(article.getCurrentVersionId())) {
             throw new ServiceException("文章没有有效版本，无法发布");
+        }
+        if (!BlogVisibility.PUBLIC.getCode().equals(article.getVisibility())) {
+            throw new ServiceException("文章处于隐藏状态，请先恢复公开后再发布");
+        }
+    }
+
+    /**
+     * 校验作者隐藏前置条件（契约 §3.6，S5 产品决议）：仅已发布文章可隐藏/重新公开，
+     * 草稿本就不进公共列表无需隐藏；ADMIN_HIDDEN 不可被作者操作
+     *
+     * @param article 文章
+     * @param userId  当前登录用户ID
+     */
+    public static void requireUserToggleVisible(SdBlogArticle article, Long userId) {
+        requireExists(article);
+        if (!isAuthor(article, userId)) {
+            throw new ServiceException("只能操作自己的文章");
+        }
+        if (!BlogArticleStatus.PUBLISHED.getCode().equals(article.getStatus())) {
+            throw new ServiceException("草稿文章无需隐藏或重新公开");
+        }
+        if (BlogVisibility.ADMIN_HIDDEN.getCode().equals(article.getVisibility())) {
+            throw new ServiceException("文章已被管理员下线，无法自行调整可见性");
+        }
+    }
+
+    /**
+     * 校验作者删除前置条件（契约 §3.8）：四种状态均可删除，仅作者本人；
+     * 管理员不可删除（MVP 治理手段仅有下线与恢复）
+     *
+     * @param article 文章
+     * @param userId  当前登录用户ID
+     */
+    public static void requireDeletable(SdBlogArticle article, Long userId) {
+        requireExists(article);
+        if (!isAuthor(article, userId)) {
+            throw new ServiceException("只能删除自己的文章");
+        }
+    }
+
+    /**
+     * 校验管理员下线前置条件（契约 §11.3，S5 产品决议）：仅对已发布且当前公开的文章生效，
+     * 草稿与 USER_HIDDEN 不属于公共治理对象
+     *
+     * @param article 文章
+     */
+    public static void requireAdminHidable(SdBlogArticle article) {
+        requireExists(article);
+        if (!BlogArticleStatus.PUBLISHED.getCode().equals(article.getStatus())
+            || !BlogVisibility.PUBLIC.getCode().equals(article.getVisibility())) {
+            throw new ServiceException("仅已公开的文章可以下线");
+        }
+    }
+
+    /**
+     * 校验管理员恢复前置条件（契约 §11.4）：仅 ADMIN_HIDDEN 可恢复
+     *
+     * @param article 文章
+     */
+    public static void requireAdminRestorable(SdBlogArticle article) {
+        requireExists(article);
+        if (!BlogVisibility.ADMIN_HIDDEN.getCode().equals(article.getVisibility())) {
+            throw new ServiceException("文章不处于管理员下线状态，无需恢复");
         }
     }
 

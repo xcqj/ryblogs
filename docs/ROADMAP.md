@@ -23,10 +23,10 @@
 |---|------|-------------|--------------|------|------|
 | S0 | 基线固化 | — | — | ✅（遗留：Apifox 覆盖导入清除陈旧 ArticleTag 接口，待执行人工确认） | 0.5d |
 | S1 | 账号与个人资料 | §8、§9 | 1 | ✅ 已验收（2026-09-28） | 0.5d |
-| S2 | 文章 + 版本核心 | §3.1~3.5、§4 | 2 | 🔄 代码完成，待 Apifox 验收 | 2~3d |
+| S2 | 文章 + 版本核心 | §3.1~3.5、§4 | 2 | ✅ 已验收并 commit（49a8620） | 2~3d |
 | S3 | 编辑器与上传 | §2.4、§18.9 | 3 | ✅ 已验收（2026-09-30；编辑器传图待前端仓库） | 1d |
-| S4 | 编辑 = 新版本 | §3.4、§4.1/4.2 | 4 | 🔄 代码完成，待 Apifox 验收 | 1d |
-| S5 | 治理状态机 | §3.6~3.8、§11 | 5 | ⬜ | 1~2d |
+| S4 | 编辑 = 新版本 | §3.4、§4.1/4.2 | 4 | ✅ 已验收（2026-09-30） | 1d |
+| S5 | 治理状态机 | §3.6~3.8、§11 | 5 | 🔄 代码完成，待执行菜单 SQL + Apifox 验收 | 1~2d |
 | S6 | 标签治理 | §7、§13、§18.10 | 6 | ⬜ | 2d |
 | S7 | 评论 | §10、§12 | 8（提前） | ⬜ | 1d |
 | S8 | 搜索与阅读量 | §5.2、§6 | 9 | ⬜ | 1d |
@@ -97,7 +97,7 @@ summary 误用正文级 `sanitizeHtml` 改为纯文本化；净化后正文为�
 
 完成标准：编辑器传图成功；含 `<script>`/`on*=`/危险协议的内容保存后被剥离；正常排版保留。
 
-### S4 编辑 = 新版本 🔄
+### S4 编辑 = 新版本 ✅（已验收 2026-09-30）
 
 范围：契约 §3.4 Version 规则完整化、§4.1/4.2 历史只读、`published_at` 不随编辑更新。
 
@@ -109,15 +109,23 @@ published_at 不受编辑影响、版本只读接口），S4 真正的增量是�
 - append-only 红线护栏：`SdBlogArticleVersionServiceImpl.updateByBo/deleteWithValidByIds` 改为直接抛
   ServiceException（无调用方的生成死代码，防将来误用复活 UPDATE/DELETE 路径；insertByBo 合法不改）
 
-验收待办（人工）：Apifox 重复保存不产生新版本、编辑已发布立即生效且 published_at 不变、旧版本内容不可变可查。
+验收结果（Apifox 全部通过）：重复保存不产生新版本、编辑立即生效且 published_at 不变、历史版本不可变可查。
 
 完成标准：重复保存不产生新版本；编辑保存立即生效为新版本；旧版本内容不可变可查。
 
-### S5 治理状态机 ⬜
+### S5 治理状态机 🔄
 
 范围：契约 §3.6 hide、§3.7 show、§3.8 delete、§11 管理员下线/恢复；publish 前置校验补全（USER_HIDDEN/ADMIN_HIDDEN 不可借 publish 公开）。
 
-决策点：生成的 Article/Tag/Comment CRUD Controller 的去留（保留为管理员临时工具，或被 `/blog/admin/*` 契约接口取代后删除）。
+实施结果（D12/D13 已关闭，见 §6）：
+
+- `ArticleGuards` 新增四个纯逻辑守卫（requireUserToggleVisible/requireDeletable/requireAdminHidable/requireAdminRestorable），守卫矩阵单测 5→8 条；同态幂等在 Service 层实现
+- 作者三接口：`POST /blog/article/{id}/hide`、`/show`、`DELETE /{id}`（逻辑删除，版本/标签/评论保留）
+- `BlogAdminArticleController` 四接口（§11.1~11.4），`blog:article:list/query/adminHide/adminRestore` 按钮权限；admin 列表 title 两段式防 N+1；恢复时清空治理字段（审计痕迹由 update_by/update_time 保留）
+- publish 补全：DRAFT+USER_HIDDEN 不得借发布转公开（必须先 show）
+- D12：`SdBlogArticleController` 注释停用；`docs/blog_s5_menu.sql` 新增 4 治理按钮 + 清理 blogArticle 及 S0 延后的 3 组残留菜单（幂等可重跑，含执行后验证段）
+
+验收待办（人工）：① 执行 `docs/blog_s5_menu.sql` 并重新登录刷新权限；② 重启 8081 加载 S5 代码（IDEA 先 Rebuild，Maven 产物与 IDEA 增量混用是已知坑）；③ Apifox 状态机矩阵用例。
 
 完成标准：状态转换矩阵（四状态 × 六动作 × 三种角色）全部符合契约 §14 动作式 API 原则；ADMIN_HIDDEN 文章作者不可编辑不可恢复、仍可删除。
 
@@ -208,6 +216,8 @@ S0 → S1 → S2 → S3 → S4 → S5 → S6 → S7 → S8   （后端关键路�
 | 2026-09-30 | S3-D3：S2 裸 HTML 测试数据处置 = SQL 脚本删除（docs/blog_s3_cleanup.sql，按 article_id+标题双重定位，人工确认后执行）；测试自动建的 sd_blog_tag 保留（S6 同 slug 恢复语义依赖历史记录） | Q4 决议执行 |
 | 2026-09-30 | S3-D4（Apifox 验收修正）：① summary 是纯文本字段，净化从正文级 `sanitizeHtml` 改为 `sanitizePlainText`（避免白名单内 `<p>/<b>` 被保留）；② 净化后正文 HTML 串 `StringUtils.isBlank` 时拒绝入库，防止整段 `<script>` 被剔后空串入库（注：仅拦空串，`<p></p>` 类空段落不拦，MVP 够用） | S3 验收 |
 | 2026-09-30 | D11（关闭，S4）：version_no 并发策略 = 悲观锁——`updateArticle` 事务内 `SELECT ... FOR UPDATE` 锁定文章行，同文章并发保存串行排队、拿锁后重读最新版本再比对（彻底消除竞态且不会重复建版本）；否决“撞键重试”（事务内 catch 后继续用同一事务有风险）与“撞键提示刷新”（双击即报错体验差）；DB 唯一键 `uq_blog_article_version_no` 保留作最后兜底；同时 VersionService 生成死代码 update/delete 改为抛异常护栏（append-only 红线） | S4 实施 |
+| 2026-09-30 | D12（关闭，S5）：生成 CRUD Controller 去留 = 停用 `SdBlogArticleController`（裸 edit/delete 绕过作者校验与状态机，已被 §3+§11 契约接口 100% 取代）；Tag/Comment 暂留作临时管理工具，S6/S7 契约接口就位后按同一模式停用；菜单清理并入 `blog_s5_menu.sql`（含 S0 延后的 3 组残留） | S5 实施 |
+| 2026-09-30 | D13（S5 产品决议，收窄契约未写死部分）：草稿不参与隐藏/下线——作者 hide/show 仅对 PUBLISHED 生效（草稿本不进公共列表），管理员下线仅对 PUBLISHED+PUBLIC 生效；同态幂等放行（重复 hide/show/下线返回成功不改数据，adminHide 对已下线文章允许更新下线记录）；治理动作的可见性转换不改 status | S5 开工前用户确认 |
 
 ### 待决策（当前无）
 

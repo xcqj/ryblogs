@@ -63,6 +63,27 @@ public class BlogArticleDetailVo implements Serializable {
     private LocalDateTime publishedAt;
 
     /**
+     * 下线原因（治理信息，仅管理员下线后非空，契约 §11.2）
+     */
+    private String adminHiddenReason;
+
+    /**
+     * 下线操作管理员ID
+     */
+    private Long adminHiddenBy;
+
+    /**
+     * 下线操作管理员昵称（实时翻译）
+     */
+    @Translation(type = TransConstant.USER_ID_TO_NAME, mapper = "adminHiddenBy")
+    private String adminHiddenByName;
+
+    /**
+     * 下线时间
+     */
+    private LocalDateTime adminHiddenTime;
+
+    /**
      * 创建时间
      */
     private LocalDateTime createTime;

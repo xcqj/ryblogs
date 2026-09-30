@@ -20,9 +20,11 @@ import org.dromara.blog.domain.SdBlogArticleVersion;
 import org.dromara.blog.domain.SdBlogTag;
 import org.dromara.blog.domain.bo.BlogArticleMyQueryBo;
 import org.dromara.blog.domain.bo.BlogArticleSaveBo;
+import org.dromara.blog.domain.bo.BlogAdminArticleQueryBo;
 import org.dromara.blog.domain.bo.SdBlogArticleBo;
 import org.dromara.blog.domain.vo.BlogArticleDetailVo;
 import org.dromara.blog.domain.vo.BlogArticleListItemVo;
+import org.dromara.blog.domain.vo.BlogAdminArticleListItemVo;
 import org.dromara.blog.domain.vo.SdBlogArticleVersionVo;
 import org.dromara.blog.domain.vo.SdBlogArticleVo;
 import org.dromara.blog.domain.vo.SdBlogTagVo;
@@ -310,6 +312,9 @@ public class SdBlogArticleServiceImpl implements ISdBlogArticleService {
         vo.setVisibility(article.getVisibility());
         vo.setViewCount(article.getViewCount());
         vo.setPublishedAt(article.getPublishedAt());
+        vo.setAdminHiddenReason(article.getAdminHiddenReason());
+        vo.setAdminHiddenBy(article.getAdminHiddenBy());
+        vo.setAdminHiddenTime(article.getAdminHiddenTime());
         vo.setCreateTime(article.getCreateTime());
         vo.setUpdateTime(article.getUpdateTime());
         if (Objects.nonNull(article.getCurrentVersionId())) {
@@ -385,6 +390,180 @@ public class SdBlogArticleServiceImpl implements ISdBlogArticleService {
             && !StringUtils.startsWithAny(coverUrl, "http://", "https://")) {
             throw new ServiceException("封面地址格式不合法");
         }
+    }
+
+    /**
+     * 作者隐藏文章（契约 §3.6）：PUBLIC → USER_HIDDEN，不改 status，同态幂等
+     */
+    @Override
+    public Boolean hideArticle(Long articleId, Long userId) {
+        SdBlogArticle article = sdBlogArticleMapper.selectById(articleId);
+        ArticleGuards.requireUserToggleVisible(article, userId);
+        if (BlogVisibility.USER_HIDDEN.getCode().equals(article.getVisibility())) {
+            return true;
+        }
+        SdBlogArticle update = new SdBlogArticle();
+        update.setArticleId(articleId);
+        update.setVisibility(BlogVisibility.USER_HIDDEN.getCode());
+        return sdBlogArticleMapper.updateById(update) > 0;
+    }
+
+    /**
+     * 作者重新公开文章（契约 §3.7）：USER_HIDDEN → PUBLIC，同态幂等；不恢复 ADMIN_HIDDEN（守卫已拦）
+     */
+    @Override
+    public Boolean showArticle(Long articleId, Long userId) {
+        SdBlogArticle article = sdBlogArticleMapper.selectById(articleId);
+        ArticleGuards.requireUserToggleVisible(article, userId);
+        if (BlogVisibility.PUBLIC.getCode().equals(article.getVisibility())) {
+            return true;
+        }
+        SdBlogArticle update = new SdBlogArticle();
+        update.setArticleId(articleId);
+        update.setVisibility(BlogVisibility.PUBLIC.getCode());
+        return sdBlogArticleMapper.updateById(update) > 0;
+    }
+
+    /**
+     * 作者删除文章（契约 §3.8）：逻辑删除 del_flag=1，版本/标签关系/评论保留，不做物理清理
+     */
+    @Override
+    public Boolean deleteByAuthor(Long articleId, Long userId) {
+        SdBlogArticle article = sdBlogArticleMapper.selectById(articleId);
+        ArticleGuards.requireDeletable(article, userId);
+        return sdBlogArticleMapper.deleteById(articleId) > 0;
+    }
+
+    /**
+     * 管理员分页查询平台文章（契约 §11.1）：可见全部状态；title 两段式批量填充防 N+1
+     */
+    @Override
+    public PageResult<BlogAdminArticleListItemVo> queryAdminPageList(BlogAdminArticleQueryBo bo, PageQuery pageQuery) {
+        LambdaQueryWrapper<SdBlogArticle> lqw = QueryBuilder.lambda(SdBlogArticle.class)
+            .eqIfPresent(SdBlogArticle::getAuthorId, bo.getAuthorId())
+            .eqIfText(SdBlogArticle::getStatus, bo.getStatus())
+            .eqIfText(SdBlogArticle::getVisibility, bo.getVisibility())
+            .orderByDesc(SdBlogArticle::getUpdateTime)
+            .orderByDesc(SdBlogArticle::getArticleId)
+            .build();
+        // 创建时间范围（显式字符串字段，MySQL 自动转 datetime 比较；支持单边）
+        if (StringUtils.isNotBlank(bo.getBeginTime())) {
+            lqw.ge(SdBlogArticle::getCreateTime, bo.getBeginTime());
+        }
+        if (StringUtils.isNotBlank(bo.getEndTime())) {
+            lqw.le(SdBlogArticle::getCreateTime, bo.getEndTime());
+        }
+        // 标题存于版本表：先按当前版本 title 匹配出 ID 集合再 in（与 §18.11 两段式同源，避免改 XML 联表）
+        if (StringUtils.isNotBlank(bo.getTitle())) {
+            List<Long> articleIds = sdBlogArticleVersionMapper.lambda()
+                .select(SdBlogArticleVersion::getArticleId)
+                .like(SdBlogArticleVersion::getTitle, bo.getTitle())
+                .list().stream().map(SdBlogArticleVersion::getArticleId).distinct().toList();
+            if (articleIds.isEmpty()) {
+                return PageResult.build(List.of(), 0);
+            }
+            lqw.in(SdBlogArticle::getArticleId, articleIds);
+        }
+        Page<SdBlogArticle> page = sdBlogArticleMapper.selectPage(pageQuery.build(), lqw);
+        List<BlogAdminArticleListItemVo> rows = page.getRecords().stream().map(this::toAdminListItem).toList();
+        fillTitles(rows);
+        return PageResult.build(rows, page.getTotal());
+    }
+
+    /**
+     * 管理员下线文章（契约 §11.3）：写治理三字段，不改 status；已下线允许更新下线记录（留最新依据），同态幂等
+     */
+    @Override
+    public Boolean adminHide(Long articleId, String reason, Long adminId) {
+        SdBlogArticle article = sdBlogArticleMapper.selectById(articleId);
+        ArticleGuards.requireExists(article);
+        if (BlogVisibility.ADMIN_HIDDEN.getCode().equals(article.getVisibility())) {
+            SdBlogArticle refresh = new SdBlogArticle();
+            refresh.setArticleId(articleId);
+            refresh.setAdminHiddenReason(reason);
+            refresh.setAdminHiddenBy(adminId);
+            refresh.setAdminHiddenTime(LocalDateTime.now());
+            return sdBlogArticleMapper.updateById(refresh) > 0;
+        }
+        ArticleGuards.requireAdminHidable(article);
+        SdBlogArticle update = new SdBlogArticle();
+        update.setArticleId(articleId);
+        update.setVisibility(BlogVisibility.ADMIN_HIDDEN.getCode());
+        update.setAdminHiddenReason(reason);
+        update.setAdminHiddenBy(adminId);
+        update.setAdminHiddenTime(LocalDateTime.now());
+        return sdBlogArticleMapper.updateById(update) > 0;
+    }
+
+    /**
+     * 管理员恢复文章（契约 §11.4）：visibility → PUBLIC，status 保持不变即重新可见；
+     * 治理字段语义为"当前下线状态"，恢复时清空（审计痕迹由 update_by/update_time 保留）
+     */
+    @Override
+    public Boolean adminRestore(Long articleId) {
+        SdBlogArticle article = sdBlogArticleMapper.selectById(articleId);
+        ArticleGuards.requireExists(article);
+        if (BlogVisibility.PUBLIC.getCode().equals(article.getVisibility())) {
+            return true;
+        }
+        ArticleGuards.requireAdminRestorable(article);
+        return sdBlogArticleMapper.lambdaUpdate()
+            .set(SdBlogArticle::getVisibility, BlogVisibility.PUBLIC.getCode())
+            .set(SdBlogArticle::getAdminHiddenReason, null)
+            .set(SdBlogArticle::getAdminHiddenBy, null)
+            .set(SdBlogArticle::getAdminHiddenTime, null)
+            .eq(SdBlogArticle::getArticleId, articleId)
+            .update();
+    }
+
+    /**
+     * 实体 → 管理员列表项
+     */
+    private BlogAdminArticleListItemVo toAdminListItem(SdBlogArticle article) {
+        BlogAdminArticleListItemVo vo = new BlogAdminArticleListItemVo();
+        vo.setArticleId(article.getArticleId());
+        vo.setAuthorId(article.getAuthorId());
+        vo.setStatus(article.getStatus());
+        vo.setVisibility(article.getVisibility());
+        vo.setViewCount(article.getViewCount());
+        vo.setPublishedAt(article.getPublishedAt());
+        vo.setCreateTime(article.getCreateTime());
+        vo.setUpdateTime(article.getUpdateTime());
+        vo.setAdminHiddenReason(article.getAdminHiddenReason());
+        vo.setAdminHiddenBy(article.getAdminHiddenBy());
+        vo.setAdminHiddenTime(article.getAdminHiddenTime());
+        return vo;
+    }
+
+    /**
+     * 批量填充当前版本标题（两段式，杜绝 N+1）
+     */
+    private void fillTitles(List<BlogAdminArticleListItemVo> rows) {
+        if (CollUtil.isEmpty(rows)) {
+            return;
+        }
+        List<Long> articleIds = rows.stream().map(BlogAdminArticleListItemVo::getArticleId).toList();
+        Map<Long, Long> articleVersionMap = new HashMap<>();
+        for (SdBlogArticle a : sdBlogArticleMapper.lambda()
+            .select(SdBlogArticle::getArticleId, SdBlogArticle::getCurrentVersionId)
+            .in(SdBlogArticle::getArticleId, articleIds).list()) {
+            if (Objects.nonNull(a.getCurrentVersionId())) {
+                articleVersionMap.put(a.getArticleId(), a.getCurrentVersionId());
+            }
+        }
+        if (articleVersionMap.isEmpty()) {
+            return;
+        }
+        Map<Long, String> titleMap = new HashMap<>();
+        for (SdBlogArticleVersion v : sdBlogArticleVersionMapper.lambda()
+            .select(SdBlogArticleVersion::getVersionId, SdBlogArticleVersion::getTitle)
+            .in(SdBlogArticleVersion::getVersionId, articleVersionMap.values()).list()) {
+            titleMap.put(v.getVersionId(), v.getTitle());
+        }
+        rows.forEach(row -> {
+            Long vid = articleVersionMap.get(row.getArticleId());
+            row.setTitle(vid == null ? null : titleMap.get(vid));
+        });
     }
 
     /**

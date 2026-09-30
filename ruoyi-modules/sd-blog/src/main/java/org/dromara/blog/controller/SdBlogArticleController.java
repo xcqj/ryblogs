@@ -30,8 +30,11 @@ import org.dromara.common.core.domain.PageResult;
  */
 @Validated
 @RequiredArgsConstructor
-@RestController
-@RequestMapping("/blog/blogArticle")
+// 按 docs/ROADMAP.md §6 D12 决议（S5）：生成器裸 CRUD 的 edit/delete 会绕过作者校验与状态机（AGENTS.md §5 红线），
+// 已被契约接口取代——作者链路 /blog/article/**（§3）+ 治理链路 /blog/admin/articles/**（§11）。
+// Controller 停用，Service/Mapper 保留复用；其菜单权限随 blog_s5_menu.sql 一并清理。
+//@RestController
+//@RequestMapping("/blog/blogArticle")
 public class SdBlogArticleController extends BaseController {
 
     private final ISdBlogArticleService sdBlogArticleService;

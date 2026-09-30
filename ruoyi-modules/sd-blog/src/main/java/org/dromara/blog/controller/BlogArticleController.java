@@ -17,6 +17,7 @@ import org.dromara.common.redis.annotation.RepeatSubmit;
 import org.dromara.common.satoken.utils.LoginHelper;
 import org.dromara.common.web.core.BaseController;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -107,6 +108,42 @@ public class BlogArticleController extends BaseController {
     @PostMapping("/{articleId}/publish")
     public R<Void> publish(@NotNull(message = "文章ID不能为空") @PathVariable("articleId") Long articleId) {
         return toAjax(sdBlogArticleService.publishArticle(articleId, LoginHelper.getUserId()));
+    }
+
+    /**
+     * 隐藏文章（PUBLISHED 且非 ADMIN_HIDDEN，PUBLIC → USER_HIDDEN，同态幂等）
+     *
+     * @param articleId 文章ID
+     * @return 操作结果
+     */
+    @Log(title = "博客文章", businessType = BusinessType.UPDATE)
+    @PostMapping("/{articleId}/hide")
+    public R<Void> hide(@NotNull(message = "文章ID不能为空") @PathVariable("articleId") Long articleId) {
+        return toAjax(sdBlogArticleService.hideArticle(articleId, LoginHelper.getUserId()));
+    }
+
+    /**
+     * 重新公开文章（USER_HIDDEN → PUBLIC，不可恢复管理员下线，同态幂等）
+     *
+     * @param articleId 文章ID
+     * @return 操作结果
+     */
+    @Log(title = "博客文章", businessType = BusinessType.UPDATE)
+    @PostMapping("/{articleId}/show")
+    public R<Void> show(@NotNull(message = "文章ID不能为空") @PathVariable("articleId") Long articleId) {
+        return toAjax(sdBlogArticleService.showArticle(articleId, LoginHelper.getUserId()));
+    }
+
+    /**
+     * 删除文章（逻辑删除，四种状态均可，仅作者本人；管理员治理仅有下线/恢复）
+     *
+     * @param articleId 文章ID
+     * @return 操作结果
+     */
+    @Log(title = "博客文章", businessType = BusinessType.DELETE)
+    @DeleteMapping("/{articleId}")
+    public R<Void> remove(@NotNull(message = "文章ID不能为空") @PathVariable("articleId") Long articleId) {
+        return toAjax(sdBlogArticleService.deleteByAuthor(articleId, LoginHelper.getUserId()));
     }
 
     /**

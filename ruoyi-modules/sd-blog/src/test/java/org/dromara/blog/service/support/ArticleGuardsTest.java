@@ -60,7 +60,7 @@ class ArticleGuardsTest {
     }
 
     @Test
-    @DisplayName("发布：仅 DRAFT 且有生效版本；已发布/无版本均拒绝")
+    @DisplayName("发布：仅 DRAFT 且有生效版本且 PUBLIC；已发布/无版本/USER_HIDDEN 均拒绝")
     void shouldControlPublish() {
         assertDoesNotThrow(() -> ArticleGuards.requirePublishable(
             article(BlogArticleStatus.DRAFT, BlogVisibility.PUBLIC, 9L), AUTHOR));
@@ -68,6 +68,57 @@ class ArticleGuardsTest {
             article(BlogArticleStatus.DRAFT, BlogVisibility.PUBLIC, null), AUTHOR));
         assertThrows(ServiceException.class, () -> ArticleGuards.requirePublishable(
             article(BlogArticleStatus.PUBLISHED, BlogVisibility.USER_HIDDEN, 9L), AUTHOR));
+        // S5 补全：DRAFT+USER_HIDDEN 不得借 publish 把状态机拧成"已发布且隐藏"，必须先 show
+        assertThrows(ServiceException.class, () -> ArticleGuards.requirePublishable(
+            article(BlogArticleStatus.DRAFT, BlogVisibility.USER_HIDDEN, 9L), AUTHOR));
+    }
+
+    @Test
+    @DisplayName("作者隐藏/重新公开：仅已发布且非 ADMIN_HIDDEN；草稿与非作者拒绝（S5 决议）")
+    void shouldControlUserToggleVisible() {
+        // 已发布 + PUBLIC/USER_HIDDEN 均可操作（具体幂等在 Service 层）
+        assertDoesNotThrow(() -> ArticleGuards.requireUserToggleVisible(
+            article(BlogArticleStatus.PUBLISHED, BlogVisibility.PUBLIC, 1L), AUTHOR));
+        assertDoesNotThrow(() -> ArticleGuards.requireUserToggleVisible(
+            article(BlogArticleStatus.PUBLISHED, BlogVisibility.USER_HIDDEN, 1L), AUTHOR));
+        // 草稿无需隐藏；管理员下线不可自行调整；非作者拒绝
+        assertThrows(ServiceException.class, () -> ArticleGuards.requireUserToggleVisible(
+            article(BlogArticleStatus.DRAFT, BlogVisibility.PUBLIC, 1L), AUTHOR));
+        assertThrows(ServiceException.class, () -> ArticleGuards.requireUserToggleVisible(
+            article(BlogArticleStatus.PUBLISHED, BlogVisibility.ADMIN_HIDDEN, 1L), AUTHOR));
+        assertThrows(ServiceException.class, () -> ArticleGuards.requireUserToggleVisible(
+            article(BlogArticleStatus.PUBLISHED, BlogVisibility.PUBLIC, 1L), OTHER));
+    }
+
+    @Test
+    @DisplayName("作者删除：四种状态均可，仅作者本人")
+    void shouldControlDelete() {
+        for (BlogVisibility v : BlogVisibility.values()) {
+            assertDoesNotThrow(() -> ArticleGuards.requireDeletable(
+                article(BlogArticleStatus.PUBLISHED, v, 1L), AUTHOR));
+        }
+        assertDoesNotThrow(() -> ArticleGuards.requireDeletable(
+            article(BlogArticleStatus.DRAFT, BlogVisibility.PUBLIC, 1L), AUTHOR));
+        assertThrows(ServiceException.class, () -> ArticleGuards.requireDeletable(
+            article(BlogArticleStatus.PUBLISHED, BlogVisibility.PUBLIC, 1L), OTHER));
+    }
+
+    @Test
+    @DisplayName("管理员下线：仅 PUBLISHED+PUBLIC；恢复：仅 ADMIN_HIDDEN（S5 决议）")
+    void shouldControlAdminActions() {
+        assertDoesNotThrow(() -> ArticleGuards.requireAdminHidable(
+            article(BlogArticleStatus.PUBLISHED, BlogVisibility.PUBLIC, 1L)));
+        assertThrows(ServiceException.class, () -> ArticleGuards.requireAdminHidable(
+            article(BlogArticleStatus.DRAFT, BlogVisibility.PUBLIC, 1L)));
+        assertThrows(ServiceException.class, () -> ArticleGuards.requireAdminHidable(
+            article(BlogArticleStatus.PUBLISHED, BlogVisibility.USER_HIDDEN, 1L)));
+
+        assertDoesNotThrow(() -> ArticleGuards.requireAdminRestorable(
+            article(BlogArticleStatus.PUBLISHED, BlogVisibility.ADMIN_HIDDEN, 1L)));
+        assertThrows(ServiceException.class, () -> ArticleGuards.requireAdminRestorable(
+            article(BlogArticleStatus.PUBLISHED, BlogVisibility.PUBLIC, 1L)));
+        assertThrows(ServiceException.class, () -> ArticleGuards.requireAdminRestorable(
+            article(BlogArticleStatus.PUBLISHED, BlogVisibility.USER_HIDDEN, 1L)));
     }
 
     @Test
