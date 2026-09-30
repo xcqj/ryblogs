@@ -48,7 +48,7 @@ public class SdBlogTagAlias extends BaseEntity {
      * 删除标志（0代表存在 1代表删除）
      */
     @TableLogic
-    private Boolean delFlag;
+    private String delFlag;
 
 
 }

@@ -30,8 +30,11 @@ import org.dromara.common.core.domain.PageResult;
  */
 @Validated
 @RequiredArgsConstructor
-@RestController
-@RequestMapping("/blog/blogTag")
+// 按 docs/ROADMAP.md §6 D12 决议（S6）：生成器裸 CRUD 直改 name/slug/status、裸批量删除会留孤儿关系，
+// 已被契约接口取代——公共 §7（/blog/public/tags/**）+ 治理 §13（/blog/admin/tags/**）；
+// Service 写方法已加护栏，本 Controller 停用，Service/Mapper 查询能力保留复用；菜单随 blog_s6_menu.sql 清理。
+//@RestController
+//@RequestMapping("/blog/blogTag")
 public class SdBlogTagController extends BaseController {
 
     private final ISdBlogTagService sdBlogTagService;

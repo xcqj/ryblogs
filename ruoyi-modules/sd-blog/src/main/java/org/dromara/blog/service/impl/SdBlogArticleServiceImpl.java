@@ -25,6 +25,7 @@ import org.dromara.blog.domain.bo.SdBlogArticleBo;
 import org.dromara.blog.domain.vo.BlogArticleDetailVo;
 import org.dromara.blog.domain.vo.BlogArticleListItemVo;
 import org.dromara.blog.domain.vo.BlogAdminArticleListItemVo;
+import org.dromara.blog.domain.vo.BlogPublicArticleListItemVo;
 import org.dromara.blog.domain.vo.SdBlogArticleVersionVo;
 import org.dromara.blog.domain.vo.SdBlogArticleVo;
 import org.dromara.blog.domain.vo.SdBlogTagVo;
@@ -514,6 +515,42 @@ public class SdBlogArticleServiceImpl implements ISdBlogArticleService {
             .set(SdBlogArticle::getAdminHiddenTime, null)
             .eq(SdBlogArticle::getArticleId, articleId)
             .update();
+    }
+
+    /**
+     * 公共文章分页（契约 §5.1 / §7.4 共用底座）：公共三条件由 selectPublicPage 强制内建，
+     * 本方法不接受任何绕过参数；标签限定集合为空时短路空页（空 in 会退化为全量，必须短接）
+     */
+    @Override
+    public PageResult<BlogPublicArticleListItemVo> queryPublicPageList(PageQuery pageQuery, Collection<Long> restrictArticleIds) {
+        if (Objects.nonNull(restrictArticleIds) && restrictArticleIds.isEmpty()) {
+            return PageResult.build(List.of(), 0);
+        }
+        Page<BlogPublicArticleListItemVo> page = sdBlogArticleMapper.selectPublicPage(pageQuery.build(), restrictArticleIds);
+        List<BlogPublicArticleListItemVo> records = page.getRecords();
+        if (CollUtil.isNotEmpty(records)) {
+            Map<Long, List<SdBlogTagVo>> tagMap = queryTagsByArticleIds(
+                records.stream().map(BlogPublicArticleListItemVo::getArticleId).toList());
+            records.forEach(item -> item.setTags(tagMap.getOrDefault(item.getArticleId(), List.of())));
+        }
+        return PageResult.build(records, page.getTotal());
+    }
+
+    /**
+     * 标签下公开文章（契约 §7.4）：先解析 canonical，再取关系表文章集合作限定分页；
+     * 无关系时传空集合由 queryPublicPageList 短路空页
+     */
+    @Override
+    public PageResult<BlogPublicArticleListItemVo> queryPublicTagArticles(String slug, PageQuery pageQuery) {
+        SdBlogTag tag = sdBlogTagService.resolveCanonicalBySlug(slug);
+        if (Objects.isNull(tag)) {
+            throw new ServiceException("标签不存在");
+        }
+        List<Long> articleIds = sdBlogArticleTagMapper.lambda()
+            .select(SdBlogArticleTag::getArticleId)
+            .eq(SdBlogArticleTag::getTagId, tag.getTagId())
+            .list().stream().map(SdBlogArticleTag::getArticleId).toList();
+        return queryPublicPageList(pageQuery, articleIds);
     }
 
     /**

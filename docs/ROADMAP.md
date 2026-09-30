@@ -27,7 +27,7 @@
 | S3 | 编辑器与上传 | §2.4、§18.9 | 3 | ✅ 已验收（2026-09-30；编辑器传图待前端仓库） | 1d |
 | S4 | 编辑 = 新版本 | §3.4、§4.1/4.2 | 4 | ✅ 已验收（2026-09-30） | 1d |
 | S5 | 治理状态机 | §3.6~3.8、§11 | 5 | 🔄 代码完成，待执行菜单 SQL + Apifox 验收 | 1~2d |
-| S6 | 标签治理 | §7、§13、§18.10 | 6 | ⬜ | 2d |
+| S6 | 标签治理 | §7、§13、§18.10 | 6 | 🔄 代码完成，待执行菜单 SQL + Apifox 验收（含 §5.1，D14） | 2d |
 | S7 | 评论 | §10、§12 | 8（提前） | ⬜ | 1d |
 | S8 | 搜索与阅读量 | §5.2、§6 | 9 | ⬜ | 1d |
 | S9 | 前台站 | §15 边界 | 7（后移） | ⬜（独立前端仓库） | — |
@@ -129,15 +129,25 @@ published_at 不受编辑影响、版本只读接口），S4 真正的增量是�
 
 完成标准：状态转换矩阵（四状态 × 六动作 × 三种角色）全部符合契约 §14 动作式 API 原则；ADMIN_HIDDEN 文章作者不可编辑不可恢复、仍可删除。
 
-### S6 标签治理 ⬜
+### S6 标签治理 🔄
 
-范围：契约 §7 公共标签接口组（featured/hot/list+联想/{slug}/tag articles）、§13 管理端 rename/merge/运营更新/删除、§18.10 规范化实现。
+范围：契约 §7 公共标签接口组（featured/hot/list+联想/{slug}/tag articles）、§13 管理端 rename/merge/运营更新/删除、§18.10 规范化实现；另含 §5.1 公共文章列表（D14 决议并入，与 §7.4 共用查询底座）。
 
 关键点：合并事务六步（契约 §13.5）+ 链式展平（A→B→C 归一为 A→C、B→C）；跨表 slug 唯一性由 Service 保证（database-design §9.5）；删除后重输同 slug 恢复原标签。
 
-S2 遗留接入（必须做，否则功能不自洽）：
-- `ISdBlogTagService.resolveOrCreateByNames` 补三件事：① MERGED 标签沿 `merged_into` 跟随到 canonical；② 已软删标签同 slug 恢复原记录而非新建；③ 新建/恢复前做 tag.slug 与 tag_alias.alias_slug 跨表冲突检查。
-- 标签合并迁移 ArticleTag 关系时注意：该表已是纯物理删除关系表（S2 决议），"重复关系逻辑删除"按新语义改为物理删除。
+S2 遗留接入（已落地）：
+- `ISdBlogTagService.resolveOrCreateByNames` 三件事已补：① MERGED 沿 merged_into 跟随；② 已软删标签同 slug 恢复原记录（新增绕过 @TableLogic 的 selectAnyBySlug/restoreByTagId）；③ 新建前 tag.slug 与 alias_slug 跨表冲突检查；并消除旧版并发撞软删键回查 null 进结果的 NPE 隐患
+- 标签合并迁移 ArticleTag 关系：重复关系按纯物理删除语义处理（S2 决议）
+
+实施结果（D14/D15 已关闭，见 §6）：
+- 新增 `TagMergeResolver` 纯逻辑（链跟随/冲突与迁移集合，4 条单测）；TagService 另三个生成写方法加护栏抛异常（同 S4 模式）
+- `BlogPublicTagController` §7 五接口 + `BlogPublicArticleController` §5.1（D14 并入）+ `BlogAdminTagController` §13 六接口（blog:tag:* 按钮，blog_s6_menu.sql 含 blogTag 裸 CRUD 菜单清理）
+- 公共文章底座 `selectPublicPage`（MPJ 联版本表，三条件内建不可绕过，§5.2/S8/S9 复用）；§7.4 实现在 article 侧避免 tag→article 循环依赖
+- `SdBlogTagAlias.delFlag` Boolean→String（S2-D1 尾巴）；`SdBlogTagController` 注释停用（D12）
+- 自决项：§7.4/§5.1 排序 published_at DESC, article_id DESC；§7.2 hot 默认 10 封顶 50；featured/hot 为保留路径（同名 slug 标签不可按 §7.3 访问，契约既定取舍）
+- 冒烟发现并修复：hot 统计 `count(at.article_id)` 在 left join 下把草稿/隐藏计入（实测 6 vs 2），改 `count(a.article_id)` 后与 §7.3 一致
+
+验收待办（人工）：① 执行 `docs/blog_s6_menu.sql` 并重新登录；② 重启 8081；③ Apifox 矩阵用例（含合并六步/alias 解析/软删恢复）。
 
 完成标准：合并后无重复 ArticleTag、无多级合并链、alias 全部直指 canonical；热门标签统计只算公共可见文章。
 
@@ -218,6 +228,8 @@ S0 → S1 → S2 → S3 → S4 → S5 → S6 → S7 → S8   （后端关键路�
 | 2026-09-30 | D11（关闭，S4）：version_no 并发策略 = 悲观锁——`updateArticle` 事务内 `SELECT ... FOR UPDATE` 锁定文章行，同文章并发保存串行排队、拿锁后重读最新版本再比对（彻底消除竞态且不会重复建版本）；否决“撞键重试”（事务内 catch 后继续用同一事务有风险）与“撞键提示刷新”（双击即报错体验差）；DB 唯一键 `uq_blog_article_version_no` 保留作最后兜底；同时 VersionService 生成死代码 update/delete 改为抛异常护栏（append-only 红线） | S4 实施 |
 | 2026-09-30 | D12（关闭，S5）：生成 CRUD Controller 去留 = 停用 `SdBlogArticleController`（裸 edit/delete 绕过作者校验与状态机，已被 §3+§11 契约接口 100% 取代）；Tag/Comment 暂留作临时管理工具，S6/S7 契约接口就位后按同一模式停用；菜单清理并入 `blog_s5_menu.sql`（含 S0 延后的 3 组残留） | S5 实施 |
 | 2026-09-30 | D13（S5 产品决议，收窄契约未写死部分）：草稿不参与隐藏/下线——作者 hide/show 仅对 PUBLISHED 生效（草稿本不进公共列表），管理员下线仅对 PUBLISHED+PUBLIC 生效；同态幂等放行（重复 hide/show/下线返回成功不改数据，adminHide 对已下线文章允许更新下线记录）；治理动作的可见性转换不改 status | S5 开工前用户确认 |
+| 2026-09-30 | D14（关闭，S6）：§5.1 公共文章列表未分配切片，经确认并入 S6 实现（与 §7.4 共用 selectPublicPage 底座，三条件内建不可绕过）；S8 只剩 §5.2 详情+§6 搜索 | S6 开工前用户确认 |
+| 2026-09-30 | D15（S6 自决项备案）：§7.4/§5.1 排序 published_at DESC, article_id DESC；§7.2 hot 默认 10 封顶 50；featured/hot 为保留路径；adminDelete 仅允许 ACTIVE 标签（MERGED 历史节点不可删，保护 alias/合并链）；重命名后同 slug 再输入经 resolveOrCreate 的 alias 分支复用 canonical | S6 实施 |
 
 ### 待决策（当前无）
 

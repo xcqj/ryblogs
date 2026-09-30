@@ -3,6 +3,7 @@ package org.dromara.blog.service;
 import org.dromara.blog.domain.vo.BlogArticleDetailVo;
 import org.dromara.blog.domain.vo.BlogArticleListItemVo;
 import org.dromara.blog.domain.vo.BlogAdminArticleListItemVo;
+import org.dromara.blog.domain.vo.BlogPublicArticleListItemVo;
 import org.dromara.blog.domain.vo.SdBlogArticleVersionVo;
 import org.dromara.blog.domain.vo.SdBlogArticleVo;
 import org.dromara.blog.domain.bo.BlogArticleMyQueryBo;
@@ -199,4 +200,24 @@ public interface ISdBlogArticleService {
      * @return 是否成功
      */
     Boolean adminRestore(Long articleId);
+
+    /**
+     * 公共文章分页（契约 §5.1 / §7.4 共用底座，S6 落地）：只返回公共可见三条件文章，
+     * 联当前版本取标题/摘要/封面，标签两段式批量填充
+     *
+     * @param pageQuery          分页参数
+     * @param restrictArticleIds 限定文章ID集合（标签下文章场景）；null 不限定，空集合返回空页
+     * @return 分页结果
+     */
+    PageResult<BlogPublicArticleListItemVo> queryPublicPageList(PageQuery pageQuery, Collection<Long> restrictArticleIds);
+
+    /**
+     * 标签下公开文章分页（契约 §7.4）：slug/alias 解析 canonical 后只返回公共可见文章；
+     * 放在文章侧实现以避免 tag→article 循环依赖（article 已依赖 tag）
+     *
+     * @param slug      标签或别名 slug
+     * @param pageQuery 分页参数
+     * @return 公共文章分页
+     */
+    PageResult<BlogPublicArticleListItemVo> queryPublicTagArticles(String slug, PageQuery pageQuery);
 }
