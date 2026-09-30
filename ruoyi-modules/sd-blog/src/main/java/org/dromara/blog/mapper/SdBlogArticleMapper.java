@@ -2,6 +2,8 @@ package org.dromara.blog.mapper;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.github.yulichang.base.MPJBaseMapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Update;
 import org.dromara.blog.domain.SdBlogArticle;
 import org.dromara.blog.domain.SdBlogArticleVersion;
 import org.dromara.blog.domain.bo.BlogArticleMyQueryBo;
@@ -48,16 +50,18 @@ public interface SdBlogArticleMapper extends BaseMapperPlus<SdBlogArticle, SdBlo
     }
 
     /**
-     * 公共文章分页（契约 §5.1 / §7.4 共用底座，S6 落地）：公共可见三条件
-     * （status=1 且 visibility=0 且未删，del_flag 由 @TableLogic 兜底）联当前生效版本；
+     * 公共文章分页（契约 §5.1 / §7.4 共用底座，S6 落地，S8 补 §5.1 的 authorId 过滤）：
+     * 公共可见三条件（status=1 且 visibility=0 且未删，del_flag 由 @TableLogic 兜底）联当前生效版本；
      * 排序 published_at 倒序（公共信息流惯例，ROADMAP S6 自决项）。
      *
      * @param page                分页对象
      * @param restrictArticleIds  限定文章ID集合（标签下文章场景）；null 或空集合表示不限定
+     * @param authorId            作者过滤（契约 §5.1/§9.2）；null 不限定
      * @return 公共文章分页结果
      */
     default Page<BlogPublicArticleListItemVo> selectPublicPage(Page<BlogPublicArticleListItemVo> page,
-                                                               Collection<Long> restrictArticleIds) {
+                                                               Collection<Long> restrictArticleIds,
+                                                               Long authorId) {
         boolean restrict = restrictArticleIds != null && !restrictArticleIds.isEmpty();
         return QueryBuilder.lambdaJoin("a", SdBlogArticle.class)
             .select("a", SdBlogArticle::getArticleId, SdBlogArticle::getAuthorId,
@@ -66,10 +70,21 @@ public interface SdBlogArticleMapper extends BaseMapperPlus<SdBlogArticle, SdBlo
             .leftJoin(SdBlogArticleVersion.class, "v", SdBlogArticleVersion::getVersionId, SdBlogArticle::getCurrentVersionId)
             .eq("a", SdBlogArticle::getStatus, BlogArticleStatus.PUBLISHED.getCode())
             .eq("a", SdBlogArticle::getVisibility, BlogVisibility.PUBLIC.getCode())
+            .eq(authorId != null, "a", SdBlogArticle::getAuthorId, authorId)
             .in(restrict, "a", SdBlogArticle::getArticleId, restrictArticleIds)
             .orderByDesc("a", SdBlogArticle::getPublishedAt)
             .orderByDesc("a", SdBlogArticle::getArticleId)
             .page(page, BlogPublicArticleListItemVo.class);
     }
+
+    /**
+     * 阅读量原子自增（契约 §5.2 / D8：同步单条 UPDATE，view_count = view_count + 1 原子安全，
+     * 不上 Redis/异步）
+     *
+     * @param articleId 文章ID
+     * @return 更新行数
+     */
+    @Update("update sd_blog_article set view_count = view_count + 1 where article_id = #{articleId} and del_flag = '0'")
+    int increaseViewCount(@Param("articleId") Long articleId);
 
 }

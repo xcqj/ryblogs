@@ -3,12 +3,14 @@ package org.dromara.blog.service;
 import org.dromara.blog.domain.vo.BlogArticleDetailVo;
 import org.dromara.blog.domain.vo.BlogArticleListItemVo;
 import org.dromara.blog.domain.vo.BlogAdminArticleListItemVo;
+import org.dromara.blog.domain.vo.BlogPublicArticleDetailVo;
 import org.dromara.blog.domain.vo.BlogPublicArticleListItemVo;
 import org.dromara.blog.domain.vo.SdBlogArticleVersionVo;
 import org.dromara.blog.domain.vo.SdBlogArticleVo;
 import org.dromara.blog.domain.bo.BlogArticleMyQueryBo;
 import org.dromara.blog.domain.bo.BlogArticleSaveBo;
 import org.dromara.blog.domain.bo.BlogAdminArticleQueryBo;
+import org.dromara.blog.domain.bo.BlogPublicArticleQueryBo;
 import org.dromara.blog.domain.bo.SdBlogArticleBo;
 import org.dromara.common.core.domain.PageResult;
 import org.dromara.common.mybatis.core.page.PageQuery;
@@ -202,14 +204,14 @@ public interface ISdBlogArticleService {
     Boolean adminRestore(Long articleId);
 
     /**
-     * 公共文章分页（契约 §5.1 / §7.4 共用底座，S6 落地）：只返回公共可见三条件文章，
-     * 联当前版本取标题/摘要/封面，标签两段式批量填充
+     * 公共文章分页（契约 §5.1 / §9.2 共用入口，S6 落地、S8 补全参数）：只返回公共可见三条件文章，
+     * 联当前版本取标题/摘要/封面，标签两段式批量填充；tagSlug 无效/无命中返回空页
      *
-     * @param pageQuery          分页参数
-     * @param restrictArticleIds 限定文章ID集合（标签下文章场景）；null 不限定，空集合返回空页
+     * @param bo        过滤条件（tagSlug/authorId）
+     * @param pageQuery 分页参数
      * @return 分页结果
      */
-    PageResult<BlogPublicArticleListItemVo> queryPublicPageList(PageQuery pageQuery, Collection<Long> restrictArticleIds);
+    PageResult<BlogPublicArticleListItemVo> queryPublicPageList(BlogPublicArticleQueryBo bo, PageQuery pageQuery);
 
     /**
      * 标签下公开文章分页（契约 §7.4）：slug/alias 解析 canonical 后只返回公共可见文章；
@@ -220,4 +222,12 @@ public interface ISdBlogArticleService {
      * @return 公共文章分页
      */
     PageResult<BlogPublicArticleListItemVo> queryPublicTagArticles(String slug, PageQuery pageQuery);
+
+    /**
+     * 公共文章详情（契约 §5.2）：非公共可见报“文章不存在”；成功打开时 view_count 原子 +1（D8）
+     *
+     * @param articleId 文章ID
+     * @return 公共详情（含当前版本与标签，不含内部状态字段）
+     */
+    BlogPublicArticleDetailVo queryPublicDetail(Long articleId);
 }

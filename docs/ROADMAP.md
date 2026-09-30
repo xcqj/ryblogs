@@ -28,8 +28,8 @@
 | S4 | 编辑 = 新版本 | §3.4、§4.1/4.2 | 4 | ✅ 已验收（2026-09-30） | 1d |
 | S5 | 治理状态机 | §3.6~3.8、§11 | 5 | ✅ 已验收（2026-10-01，commit 9db0752） | 1~2d |
 | S6 | 标签治理 | §7、§13、§18.10 | 6 | ✅ 已验收（2026-10-01，commit 7620186；含 §5.1，D14） | 2d |
-| S7 | 评论 | §10、§12 | 8（提前） | 🔄 代码完成，待执行菜单 SQL + Apifox 验收 | 1d |
-| S8 | 搜索与阅读量 | §5.2、§6 | 9 | ⬜ | 1d |
+| S7 | 评论 | §10、§12 | 8（提前） | ✅ 已验收（2026-10-01，commit 63e68bd） | 1d |
+| S8 | 搜索与阅读量 | §5.2、§6 | 9 | 🔄 代码完成，待 Apifox 验收（含 §5.1 补参、§9.2，D18） | 1d |
 | S9 | 前台站 | §15 边界 | 7（后移） | ⬜（独立前端仓库） | — |
 
 > 与 PRD §12.1 的顺序差异：评论提前到前台站之前，保证后端 API 闭环先行；
@@ -167,11 +167,22 @@ S2 遗留接入（已落地）：
 
 完成标准：仅 PUBLISHED+PUBLIC+未删 文章可评；`parent_id` 恒为 NULL；评论不可修改；仅管理员可逻辑删除。
 
-### S8 搜索与阅读量 ⬜
+### S8 搜索与阅读量 🔄
 
-范围：契约 §6 搜索（MySQL LIKE，经 ArticleSearchService 抽象隔离）、§5.2 详情 view_count+1。
+范围：契约 §6 搜索（MySQL LIKE，经 ArticleSearchService 抽象隔离）、§5.2 详情 view_count+1；
+另含 §5.1 参数补齐（S6 时只做了分页，漏了 tagSlug/authorId 契约参数，本切片修正）与 §9.2 用户公开文章（D18 并入）。
 
-决策点：阅读量实现（建议同步原子 UPDATE，MVP 不上 Redis，见待决 D8）。
+实施结果（D18/D19 已关闭）：
+- §5.2 详情：独立 `BlogPublicArticleDetailVo`（不复用作者视角 VO，不泄露 status/visibility/治理字段）；
+  非公共可见一律"文章不存在"；阅读量原子 UPDATE 自增（D8），返回库内原值+1 不二次查询
+- §6 搜索：`ArticleSearchService` 接口 + `MysqlArticleSearchService`（仅当前生效版本 title/summary/content
+  三字段 OR LIKE，D19）；ES 接入时替换实现不改契约；keyword 缺失/空串统一走 @NotBlank
+  （required=false 防止 MissingServletRequestParameterException 落入未处理 500）
+- §5.1 补 tagSlug（无效 slug → 空页，列表过滤语义）/authorId 参数；§9.2 复用同入口
+- 标签填充抽为 `ArticleTagFiller` 组件，列表/详情/搜索同源；`selectPublicPage` 底座加 authorId 参数
+- 冒烟：阅读量两次打开 1→3 与 DB 一致；搜索命中/空页/校验文案全过
+
+验收待办（人工）：重启 8081（IDEA 先 Rebuild）+ Apifox 用例（无需菜单 SQL，全部匿名接口）。
 
 完成标准：搜索仅返回公共可见文章；详情打开计数 +1；ES 替换不改变 API 契约。
 
@@ -242,6 +253,8 @@ S0 → S1 → S2 → S3 → S4 → S5 → S6 → S7 → S8   （后端关键路�
 | 2026-09-30 | D15（S6 自决项备案）：§7.4/§5.1 排序 published_at DESC, article_id DESC；§7.2 hot 默认 10 封顶 50；featured/hot 为保留路径；adminDelete 仅允许 ACTIVE 标签（MERGED 历史节点不可删，保护 alias/合并链）；重命名后同 slug 再输入经 resolveOrCreate 的 alias 分支复用 canonical | S6 实施 |
 | 2026-10-01 | D16（关闭，S7）：UserProfile 生成 CRUD 无契约接口取代——停用 `SdBlogUserProfileController`（裸 edit 可改任意用户 bio，MVP 无此场景无审计），菜单随 blog_s7_menu.sql 清理；将来若需后台查资料再按契约补接口；Service/Mapper 保留供 S1 自助链路复用 | S7 开工前用户确认 |
 | 2026-10-01 | D17（S7 自决项备案）：公共评论列表排序 create_time ASC, comment_id ASC（一级评论流时间序）；管理列表 create_time DESC；adminDelete 对已删评论报"评论不存在"（@TableLogic 过滤后不可见，不做幂等伪成功）；评论内容按纯文本 sanitizePlainText 处理（非富文本链路，与 title 同口径） | S7 实施 |
+| 2026-10-01 | D18（关闭，S8）：§9.2 用户公开文章未分配切片，经确认并入 S8（与 §5.1 共用 queryPublicPageList 入口的 authorId 过滤）；用户不存在时返回空列表（列表类语义）；同时补 S6 漏实现的 §5.1 tagSlug/authorId 参数 | S8 开工前用户确认 |
+| 2026-10-01 | D19（S8 自决项备案）：搜索字段 = 当前生效版本的 title/summary/content 三字段 OR LIKE（仅命中 current_version_id 对应版本，不含历史版本）；结果排序同 §5.1 published_at 倒序；§5.1 tagSlug 无效返回空页（区别于 §7.4 报错）；详情 viewCount 返回库内原值+1；@RequestParam 必传参数一律 required=false + @NotBlank（防参数缺失落入未处理 500） | S8 实施 |
 
 ### 待决策（当前无）
 

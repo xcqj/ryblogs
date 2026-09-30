@@ -21,10 +21,12 @@ import org.dromara.blog.domain.SdBlogTag;
 import org.dromara.blog.domain.bo.BlogArticleMyQueryBo;
 import org.dromara.blog.domain.bo.BlogArticleSaveBo;
 import org.dromara.blog.domain.bo.BlogAdminArticleQueryBo;
+import org.dromara.blog.domain.bo.BlogPublicArticleQueryBo;
 import org.dromara.blog.domain.bo.SdBlogArticleBo;
 import org.dromara.blog.domain.vo.BlogArticleDetailVo;
 import org.dromara.blog.domain.vo.BlogArticleListItemVo;
 import org.dromara.blog.domain.vo.BlogAdminArticleListItemVo;
+import org.dromara.blog.domain.vo.BlogPublicArticleDetailVo;
 import org.dromara.blog.domain.vo.BlogPublicArticleListItemVo;
 import org.dromara.blog.domain.vo.SdBlogArticleVersionVo;
 import org.dromara.blog.domain.vo.SdBlogArticleVo;
@@ -39,6 +41,7 @@ import org.dromara.blog.service.ISdBlogArticleService;
 import org.dromara.blog.service.ISdBlogArticleTagService;
 import org.dromara.blog.service.ISdBlogTagService;
 import org.dromara.blog.service.support.ArticleGuards;
+import org.dromara.blog.service.support.ArticleTagFiller;
 import org.dromara.blog.service.support.VersionPolicy;
 import org.dromara.blog.util.HtmlSanitizer;
 
@@ -67,6 +70,7 @@ public class SdBlogArticleServiceImpl implements ISdBlogArticleService {
     private final SdBlogTagMapper sdBlogTagMapper;
     private final ISdBlogTagService sdBlogTagService;
     private final ISdBlogArticleTagService sdBlogArticleTagService;
+    private final ArticleTagFiller articleTagFiller;
 
     /**
      * 查询博客文章
@@ -518,15 +522,64 @@ public class SdBlogArticleServiceImpl implements ISdBlogArticleService {
     }
 
     /**
-     * 公共文章分页（契约 §5.1 / §7.4 共用底座）：公共三条件由 selectPublicPage 强制内建，
-     * 本方法不接受任何绕过参数；标签限定集合为空时短路空页（空 in 会退化为全量，必须短接）
+     * 公共文章分页（契约 §5.1 / §9.2 共用入口）：tagSlug 解析 canonical 后取关系集合作限定，
+     * 无效 slug/无命中返回空页（列表过滤语义，不报错）；本方法不接受任何绕过三条件的参数
      */
     @Override
-    public PageResult<BlogPublicArticleListItemVo> queryPublicPageList(PageQuery pageQuery, Collection<Long> restrictArticleIds) {
+    public PageResult<BlogPublicArticleListItemVo> queryPublicPageList(BlogPublicArticleQueryBo bo, PageQuery pageQuery) {
+        Collection<Long> restrictIds = null;
+        if (StringUtils.isNotBlank(bo.getTagSlug())) {
+            SdBlogTag tag = sdBlogTagService.resolveCanonicalBySlug(bo.getTagSlug().trim());
+            if (Objects.isNull(tag)) {
+                return PageResult.build(List.of(), 0);
+            }
+            restrictIds = queryArticleIdsByTag(tag.getTagId());
+        }
+        return doPublicPage(restrictIds, bo.getAuthorId(), pageQuery);
+    }
+
+    /**
+     * 标签下公开文章（契约 §7.4）：无法解析报错（详情页语义，区别于 §5.1 过滤）
+     */
+    @Override
+    public PageResult<BlogPublicArticleListItemVo> queryPublicTagArticles(String slug, PageQuery pageQuery) {
+        SdBlogTag tag = sdBlogTagService.resolveCanonicalBySlug(slug);
+        if (Objects.isNull(tag)) {
+            throw new ServiceException("标签不存在");
+        }
+        return doPublicPage(queryArticleIdsByTag(tag.getTagId()), null, pageQuery);
+    }
+
+    /**
+     * 公共文章详情（契约 §5.2）：验证可见后原子 +1，返回库内原值 +1（不二次查询）
+     */
+    @Override
+    public BlogPublicArticleDetailVo queryPublicDetail(Long articleId) {
+        SdBlogArticle article = sdBlogArticleMapper.selectById(articleId);
+        if (Objects.isNull(article) || !ArticleGuards.isPublicVisible(article)) {
+            throw new ServiceException("文章不存在");
+        }
+        sdBlogArticleMapper.increaseViewCount(articleId);
+        BlogPublicArticleDetailVo vo = new BlogPublicArticleDetailVo();
+        vo.setArticleId(article.getArticleId());
+        vo.setAuthorId(article.getAuthorId());
+        vo.setPublishedAt(article.getPublishedAt());
+        vo.setViewCount(Objects.isNull(article.getViewCount()) ? 1L : article.getViewCount() + 1);
+        if (Objects.nonNull(article.getCurrentVersionId())) {
+            vo.setCurrentVersion(toVersionVo(sdBlogArticleVersionMapper.selectById(article.getCurrentVersionId())));
+        }
+        vo.setTags(queryTagsByArticleIds(List.of(articleId)).getOrDefault(articleId, List.of()));
+        return vo;
+    }
+
+    /**
+     * 公共分页底座（三条件由 selectPublicPage 内建；限定集合为空时短路空页，空 in 会退化为全量）
+     */
+    private PageResult<BlogPublicArticleListItemVo> doPublicPage(Collection<Long> restrictArticleIds, Long authorId, PageQuery pageQuery) {
         if (Objects.nonNull(restrictArticleIds) && restrictArticleIds.isEmpty()) {
             return PageResult.build(List.of(), 0);
         }
-        Page<BlogPublicArticleListItemVo> page = sdBlogArticleMapper.selectPublicPage(pageQuery.build(), restrictArticleIds);
+        Page<BlogPublicArticleListItemVo> page = sdBlogArticleMapper.selectPublicPage(pageQuery.build(), restrictArticleIds, authorId);
         List<BlogPublicArticleListItemVo> records = page.getRecords();
         if (CollUtil.isNotEmpty(records)) {
             Map<Long, List<SdBlogTagVo>> tagMap = queryTagsByArticleIds(
@@ -537,20 +590,13 @@ public class SdBlogArticleServiceImpl implements ISdBlogArticleService {
     }
 
     /**
-     * 标签下公开文章（契约 §7.4）：先解析 canonical，再取关系表文章集合作限定分页；
-     * 无关系时传空集合由 queryPublicPageList 短路空页
+     * 取标签下的全部文章ID（关系集合，供公共分页限定；含非公共文章，由底座三条件再过滤）
      */
-    @Override
-    public PageResult<BlogPublicArticleListItemVo> queryPublicTagArticles(String slug, PageQuery pageQuery) {
-        SdBlogTag tag = sdBlogTagService.resolveCanonicalBySlug(slug);
-        if (Objects.isNull(tag)) {
-            throw new ServiceException("标签不存在");
-        }
-        List<Long> articleIds = sdBlogArticleTagMapper.lambda()
+    private List<Long> queryArticleIdsByTag(Long tagId) {
+        return sdBlogArticleTagMapper.lambda()
             .select(SdBlogArticleTag::getArticleId)
-            .eq(SdBlogArticleTag::getTagId, tag.getTagId())
+            .eq(SdBlogArticleTag::getTagId, tagId)
             .list().stream().map(SdBlogArticleTag::getArticleId).toList();
-        return queryPublicPageList(pageQuery, articleIds);
     }
 
     /**
@@ -680,38 +726,13 @@ public class SdBlogArticleServiceImpl implements ISdBlogArticleService {
     }
 
     /**
-     * 按文章ID集合批量查询标签，分组返回
+     * 按文章ID集合批量查询标签，分组返回（委托 ArticleTagFiller，与搜索链路同源）
      *
      * @param articleIds 文章ID集合
      * @return 文章ID → 标签VO列表
      */
     private Map<Long, List<SdBlogTagVo>> queryTagsByArticleIds(List<Long> articleIds) {
-        if (CollUtil.isEmpty(articleIds)) {
-            return Map.of();
-        }
-        List<SdBlogArticleTag> relations = sdBlogArticleTagMapper.lambda()
-            .in(SdBlogArticleTag::getArticleId, articleIds)
-            .list();
-        if (CollUtil.isEmpty(relations)) {
-            return Map.of();
-        }
-        List<Long> tagIds = relations.stream().map(SdBlogArticleTag::getTagId).distinct().toList();
-        Map<Long, SdBlogTagVo> tagVoMap = new HashMap<>();
-        for (SdBlogTag tag : sdBlogTagMapper.lambda().in(SdBlogTag::getTagId, tagIds).list()) {
-            SdBlogTagVo vo = new SdBlogTagVo();
-            vo.setTagId(tag.getTagId());
-            vo.setName(tag.getName());
-            vo.setSlug(tag.getSlug());
-            tagVoMap.put(tag.getTagId(), vo);
-        }
-        Map<Long, List<SdBlogTagVo>> result = new HashMap<>();
-        for (SdBlogArticleTag rel : relations) {
-            SdBlogTagVo vo = tagVoMap.get(rel.getTagId());
-            if (Objects.nonNull(vo)) {
-                result.computeIfAbsent(rel.getArticleId(), k -> new ArrayList<>()).add(vo);
-            }
-        }
-        return result;
+        return articleTagFiller.queryTagsByArticleIds(articleIds);
     }
 
 }
