@@ -255,6 +255,7 @@ S0 → S1 → S2 → S3 → S4 → S5 → S6 → S7 → S8   （后端关键路�
 | 2026-10-01 | D17（S7 自决项备案）：公共评论列表排序 create_time ASC, comment_id ASC（一级评论流时间序）；管理列表 create_time DESC；adminDelete 对已删评论报"评论不存在"（@TableLogic 过滤后不可见，不做幂等伪成功）；评论内容按纯文本 sanitizePlainText 处理（非富文本链路，与 title 同口径） | S7 实施 |
 | 2026-10-01 | D18（关闭，S8）：§9.2 用户公开文章未分配切片，经确认并入 S8（与 §5.1 共用 queryPublicPageList 入口的 authorId 过滤）；用户不存在时返回空列表（列表类语义）；同时补 S6 漏实现的 §5.1 tagSlug/authorId 参数 | S8 开工前用户确认 |
 | 2026-10-01 | D19（S8 自决项备案）：搜索字段 = 当前生效版本的 title/summary/content 三字段 OR LIKE（仅命中 current_version_id 对应版本，不含历史版本）；结果排序同 §5.1 published_at 倒序；§5.1 tagSlug 无效返回空页（区别于 §7.4 报错）；详情 viewCount 返回库内原值+1；@RequestParam 必传参数一律 required=false + @NotBlank（防参数缺失落入未处理 500） | S8 实施 |
+| 2026-10-01 | D20（S8 后死代码治理，含第二批执行完毕）：7 组生成 Controller + BlogHelloController 已物理删除；第二批瘦身已执行：Version/Alias Service 整类删、ArticleTagService 仅留 syncArticleTags、Article/Tag/Comment/UserProfile 生成 CRUD 方法及其 impl 删除（Tag.queryById 保留§13.2）、6 个 SdBlog*Bo 删除（TagBo 保留）；**例外：mapper/blog/ 下 7 个 XML 按用户决定保留**（头注释改为说明性）；Entity/Mapper/Vo 因 BaseMapperPlus 泛型绑定保留；护栏方法已随删除由编译期阻断接替。回归：单测 32/32、clean package、冒烟公共 200/鉴权 401/swagger 31 paths 接口面零变化 | S8 后清理 |
 
 ### 待决策（当前无）
 

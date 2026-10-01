@@ -3,4 +3,5 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="org.dromara.blog.mapper.SdBlogTagAliasMapper">
+  <!-- 空壳XML：本模块无自定义XML SQL，联表查询统一走 MPJ default 方法（QueryBuilder.lambdaJoin 惯例） -->
 </mapper>

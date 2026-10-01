@@ -2,7 +2,6 @@ package org.dromara.blog.service.impl;
 
 import cn.hutool.core.util.ObjectUtil;
 import org.dromara.common.core.exception.ServiceException;
-import org.dromara.common.core.utils.MapstructUtils;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.core.domain.PageResult;
 import org.dromara.common.mybatis.core.page.PageQuery;
@@ -34,7 +33,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.Collection;
 import java.util.stream.Collectors;
 
 /**
@@ -61,100 +59,6 @@ public class SdBlogTagServiceImpl implements ISdBlogTagService {
     @Override
     public SdBlogTagVo queryById(Long tagId) {
         return sdBlogTagMapper.selectVoById(tagId);
-    }
-
-    /**
-     * 分页查询博客标签列表
-     *
-     * @param bo        查询条件
-     * @param pageQuery 分页参数
-     * @return 博客标签分页列表
-     */
-    @Override
-    public PageResult<SdBlogTagVo> queryPageList(SdBlogTagBo bo, PageQuery pageQuery) {
-        LambdaQueryWrapper<SdBlogTag> lqw = buildQueryWrapper(bo);
-        Page<SdBlogTagVo> result = sdBlogTagMapper.selectVoPage(pageQuery.build(), lqw);
-        return PageResult.build(result.getRecords(), result.getTotal());
-    }
-
-    /**
-     * 查询符合条件的博客标签列表
-     *
-     * @param bo 查询条件
-     * @return 博客标签列表
-     */
-    @Override
-    public List<SdBlogTagVo> queryList(SdBlogTagBo bo) {
-        LambdaQueryWrapper<SdBlogTag> lqw = buildQueryWrapper(bo);
-        return sdBlogTagMapper.selectVoList(lqw);
-    }
-
-
-    private LambdaQueryWrapper<SdBlogTag> buildQueryWrapper(SdBlogTagBo bo) {
-        Map<String, Object> params = bo.getParams();
-        return QueryBuilder.lambda(SdBlogTag.class)
-            .likeIfText(SdBlogTag::getName, bo.getName())
-            .eqIfText(SdBlogTag::getSlug, bo.getSlug())
-            .eqIfPresent(SdBlogTag::getStatus, bo.getStatus())
-            .eqIfPresent(SdBlogTag::getMergedInto, bo.getMergedInto())
-            .eqIfPresent(SdBlogTag::getIsFeatured, bo.getIsFeatured())
-            .eqIfPresent(SdBlogTag::getSortOrder, bo.getSortOrder())
-            .eqIfPresent(SdBlogTag::getCreateBy, bo.getCreateBy())
-            .betweenParams(SdBlogTag::getCreateTime, params, "beginCreateTime", "endCreateTime")
-            .orderByAsc(SdBlogTag::getTagId)
-            .build();
-    }
-
-    /**
-     * 新增博客标签
-     * <p>
-     * ⚠️ 护栏：标签写入必须走领域链路（resolveOrCreateByNames / rename / merge / updateOps），
-     * 生成器裸 insert 无跨表 slug 冲突检查与规范化，Controller 停用后无合法调用方。
-     *
-     * @param bo 博客标签
-     * @return 永远抛出异常
-     */
-    @Override
-    public Boolean insertByBo(SdBlogTagBo bo) {
-        throw new ServiceException("标签请通过文章保存自动创建或管理端治理接口操作");
-    }
-
-    /**
-     * 修改博客标签
-     * <p>
-     * ⚠️ 护栏：契约 §13.3 禁止普通更新直改 name/slug/status/mergedInto，
-     * 治理动作必须走专用接口（rename/merge/updateOps）。
-     *
-     * @param bo 博客标签
-     * @return 永远抛出异常
-     */
-    @Override
-    public Boolean updateByBo(SdBlogTagBo bo) {
-        throw new ServiceException("标签名称/状态/合并关系必须通过重命名、合并或运营属性接口操作");
-    }
-
-
-
-    /**
-     * 保存前的数据校验
-     */
-    private void validEntityBeforeSave(SdBlogTag entity) {
-        // 可在此扩展通用业务校验
-    }
-
-
-    /**
-     * 校验并批量删除博客标签信息
-     * <p>
-     * ⚠️ 护栏：删除必须走 adminDelete（解除关系 + 状态前置校验），裸批量删会留下孤儿关系。
-     *
-     * @param ids     待删除的主键集合
-     * @param isValid 是否进行有效性校验
-     * @return 永远抛出异常
-     */
-    @Override
-    public Boolean deleteWithValidByIds(Collection<Long> ids, Boolean isValid) {
-        throw new ServiceException("标签删除请通过管理端专用接口操作");
     }
 
     /**
