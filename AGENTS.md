@@ -91,6 +91,7 @@ Generator 定位是生成 RuoYi 风格骨架，不是完成博客业务。Entity
 - mapstruct-plus 的转换器类是**编译期生成**的。运行时报 `ConvertException: cannot find converter` 大概率不是代码问题，而是 IDEA 增量编译与 Maven 产物混用导致生成类缺失——先 `mvn clean` 全量重编 + IDEA Rebuild，再排查源码。
 - 复制模块目录时不要带上 `target/` 与 `.flattened-pom.xml` 残留；模块改名后必须 clean。
 - IDEA Maven 同步报错（未解析插件等）时，先对齐 IDEA 与命令行的 Maven home / settings.xml，再判断是不是代码问题。
+- ⚠️ **不要在父目录（多仓库同级的上层目录，如 `sd-blog/`）执行 `mvn`**：会在不受任何 `.gitignore` 保护的父目录落下游离 `target/`（mapstruct-plus 编译期产物）长期残留成噪音；构建一律在 `RuoYi-Vue-Plus/` 目录内执行（`./mvnw` 或 `mvn`）。详见 `docs/SETUP.md` §10.3。
 
 测试策略（切片级约定）：
 

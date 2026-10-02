@@ -131,7 +131,7 @@ git clone git@github.com:xcqj/ryblogs-ui.git  plus-ui
 跨仓库共享物只有这一个 workspace 文件，**由后端仓库托管**——因为后端是所有前端的公共依赖，它不会依赖任何前端而存在。
 
 > ⚠️ 由此带来一条约束：**不要在父目录执行 `mvn`**。那会在父目录落下无人管理的游离 `target/`（mapstruct-plus 编译期产物），
-> 而父目录不受任何 `.gitignore` 保护，会长期残留成噪音。构建一律在 `RuoYi-Vue-Plus/` 目录内执行（`./mvnw` 或 `mvn`）。
+> 而父目录不受任何 `.gitignore` 保护，会长期残留成噪音。构建一律在 `RuoYi-Vue-Plus/` 目录内执行（`./mvnw` 或 `mvn`）。此约束已升格为 `AGENTS.md` §8 构建红线。
 
 ### 10.4 新增前端仓库时的约定（PC 博客前台已确认，移动端暂不纳入）
 

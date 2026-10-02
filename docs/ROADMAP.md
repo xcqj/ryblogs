@@ -21,7 +21,7 @@
 
 | # | 切片 | 主要契约章节 | 对应 PRD 切片 | 状态 | 粗估 |
 |---|------|-------------|--------------|------|------|
-| S0 | 基线固化 | — | — | ✅（遗留：Apifox 覆盖导入清除陈旧 ArticleTag 接口，待执行人工确认） | 0.5d |
+| S0 | 基线固化 | — | — | ✅（遗留已清：Apifox 陈旧 ArticleTag 接口已覆盖导入清除；git commit = c96e59d） | 0.5d |
 | S1 | 账号与个人资料 | §8、§9 | 1 | ✅ 已验收（2026-09-28） | 0.5d |
 | S2 | 文章 + 版本核心 | §3.1~3.5、§4 | 2 | ✅ 已验收并 commit（49a8620） | 2~3d |
 | S3 | 编辑器与上传 | §2.4、§18.9 | 3 | ✅ 已验收（2026-09-30；编辑器传图待前端仓库） | 1d |
@@ -29,7 +29,7 @@
 | S5 | 治理状态机 | §3.6~3.8、§11 | 5 | ✅ 已验收（2026-10-01，commit 9db0752） | 1~2d |
 | S6 | 标签治理 | §7、§13、§18.10 | 6 | ✅ 已验收（2026-10-01，commit 7620186；含 §5.1，D14） | 2d |
 | S7 | 评论 | §10、§12 | 8（提前） | ✅ 已验收（2026-10-01，commit 63e68bd） | 1d |
-| S8 | 搜索与阅读量 | §5.2、§6 | 9 | 🔄 代码完成，待 Apifox 验收（含 §5.1 补参、§9.2，D18） | 1d |
+| S8 | 搜索与阅读量 | §5.2、§6 | 9 | ✅ 已验收（2026-10-03，commit 0dfa282；含 §5.1 补参、§9.2，D18） | 1d |
 | S9 | 前台站 | §15 边界 | 7（后移） | ⬜（独立仓库 `ryblogs-web` → 本地 `blog-web`，D21） | — |
 
 > 与 PRD §12.1 的顺序差异：评论提前到前台站之前，保证后端 API 闭环先行；
@@ -44,8 +44,8 @@
 待办：
 
 - [x] 注册开关 `sys.account.registerUser` 已置 true（2026-09-28 后台参数设置操作）
-- [x] Apifox 项目已建、Windows 侧连通验证通过；运行时 21 路径与保留 4 组 Controller 一致（2026-09-28 curl 核验）；需在 Apifox 覆盖导入清除陈旧的 ArticleTag 接口
-- [ ] git commit
+- [x] Apifox 项目已建、Windows 侧连通验证通过；运行时 21 路径与保留 4 组 Controller 一致（2026-09-28 curl 核验）；已在 Apifox 覆盖导入清除陈旧的 ArticleTag 接口（2026-10-03）
+- [x] git commit（c96e59d S0 状态收尾）
 
 延后事项（不阻塞，转入 S5）：
 
@@ -84,7 +84,7 @@
 
 - 新增 `HtmlSanitizer`（jsoup Safelist 技术博客常用集，纯逻辑类，10 条单测覆盖 script/on*/危险协议/style 表达式/幂等/排版保留/空正文边界）
 - 接入点：`SdBlogArticleServiceImpl.createArticle/updateArticle` 入口统一净化（在内容比对之前，幂等不产生伪版本差异）；title/summary 纯文本化，coverUrl 协议校验
-- Q4 遗留：`docs/blog_s3_cleanup.sql` 已写（命中 3 篇 S2 冒烟文章），DELETE 段默认注释，**人工确认后执行**
+- Q4 遗留：`docs/blog_s3_cleanup.sql`（命中 3 篇 S2 冒烟文章）DELETE 段已于 2026-10-03 人工确认后执行
 
 已知边界核实：含 content 的写入接口仅两条——契约 `/blog/article/**`（已净化）与生成的
 `SdBlogArticleVersionController`（含 content 字段，但已按契约 §14 停用不注册路由）；
@@ -167,7 +167,7 @@ S2 遗留接入（已落地）：
 
 完成标准：仅 PUBLISHED+PUBLIC+未删 文章可评；`parent_id` 恒为 NULL；评论不可修改；仅管理员可逻辑删除。
 
-### S8 搜索与阅读量 🔄
+### S8 搜索与阅读量 ✅（已验收 2026-10-03）
 
 范围：契约 §6 搜索（MySQL LIKE，经 ArticleSearchService 抽象隔离）、§5.2 详情 view_count+1；
 另含 §5.1 参数补齐（S6 时只做了分页，漏了 tagSlug/authorId 契约参数，本切片修正）与 §9.2 用户公开文章（D18 并入）。
@@ -182,7 +182,7 @@ S2 遗留接入（已落地）：
 - 标签填充抽为 `ArticleTagFiller` 组件，列表/详情/搜索同源；`selectPublicPage` 底座加 authorId 参数
 - 冒烟：阅读量两次打开 1→3 与 DB 一致；搜索命中/空页/校验文案全过
 
-验收待办（人工）：重启 8081（IDEA 先 Rebuild）+ Apifox 用例（无需菜单 SQL，全部匿名接口）。
+验收（人工，2026-10-03 已完成）：重启 8081（IDEA 先 Rebuild）+ Apifox 五类用例全部通过（§5.1 补参 / §5.2 详情 / §6 搜索 / §9.2，全部匿名接口，无需菜单 SQL）。
 
 完成标准：搜索仅返回公共可见文章；详情打开计数 +1；ES 替换不改变 API 契约。
 
@@ -192,6 +192,19 @@ S2 遗留接入（已落地）：
 建仓后需向 `tooling/blog.code-workspace` 的 `folders` 追加 `"../../blog-web"`，并照 `plus-ui/AGENTS.md` 形式自带 AGENTS.md（只调公共与登录用户两层 API）。布局约定见 `docs/SETUP.md` §10。
 
 依赖：S2（文章接口）+ S6（标签）+ S8（搜索）为最低可启动集；alias→canonical 的 301 由前台/边缘层负责（契约 §7.3）。
+
+### 一次性 SQL 脚本执行状态（docs/）
+
+> 下列迁移 / 清理 / 菜单脚本均为一次性执行，截至 2026-10-03 已全部在 `ry-vue` 库执行完毕，在此登记以免被误当作待办或重复执行。建表基线 `blog_schema_v0.1.sql` 属环境初始化（见 SETUP §3），不列入本表。
+
+| 脚本 | 用途 | 状态 |
+|---|---|---|
+| `blog_s0_cleanup.sql` | 停用 Controller 菜单清理 + 开放注册开关（转 S5 执行） | ✅ 已执行（2026-10-03） |
+| `blog_s2_migration.sql` | `sd_blog_article_tag` 转纯关系表迁移 | ✅ 已执行（S2 时，0 行数据安全） |
+| `blog_s3_cleanup.sql` | 清除 S2 冒烟测试文章（DELETE 段） | ✅ 已执行（2026-10-03 人工确认后） |
+| `blog_s5_menu.sql` | S5 管理员文章治理按钮 + 残留菜单清理 | ✅ 已执行（2026-10-03） |
+| `blog_s6_menu.sql` | S6 标签治理按钮 + Tag 裸 CRUD 菜单清理 | ✅ 已执行（2026-10-03） |
+| `blog_s7_menu.sql` | S7 评论治理按钮 + Comment/UserProfile 菜单清理 | ✅ 已执行（2026-10-03） |
 
 ## 4. 关键路径与并行
 
@@ -260,6 +273,7 @@ S0 → S1 → S2 → S3 → S4 → S5 → S6 → S7 → S8   （后端关键路�
 | 2026-10-01 | D19（S8 自决项备案）：搜索字段 = 当前生效版本的 title/summary/content 三字段 OR LIKE（仅命中 current_version_id 对应版本，不含历史版本）；结果排序同 §5.1 published_at 倒序；§5.1 tagSlug 无效返回空页（区别于 §7.4 报错）；详情 viewCount 返回库内原值+1；@RequestParam 必传参数一律 required=false + @NotBlank（防参数缺失落入未处理 500） | S8 实施 |
 | 2026-10-01 | D20（S8 后死代码治理，含第二批执行完毕）：7 组生成 Controller + BlogHelloController 已物理删除；第二批瘦身已执行：Version/Alias Service 整类删、ArticleTagService 仅留 syncArticleTags、Article/Tag/Comment/UserProfile 生成 CRUD 方法及其 impl 删除（Tag.queryById 保留§13.2）、6 个 SdBlog*Bo 删除（TagBo 保留）；**例外：mapper/blog/ 下 7 个 XML 按用户决定保留**（头注释改为说明性）；Entity/Mapper/Vo 因 BaseMapperPlus 泛型绑定保留；护栏方法已随删除由编译期阻断接替。回归：单测 32/32、clean package、冒烟公共 200/鉴权 401/swagger 31 paths 接口面零变化 | S8 后清理 |
 | 2026-10-03 | D21（端与仓库拓扑）：确认 **PC 博客前台（普通用户看到的站点）= 第三个独立代码仓库**，GitHub `ryblogs-web`、本地目录 `blog-web`，与现有两仓库同级 clone；它只调 `/blog/public/**` 与 `/blog/article·user/**` 两层，不得访问 `/blog/admin/**`；公知事实：公共接口不区分客户端，因此新增前端不需后端改接口。**移动端暂不纳入 MVP**（形态未定，将来讨论从 SETUP §10.4 该行接回，不预先设计）。多根工作区唯一权威副本由**后端仓库托管**（`tooling/blog.code-workspace`），无 meta repo 的决定不变 | docs/SETUP.md §10 |
+| 2026-10-03 | D22（文档治理，用户点头）：将「不要在父目录执行 `mvn`」从 `docs/SETUP.md` §10.3 升格为 `AGENTS.md` §8 构建红线；SETUP §10.3 保留原约束并交叉引用 AGENTS.md §8 | 本文件 |
 
 ### 待决策（当前无）
 
