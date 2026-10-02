@@ -1,7 +1,7 @@
 # 开发环境搭建（SETUP）
 
-> 状态：v0.1 · 2026-09-28
-> 范围：仅后端仓库（前端 PLUS-UI 仓库自己管理自己的环境文档）。
+> 状态：v0.2 · 2026-10-03
+> 范围：仅后端仓库（前端 PLUS-UI 仓库自己管理自己的环境文档）。各仓库的**同级目录布局前提与多根工作区**属共同前提，记在 §10（MVP 期共 2 个仓库，已规划的后续仓库见 §10.4）。
 > 凭据不在此复制，一律以 `script/docker/docker-compose.dev.yml` 与 `application-dev.yml` 实际内容为准。
 
 ## 1. 前置工具链
@@ -84,9 +84,75 @@ IDEA 默认用 Bundled Maven，与命令行 sdkman Maven 不同源会出现"命�
 
 ## 9. 冒烟验收清单（新环境搭建完成的定义）
 
+- [ ] 所需仓库按 §10 同级布局 clone 完成（MVP 期 = `RuoYi-Vue-Plus` + `plus-ui`），多根工作区可打开且 `../plus-ui` 可达
 - [ ] `docker ps` 三容器 Up
 - [ ] `mysql> show tables like 'sd_blog_%';` 返回 7 行
 - [ ] `mvn compile -pl ruoyi-admin -am` 全绿
 - [ ] 应用启动无 ERROR，`/swagger-ui/index.html` 可见「博客模块」分组
 - [ ] 默认管理员登录成功，`GET /blog/blogTag/list`（生成的临时 CRUD）返回 200
 - [ ] 参数管理里 `sys.account.registerUser` 状态与当前切片需要一致
+
+## 10. 多仓库同级布局与多根工作区
+
+### 10.1 必须同级 clone（硬性前提）
+
+后端与各前端仓库是**各自独立的 Git 仓库**，交叉引用全部走相对路径（如 `plus-ui/AGENTS.md` 指向 `../RuoYi-Vue-Plus/docs/blog-api.md`）。
+因此它们必须是**同一父目录下的兄弟目录**，布局不对则跨仓库引用直接失效（MVP 期先按下面两个 clone）：
+
+```bash
+mkdir -p ~/projects/sd-blog && cd ~/projects/sd-blog
+git clone git@github.com:xcqj/ryblogs.git     RuoYi-Vue-Plus
+git clone git@github.com:xcqj/ryblogs-ui.git  plus-ui
+```
+
+| 本地目录 | origin | 当前分支 | upstream（跟官方） |
+|---|---|---|---|
+| `RuoYi-Vue-Plus` | `github.com:xcqj/ryblogs` | `6.X` | `gitee.com/dromara/RuoYi-Vue-Plus` |
+| `plus-ui` | `github.com:xcqj/ryblogs-ui` | `6.X-Vue` | `gitee.com/JavaLionLi/plus-ui` |
+
+### 10.2 工作区文件
+
+**唯一权威副本：`tooling/blog.code-workspace`（随本仓库版本化）。**
+
+打开方式：IDE 菜单 `File → Open Workspace from File…`，选中该文件；当前两个 folder 会分别显示为
+`backend · RuoYi-Vue-Plus` 与 `admin · plus-ui`（新增前端仓库后自动多一个）。
+
+- `folders[].path` 是**相对该 workspace 文件所在目录**解析的（本文件在 `tooling/` 下，故为 `..` 与 `../../plus-ui`），
+  且要求 §10.1 的同级布局。换布局就改这两条路径，新增前端仓库则在此**追加 folder**（§10.4），不要在别处再存第二份副本 —— 多份副本必然漂移。
+- 文件内另带 `search.exclude`（排 `**/target`、`**/node_modules`、`**/dist`、`*.log`、`*.log.gz`）与
+  `files.watcherExclude`（同族 + `**/logs/**`），只是 IDE 检索/监听体验配置，**不影响构建与 `.gitignore` 语义**。
+- 采用严格 JSON（无注释），便于任何工具直接解析；配置理由记在本节，不写进配置文件。
+
+### 10.3 为什么没有 meta repo
+
+父目录（`sd-blog/`）**不是** Git 仓库，这是有意决定而非遗漏：各仓库各自独立提交、独立分支、独立上游，
+一个后端切片通常只动 `RuoYi-Vue-Plus`，后台切片只动 `plus-ui`，前端之间无交叉代码依赖，不需要原子提交，也就不需要 meta repo 或 git submodule。
+治理内容（AGENTS.md、`.codex`/`.claude`/`.qoder` skills 链接、docs 权威文档）全部版本化在各仓库内；
+跨仓库共享物只有这一个 workspace 文件，**由后端仓库托管**——因为后端是所有前端的公共依赖，它不会依赖任何前端而存在。
+
+> ⚠️ 由此带来一条约束：**不要在父目录执行 `mvn`**。那会在父目录落下无人管理的游离 `target/`（mapstruct-plus 编译期产物），
+> 而父目录不受任何 `.gitignore` 保护，会长期残留成噪音。构建一律在 `RuoYi-Vue-Plus/` 目录内执行（`./mvnw` 或 `mvn`）。
+
+### 10.4 新增前端仓库时的约定（PC 博客前台已确认，移动端暂不纳入）
+
+后端 API 已按三层边界设计（契约 §1：`/blog/public/**` 公共、`/blog/article|user/**` 登录用户、`/blog/admin/**` 管理），
+**公共接口不区分客户端**，因此新增第 N 个前端不需要后端改接口。新增仓库时只需遵三条：
+
+1. **同级 clone**（§10.1），向 §10.1 的仓库对照表补一行；
+2. **向 `tooling/blog.code-workspace` 的 `folders` 追加一条** `"path": "../../<目录名>"`，仍然只保持一份权威副本；
+3. **新仓库自带 `AGENTS.md`**：写清它用哪一层 API（PC 博客前台属公共 / 登录用户两层，不得调 `/blog/admin/**`），
+   并声明到 `../RuoYi-Vue-Plus/docs/` 的权威源引用（照 `plus-ui/AGENTS.md` 的形式）。
+
+各端与仓库登记表：
+
+| 端 | 本地目录（仓库名） | 当前状态 | 依据 |
+|---|---|---|---|
+| 后端 | `RuoYi-Vue-Plus`（`ryblogs`） | ✅ 已存在，已验收至 S8 | ROADMAP §2 |
+| 管理后台 | `plus-ui`（`ryblogs-ui`） | ✅ 已存在 | ROADMAP S1~S8 |
+| PC 博客前台 | `blog-web`（`ryblogs-web`） | ⬜ **已确认但未建仓** | ROADMAP S9 + D21；依赖 S2+S6+S8，只调公共与登录用户两层 API |
+| 移动端 | — | 🚫 **暂不纳入**（2026-10-03 决定，D21） | 未进 PRD 范围；将来若要讨论，从本行接回，不预先设计 |
+
+> 客观事实备案：`script/sql/ry_vue.sql` 的 `sys_client` 已预置两条客户端记录——`pc`（clientKey `e5cd7e48...`，
+> `plus-ui/.env.development` 的 `VITE_APP_CLIENT_ID` 即此值）与 `app`（clientKey `428a8310...`、`clientType=android`、
+> `grantType=password,sms,social`）。纯浏览的公共页面走 `security.excludes` 匿名接口不需要 client；
+> 前台一旦要登录 / 发文 / 评论，就得携 `clientid` 头（本文 §8），复用 `pc` 记录或按需新增一条，属 S9 开工时定的事。

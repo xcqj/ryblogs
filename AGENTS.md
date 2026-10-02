@@ -7,7 +7,7 @@
 
 - 基于 **RuoYi-Vue-Plus 6.X** 的后端仓库，构建**多用户 / 多作者技术博客 / 内容平台**。
 - 博客业务通过独立 Maven 模块 `sd-blog` 接入，Java 包名 `org.dromara.blog`。
-- 前端 PLUS-UI 6.X-Vue 是独立仓库，本仓库只负责后端（含 generator 前端模板产物）。
+- 前端有两个独立仓库：`plus-ui`（PLUS-UI 6.X-Vue，管理后台）与已确认待建仓的 `ryblogs-web`（本地 `blog-web`，PC 博客前台，S9）；均与本仓库**同级 clone**（布局与工作区见 `docs/SETUP.md` §10）。本仓库只负责后端（含 generator 前端模板产物），移动端暂不纳入（ROADMAP D21）。
 - 策略：先完成可真实运行的博客 MVP；ES、多级缓存、PWA、SEO、CI/CD 等 MVP 后再决定，不为“面试亮点”提前写死非 MVP 技术。
 
 ## 2. 工具链
@@ -25,6 +25,7 @@
 | Java 包 | `org.dromara.blog` |
 | Mapper XML | `sd-blog/src/main/resources/mapper/blog/` |
 | 数据库表前缀 | `sd_blog_`（以 `docs/blog_schema_v0.1.sql` 与实际库为准） |
+| IDE 工作区文件 | `tooling/blog.code-workspace`（多根工作区**唯一权威副本**，由本仓库托管；新增前端仓库时向其 `folders` 追加，不在父目录另存一份） |
 
 Maven 接入点（三处必须同时一致，已配置完成）：根 `pom.xml` 的 `<dependencyManagement>`、`ruoyi-modules/pom.xml` 的 `<modules>`、`ruoyi-admin/pom.xml` 的 `<dependencies>`。
 
@@ -124,7 +125,7 @@ Generator 定位是生成 RuoYi 风格骨架，不是完成博客业务。Entity
 | 文档 | 内容 | 备注 |
 |---|---|---|
 | `docs/ROADMAP.md` | 开发切片排期 + 决策记录（已确认/待决策） | 开工前先查当前切片状态与待决事项；决策变更写入其 §6 |
-| `docs/SETUP.md` | 开发环境搭建：容器、SQL 最小集、启动与冒烟清单 | 新环境照此 30 分钟可跑通 |
+| `docs/SETUP.md` | 开发环境搭建：容器、SQL 最小集、启动与冒烟清单 + 多仓库同级布局与工作区 | 新环境照此 30 分钟可跑通；clone 布局见其 §10 |
 | `docs/architecture.md` | 系统架构：模块图、请求链路、部署拓扑、扩展边界 | 只讲结构不讲业务 |
 | `docs/PRD博客MVP需求文档_v0.2.docx` | 产品需求基线：范围、业务规则、功能需求、验收标准、已确认决策 | Word 二进制，可用 python/unzip 解出 `word/document.xml` 阅读，或转 Markdown |
 | `docs/blog-api.md` | 博客 MVP API 契约 v0.2：三层 API 边界、接口清单、权限标识、状态动作规则 | 接口实现与文档冲突时，先报告冲突再修订，不得默默偏离契约 |

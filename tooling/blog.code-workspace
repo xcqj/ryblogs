@@ -1,0 +1,21 @@
+{
+  "folders": [
+    { "name": "backend · RuoYi-Vue-Plus", "path": ".." },
+    { "name": "admin · plus-ui", "path": "../../plus-ui" }
+  ],
+  "settings": {
+    "search.exclude": {
+      "**/target": true,
+      "**/node_modules": true,
+      "**/dist": true,
+      "**/*.log": true,
+      "**/*.log.gz": true
+    },
+    "files.watcherExclude": {
+      "**/target/**": true,
+      "**/node_modules/**": true,
+      "**/dist/**": true,
+      "**/logs/**": true
+    }
+  }
+}
