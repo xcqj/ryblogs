@@ -207,7 +207,7 @@ S2 遗留接入（已落地）：
 
 依赖：S2–S8 后端 API（已全部就绪）。细粒度实现清单见 `plus-ui/docs/frontend-plan.md`（派生自本切片，状态以本 ROADMAP 为准）。
 
-边界待确认：作者「发文/编辑」体验放 plus-ui（与后台共用，AGENTS.md §5）还是留待 S9 blog-web——开工前定，不默默假设。
+边界（D24 已确认）：作者「发文/编辑」体验落 **plus-ui**，复用框架后台能力（AGENTS.md §5：所有注册用户天然可发文、共用 PLUS-UI 后台）；blog-web（S9）为纯前台，不承担作者发文/编辑。
 
 红线：三层 API 边界不得混用（治理走 `/blog/admin/**`、作者自助走 `/blog/article|user/**`）；不信任前端权限判断，按钮隐藏仅为体验（契约 §1/§15、plus-ui/AGENTS.md）。
 
@@ -296,6 +296,7 @@ S0 → S1 → S2 → S3 → S4 → S5 → S6 → S7 → S8   （后端关键路�
 | 2026-10-03 | D21（端与仓库拓扑）：确认 **PC 博客前台（普通用户看到的站点）= 第三个独立代码仓库**，GitHub `ryblogs-web`、本地目录 `blog-web`，与现有两仓库同级 clone；它只调 `/blog/public/**` 与 `/blog/article·user/**` 两层，不得访问 `/blog/admin/**`；公知事实：公共接口不区分客户端，因此新增前端不需后端改接口。**移动端暂不纳入 MVP**（形态未定，将来讨论从 SETUP §10.4 该行接回，不预先设计）。多根工作区唯一权威副本由**后端仓库托管**（`tooling/blog.code-workspace`），无 meta repo 的决定不变 | docs/SETUP.md §10 |
 | 2026-10-03 | D22（文档治理，用户点头）：将「不要在父目录执行 `mvn`」从 `docs/SETUP.md` §10.3 升格为 `AGENTS.md` §8 构建红线；SETUP §10.3 保留原约束并交叉引用 AGENTS.md §8 | 本文件 |
 | 2026-10-03 | D23（前端工作显性化）：新增 S10 管理后台前端切片、§2 加「涉及端」列；plus-ui 补 `AGENTS.md` 编码规范/技能小节 + 新建 `plus-ui/docs/frontend-plan.md`（派生实现清单，状态单一来源仍在本 ROADMAP）；现存 blog 前端为失效生成骨架（调用已删除的 `/blog/blogXxx`），待按契约重建 | 本文件 / plus-ui |
+| 2026-10-03 | D24（作者端归属，用户确认）：作者「发文/编辑」体验落 **plus-ui**，复用框架后台能力（重申 AGENTS.md §5：所有注册用户天然可发文、共用 PLUS-UI 后台）；blog-web（S9）为纯前台，不承担作者发文/编辑（其登录用户层 API 仅用于评论等读者行为）。S10 范围据此确定 | 本文件 / plus-ui / SETUP §10.4 |
 
 ### 待决策（当前无）
 

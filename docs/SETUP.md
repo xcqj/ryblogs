@@ -149,7 +149,7 @@ git clone git@github.com:xcqj/ryblogs-ui.git  plus-ui
 |---|---|---|---|
 | 后端 | `RuoYi-Vue-Plus`（`ryblogs`） | ✅ 已存在，已验收至 S8 | ROADMAP §2 |
 | 管理后台 | `plus-ui`（`ryblogs-ui`） | ✅ 已存在 | ROADMAP S1~S8 |
-| PC 博客前台 | `blog-web`（`ryblogs-web`） | ⬜ **已确认但未建仓** | ROADMAP S9 + D21；依赖 S2+S6+S8，只调公共与登录用户两层 API |
+| PC 博客前台 | `blog-web`（`ryblogs-web`） | ⬜ **已确认但未建仓** | ROADMAP S9 + D21；依赖 S2+S6+S8，只调公共与登录用户两层 API；作者发文/编辑不在前台，属 plus-ui（D24） |
 | 移动端 | — | 🚫 **暂不纳入**（2026-10-03 决定，D21） | 未进 PRD 范围；将来若要讨论，从本行接回，不预先设计 |
 
 > 客观事实备案：`script/sql/ry_vue.sql` 的 `sys_client` 已预置两条客户端记录——`pc`（clientKey `e5cd7e48...`，
