@@ -1,6 +1,6 @@
 # 开发环境搭建（SETUP）
 
-> 状态：v0.2 · 2026-10-03
+> 状态：v0.3 · 2026-10-06
 > 范围：仅后端仓库（前端 PLUS-UI 仓库自己管理自己的环境文档）。各仓库的**同级目录布局前提与多根工作区**属共同前提，记在 §10（MVP 期共 2 个仓库，已规划的后续仓库见 §10.4）。
 > 凭据不在此复制，一律以 `script/docker/docker-compose.dev.yml` 与 `application-dev.yml` 实际内容为准。
 
@@ -133,7 +133,7 @@ git clone git@github.com:xcqj/ryblogs-ui.git  plus-ui
 > ⚠️ 由此带来一条约束：**不要在父目录执行 `mvn`**。那会在父目录落下无人管理的游离 `target/`（mapstruct-plus 编译期产物），
 > 而父目录不受任何 `.gitignore` 保护，会长期残留成噪音。构建一律在 `RuoYi-Vue-Plus/` 目录内执行（`./mvnw` 或 `mvn`）。此约束已升格为 `AGENTS.md` §8 构建红线。
 
-### 10.4 新增前端仓库时的约定（PC 博客前台已确认，移动端暂不纳入）
+### 10.4 新增前端仓库时的约定（PC 博客前台已确认待建仓；移动端已立项 S11、MVP 后启动）
 
 后端 API 已按三层边界设计（契约 §1：`/blog/public/**` 公共、`/blog/article|user/**` 登录用户、`/blog/admin/**` 管理），
 **公共接口不区分客户端**，因此新增第 N 个前端不需要后端改接口。新增仓库时只需遵三条：
@@ -149,10 +149,11 @@ git clone git@github.com:xcqj/ryblogs-ui.git  plus-ui
 |---|---|---|---|
 | 后端 | `RuoYi-Vue-Plus`（`ryblogs`） | ✅ 已存在，已验收至 S8 | ROADMAP §2 |
 | 管理后台 | `plus-ui`（`ryblogs-ui`） | ✅ 已存在 | ROADMAP S1~S8 |
-| PC 博客前台 | `blog-web`（`ryblogs-web`） | ⬜ **已确认但未建仓** | ROADMAP S9 + D21；依赖 S2+S6+S8，只调公共与登录用户两层 API；作者发文/编辑不在前台，属 plus-ui（D24） |
-| 移动端 | — | 🚫 **暂不纳入**（2026-10-03 决定，D21） | 未进 PRD 范围；将来若要讨论，从本行接回，不预先设计 |
+| PC 博客前台 | `blog-web`（`ryblogs-web`） | ⬜ **已确认但未建仓** | ROADMAP S9 + D21；**范围=响应式（PC + 移动浏览器一套代码，D27）**；依赖 S2+S6+S8，只调公共与登录用户两层 API；作者发文/编辑不在前台，属 plus-ui（D24） |
+| 移动端 | —（仓库名待建仓时定） | 🔖 **已立项 S11，MVP 后启动**（2026-10-06 决定，D27；接回 D21 预留口子） | uni-app，目标平台微信小程序 / H5 / App；范围基线=读者套件（列表/详情/搜索/评论），无发文；复用公共接口零后端改动，详见 ROADMAP S11 |
 
 > 客观事实备案：`script/sql/ry_vue.sql` 的 `sys_client` 已预置两条客户端记录——`pc`（clientKey `e5cd7e48...`，
 > `plus-ui/.env.development` 的 `VITE_APP_CLIENT_ID` 即此值）与 `app`（clientKey `428a8310...`、`clientType=android`、
 > `grantType=password,sms,social`）。纯浏览的公共页面走 `security.excludes` 匿名接口不需要 client；
-> 前台一旦要登录 / 发文 / 评论，就得携 `clientid` 头（本文 §8），复用 `pc` 记录或按需新增一条，属 S9 开工时定的事。
+> 前台一旦要登录 / 发文 / 评论，就得携 `clientid` 头（本文 §8），复用 `pc` 记录或按需新增一条，属 S9 开工时定的事；
+> S11 移动端可直接复用既有 `app` 记录（`grantType=password,sms,social`，是否按短信/社交收缩其授权类型属 S11 开工时定，纯配置零代码，D27 备案）。
