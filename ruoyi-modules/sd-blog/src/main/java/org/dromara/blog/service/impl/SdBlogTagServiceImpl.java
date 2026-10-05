@@ -234,13 +234,16 @@ public class SdBlogTagServiceImpl implements ISdBlogTagService {
     }
 
     /**
-     * 运营属性更新（契约 §13.3）：仅 isFeatured/sortOrder
+     * 运营属性更新（契约 §13.3）：仅 isFeatured/sortOrder；MERGED 历史标签不可设置
      */
     @Override
     public Boolean updateOps(Long tagId, String isFeatured, Integer sortOrder) {
         SdBlogTag tag = sdBlogTagMapper.selectById(tagId);
         if (ObjectUtil.isNull(tag)) {
             throw new ServiceException("标签不存在");
+        }
+        if (BlogTagStatus.MERGED.getCode().equals(tag.getStatus())) {
+            throw new ServiceException("已合并的历史标签不可设置运营属性");
         }
         SdBlogTag update = new SdBlogTag();
         update.setTagId(tagId);
@@ -347,12 +350,24 @@ public class SdBlogTagServiceImpl implements ISdBlogTagService {
             alias.setAliasName(source.getName());
             sdBlogTagAliasMapper.insert(alias);
         }
-        // 4&5. source 置 MERGED，merged_into 直指最终目标（target 即 canonical）
+        // 4&5. source 置 MERGED，merged_into 直指最终目标（target 即 canonical）；
+        //      无论 source 是否精选一律清零精选属性，避免精选标记残留在 MERGED 记录上（契约 §13.5）
         SdBlogTag update = new SdBlogTag();
         update.setTagId(sourceTagId);
         update.setStatus(BlogTagStatus.MERGED.getCode());
         update.setMergedInto(targetTagId);
+        update.setIsFeatured("0");
+        update.setSortOrder(0);
         sdBlogTagMapper.updateById(update);
+        // 精选身份转移：source 精选且 target 非精选 → target 继承精选与排序；
+        // target 已是精选则保持其现有精选状态与排序不变
+        if ("1".equals(source.getIsFeatured()) && !"1".equals(target.getIsFeatured())) {
+            SdBlogTag targetUpdate = new SdBlogTag();
+            targetUpdate.setTagId(targetTagId);
+            targetUpdate.setIsFeatured("1");
+            targetUpdate.setSortOrder(source.getSortOrder());
+            sdBlogTagMapper.updateById(targetUpdate);
+        }
         // 6. 展平：所有指向 source 的历史 MERGED 标签改指 target，不保留长期合并链（A→B、B→C ⇒ A→C）
         sdBlogTagMapper.lambdaUpdate()
             .set(SdBlogTag::getMergedInto, targetTagId)

@@ -1009,6 +1009,8 @@ mergedInto
 
 标签重命名、合并必须使用专用动作接口。
 
+**约束：** 目标标签 `status` 必须为 `ACTIVE`（0 正常）。对 `MERGED`（1 已合并）标签设置运营属性返回失败——已合并标签是历史节点，不参与精选与候选。
+
 ### 13.4 重命名标签
 
 ```http
@@ -1090,6 +1092,19 @@ B → C
 ```
 
 不保留长期合并链。
+
+**精选身份转移：** 合并事务内，`source` 的精选属性转移到 `target`（精选是标签级属性，不随版本快照）：
+
+```text
+source.is_featured = 1 且 target.is_featured ≠ 1
+    → target.is_featured = 1，target.sort_order = source.sort_order
+source.is_featured = 1 且 target.is_featured = 1
+    → target 保持其现有精选状态与排序不变
+无论 source 是否精选
+    → 合并后一律确保 source.is_featured = 0、source.sort_order = 0
+```
+
+该转移保证 `MERGED` 记录上不残留精选标记（数据不变量：不存在 status=1 且 is_featured=1 的标签）。
 
 ### 13.6 删除垃圾标签
 
