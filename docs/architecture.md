@@ -25,7 +25,7 @@
 
 - 架构形态：**单体多模块 Maven 工程**，唯一部署单元 `ruoyi-admin`；模块间通过 Service 接口调用，无 RPC。
 - 博客不新建用户/认证/RBAC/文件体系，全部复用 RuoYi 既有基础设施（PRD §13）。
-- 前端是**两个独立仓库**（与后端同级 clone）：博客前台 `blog-web`（仓库 `ryblogs-web`，S9 起建，尚未建仓）与管理后台 `plus-ui`（仓库 `ryblogs-ui`）；
+- 前端是**两个独立仓库**（与后端同级 clone）：博客前台 `blog-web`（仓库 `blogs-web`，S9 起建，尚未建仓）与管理后台 `plus-ui`（仓库 `ryblogs-ui`）；
   两者只分别调公共层与登录用户/管理层 API，仓库与工作区布局见 `docs/SETUP.md` §10 与 ROADMAP D21。
 
 ## 2. sd-blog 内部结构

@@ -7,7 +7,7 @@
 
 - 基于 **RuoYi-Vue-Plus 6.X** 的后端仓库，构建**多用户 / 多作者技术博客 / 内容平台**。
 - 博客业务通过独立 Maven 模块 `sd-blog` 接入，Java 包名 `org.dromara.blog`。
-- 前端有两个独立仓库：`plus-ui`（PLUS-UI 6.X-Vue，管理后台）与已确认待建仓的 `ryblogs-web`（本地 `blog-web`，PC 博客前台，S9）；均与本仓库**同级 clone**（布局与工作区见 `docs/SETUP.md` §10）。本仓库只负责后端（含 generator 前端模板产物），移动端暂不纳入（ROADMAP D21）。
+- 前端有两个独立仓库：`plus-ui`（PLUS-UI 6.X-Vue，管理后台）与已确认待建仓的 `blogs-web`（本地 `blog-web`，PC 博客前台，S9）；均与本仓库**同级 clone**（布局与工作区见 `docs/SETUP.md` §10）。本仓库只负责后端（含 generator 前端模板产物），移动端暂不纳入（ROADMAP D21）。
 - 策略：先完成可真实运行的博客 MVP；ES、多级缓存、PWA、SEO、CI/CD 等 MVP 后再决定，不为“面试亮点”提前写死非 MVP 技术。
 
 ## 2. 工具链
