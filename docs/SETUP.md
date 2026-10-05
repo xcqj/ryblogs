@@ -149,11 +149,11 @@ git clone git@github.com:xcqj/ryblogs-ui.git  plus-ui
 |---|---|---|---|
 | 后端 | `RuoYi-Vue-Plus`（`ryblogs`） | ✅ 已存在，已验收至 S8 | ROADMAP §2 |
 | 管理后台 | `plus-ui`（`ryblogs-ui`） | ✅ 已存在 | ROADMAP S1~S8 |
-| PC 博客前台 | `blog-web`（`ryblogs-web`） | ⬜ **已确认但未建仓** | ROADMAP S9 + D21；**范围=响应式（PC + 移动浏览器一套代码，D27）**；依赖 S2+S6+S8，只调公共与登录用户两层 API；作者发文/编辑不在前台，属 plus-ui（D24） |
+| PC 博客前台 | `blog-web`（`ryblogs-web`） | ⬜ **已确认但未建仓** | ROADMAP S9 + D21；**范围=响应式（PC + 移动浏览器一套代码，D27）；技术栈=Nuxt 4 SSR（D28，含开工准备清单）**；依赖 S2+S6+S8，只调公共与登录用户两层 API；作者发文/编辑不在前台，属 plus-ui（D24） |
 | 移动端 | —（仓库名待建仓时定） | 🔖 **已立项 S11，MVP 后启动**（2026-10-06 决定，D27；接回 D21 预留口子） | uni-app，目标平台微信小程序 / H5 / App；范围基线=读者套件（列表/详情/搜索/评论），无发文；复用公共接口零后端改动，详见 ROADMAP S11 |
 
 > 客观事实备案：`script/sql/ry_vue.sql` 的 `sys_client` 已预置两条客户端记录——`pc`（clientKey `e5cd7e48...`，
 > `plus-ui/.env.development` 的 `VITE_APP_CLIENT_ID` 即此值）与 `app`（clientKey `428a8310...`、`clientType=android`、
 > `grantType=password,sms,social`）。纯浏览的公共页面走 `security.excludes` 匿名接口不需要 client；
-> 前台一旦要登录 / 发文 / 评论，就得携 `clientid` 头（本文 §8），复用 `pc` 记录或按需新增一条，属 S9 开工时定的事；
+> 前台一旦要登录 / 发文 / 评论，就得携 `clientid` 头（本文 §8），复用 `pc` 记录或按需新增一条；**D28 已定：blog-web 新建独立 `web` 记录**（clientKey `web`、grantType 仅 password，与 `pc` 会话隔离），SQL 见 `docs/blog_s9_web_client.sql`（幂等含验证段，待 S9 建仓时执行）；plus-ui 继续用 `pc` 不变；
 > S11 移动端可直接复用既有 `app` 记录（`grantType=password,sms,social`，是否按短信/社交收缩其授权类型属 S11 开工时定，纯配置零代码，D27 备案）。

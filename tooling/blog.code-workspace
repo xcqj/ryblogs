@@ -1,7 +1,8 @@
 {
   "folders": [
     { "name": "backend · RuoYi-Vue-Plus", "path": ".." },
-    { "name": "admin · plus-ui", "path": "../../plus-ui" }
+    { "name": "admin · plus-ui", "path": "../../plus-ui" },
+    { "name": "web · blog-web（待建仓 clone 后生效）", "path": "../../blog-web" }
   ],
   "settings": {
     "search.exclude": {

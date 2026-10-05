@@ -196,7 +196,22 @@ S2 遗留接入（已落地）：
 
 端范围（D27 已确认）：**响应式单套代码**，PC 与移动浏览器通吃；移动浏览器适配在 S9 内一并交付，不另起移动 Web 切片。
 
-依赖：S2（文章接口）+ S6（标签）+ S8（搜索）为最低可启动集；alias→canonical 的 301 由前台/边缘层负责（契约 §7.3）。
+依赖：S2（文章接口）+ S6（标签）+ S8（搜索）为最低可启动集；alias→canonical 的 301 由前台/边缘层负责（契约 §7.3）——选 Nuxt SSR 后由 Nitro server middleware 原生兑现（D28，边缘层方案作废）。
+
+技术栈定案（D28）：**Nuxt 4**（官方 starter v4 模板）+ Vite/Vue3/TS/文件路由/自动导入/SSR 内置 + UnoCSS（照 plus-ui uno.config 裁剪）+ `@nuxtjs/seo` + `@nuxt/image` + shiki（服务端着色）+ `@nuxt/eslint`；**无组件库**，正文排版 preset-typography + 薄组件。
+
+开工准备清单（新会话/建仓首日照此执行）：
+
+- [ ] GitHub 建仓 `ryblogs-web`，同级 clone 为 `blog-web`（workspace 已预登记 folder，clone 后即生效）
+- [ ] `npm create nuxt@latest . -- -t v4` 初始化；`.env`：`NUXT_APP_CLIENT_ID` = docs/blog_s9_web_client.sql 验证段中的 client_id
+- [ ] 执行 `docs/blog_s9_web_client.sql`（幂等，含验证段）新建 `web` 客户端记录
+- [ ] 挂 `@unocss/nuxt`：uno.config 以 plus-ui 为蓝本裁剪（去 Element Plus 相关与 auto-import，Nuxt 原生；留 icons/preset-typography）
+- [ ] 自带 AGENTS.md（SETUP §10.4 三条）+ 一个 `nuxt-frontend-coding` skill（`.codex/skills` 实体 + `.qoder/skills` symlink，覆盖：新页面/SSR 数据获取套路、$fetch/Nitro 代理规范、UnoCSS+prose 样式）；不预先建 .claude/agents 子代理，按需再加
+- [ ] 页面清单（D28）：`/` `/page/{n}` `/post/{slug}` `/tag/{slug}` `/search` `/user/{userId}` + 登录/评论弹层；内容页 SSR，评论提交/登录交互 CSR
+- [ ] 认证：cookie + Nitro server route 代理 `/auth/login`（httpOnly，SSR 可读物；顺带规避 CORS）
+- [ ] 开发环境：runtimeConfig 后端基址 `http://localhost:8081`；Windows 浏览器访问注意 WSL2 localhost 转发既有处理（SETUP/记忆登记）
+- [ ] 部署：`nitro.output: 'node-server'` + Dockerfile，docker-compose 新增服务，architecture.md 部署图同步
+- [ ] 验收含移动端视口检查（D27 响应式口径）与 alias 301 链路实测
 
 ### S10 管理后台前端（博客） ✅（plus-ui 仓库，2026-10-06 已验收）
 
@@ -248,6 +263,7 @@ S2 遗留接入（已落地）：
 | `blog_s6_menu.sql` | S6 标签治理按钮 + Tag 裸 CRUD 菜单清理 | ✅ 已执行（2026-10-03） |
 | `blog_s7_menu.sql` | S7 评论治理按钮 + Comment/UserProfile 菜单清理 | ✅ 已执行（2026-10-03） |
 | `blog_s10_menu.sql` | S10 治理页 C 型菜单入口（文章/标签/评论，parent=博客目录） | ✅ 已执行（2026-10-05） |
+| `blog_s9_web_client.sql` | S9 开工准备：sys_client 新增 `web` 客户端记录（D28，幂等含验证段） | ⬜ 待执行（S9 建仓时） |
 
 ## 4. 关键路径与并行
 
@@ -323,6 +339,7 @@ S0 → S1 → S2 → S3 → S4 → S5 → S6 → S7 → S8   （后端关键路�
 | 2026-10-03 | D24（作者端归属，用户确认）：作者「发文/编辑」体验落 **plus-ui**，复用框架后台能力（重申 AGENTS.md §5：所有注册用户天然可发文、共用 PLUS-UI 后台）；blog-web（S9）为纯前台，不承担作者发文/编辑（其登录用户层 API 仅用于评论等读者行为）。S10 范围据此确定 | 本文件 / plus-ui / SETUP §10.4 |
 | 2026-10-05 | D26（标签运营属性守卫补全，S10 验收衍生）：① §13.3 `updateOps` 增状态校验，对 MERGED 标签设精选/排序拒绝（对齐 renameTag/adminDelete 的 MERGED 拒绝模式）；② §13.5 合并事务内精选身份转移——source 精选且 target 非精选则 target 继承精选与排序，target 已精选则保持不变，无论 source 是否精选合并后一律 `source.is_featured=0/sort_order=0`，杜绝 MERGED 记录残留精选（数据不变量：不存在 status=1 且 is_featured=1）。契约/后端/前端同步，不新增表/字段/接口；热门标签实时统计不受影响 | 本文件 / blog-api.md §13.3/§13.5 |
 | 2026-10-06 | D27（端与切片扩展，S10 收尾后用户确认，接回 D21「移动端暂不纳入，将来讨论接回」预留口子）：① **S9 范围明确为响应式**（PC + 移动浏览器一套代码），移动适配在 S9 内交付，不再另起移动 Web 切片；② **uni-app 立项为 S11 移动端套件**，MVP 后启动，目标平台微信小程序 / H5 / App，范围基线=读者套件（列表/详情/搜索/评论），不做发文与治理（D24 口径延伸）；复用 S9 同一接口面零后端改动，认证走统一 `/auth/login` + `sys_client` 既有 `app` 记录（纯配置）；③ 仓库名、页面级切分、启动排期待 S11 开工前另决。注：编号顺延 D26——D25 已被待决策占用，已确认表无 D25，属既定事实非缺录 | 本文件 / SETUP §10.4 |
+| 2026-10-06 | D28（S9 技术栈与开工决策，用户逐项拍板）：① **渲染模式弃 SPA 方案 A、选 SSR，且落地版本从讨论中的 Nuxt 3 升为 Nuxt 4**——starter 仓库 v4 模板（Nuxt 3 已 2026-07-31 EOL，v3/v4-compat 排除；content 模板不适用——内容源是后端 API）；Vite/Vue3/TS/文件路由/自动导入/SSR 全内置，回应"不自建基础"诉求；② 集成清单：`@unocss/nuxt`（与 plus-ui 同语法，uno.config 裁剪复用）+ preset-typography、`@nuxtjs/seo`、`@nuxt/image`、shiki 服务端着色、`@nuxt/eslint`；**无组件库**（博客前台无管理端刚需，薄组件+prose 排版）；③ alias 301 由 Nitro server middleware 原生实现，契约 §7.3 边缘层方案作废；④ 认证：token 走 **cookie + Nitro 代理**（httpOnly，SSR 可读，规避 CORS）；**blog-web 新建 `web` 客户端记录**（与 plus-ui `pc` 会话隔离，grantType 仅 password），SQL 落 docs/blog_s9_web_client.sql；备案：跨端无缝登录不存在（localStorage 按 origin 隔离 + 会话隔离，与 clientid 选择无关，非 SSO 改造不做），plus-ui 仍用 pc；⑤ 响应式策略：**只拍一张桌面骨架**，移动/平板形态由既定断点规则推导（断点=UnoCSS 默认 sm640/md768/lg1024/xl1280），实现期真机微调；⑥ 页面清单 7 项+登录/评论弹层（详 S9 节）；⑦ 治理资产：建仓时 AGENTS.md（§10.4 硬要求）+ 一个 nuxt-frontend-coding skill（symlink 规范），子代理资产按需后加；⑧ SSR-safe 纪律由"迁移预备"升为当下硬性要求（SSR 执行环境） | 本文件 / SETUP §10.4 / docs/blog_s9_web_client.sql |
 
 ### 待决策
 
