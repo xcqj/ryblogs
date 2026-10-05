@@ -78,8 +78,9 @@ public final class HtmlSanitizer {
             // 语法高亮标记（language-java 等）：relaxed 未给 pre/code 放开 class，技术博客必须保留
             .addAttributes("pre", "class")
             .addAttributes("code", "class")
-            // 编辑器粘贴截图产生的 data:image 内联图（jsoup 仅对 src 类属性生效）
-            .addProtocols("img", "src", "data")
+            // 编辑器图片协议：data:image 内联图（粘贴截图）+ oss://ossId 标记（“上传图片”落 OSS 后由
+            // 前端 Editor 编码为 oss://ossId，回显时经 listByIds 解析为可用 URL）；不放行会被 jsoup 剥 src 致正文图丢失
+            .addProtocols("img", "src", "data", "oss")
             // 保留 # Fragment 等非 URL 形式的相对锚点链接（长文目录）
             .preserveRelativeLinks(true);
         // 内联样式与锚点 id：WangEditor 颜色/字号/对齐依赖 style，逐标签放开
