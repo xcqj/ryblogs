@@ -203,13 +203,13 @@ S2 遗留接入（已落地）：
 开工准备清单（新会话/建仓首日照此执行）：
 
 - [x] GitHub 建仓 `blogs-web`，同级 clone 为 `blog-web`（workspace 已预登记 folder，clone 后即生效）
-- [ ] `npm create nuxt@latest . -- -t v4` 初始化；`.env`：`NUXT_APP_CLIENT_ID` = docs/blog_s9_web_client.sql 验证段中的 client_id
+- [x] `npm create nuxt@latest` 初始化（create-nuxt v4.0.0 已无独立 `-t v4` tag，官方 v4 starter 即默认 `minimal` 模板，装得 nuxt 4.5.2）；`.env`：`NUXT_APP_CLIENT_ID` = docs/blog_s9_web_client.sql 验证段中的 client_id
 - [x] 执行 `docs/blog_s9_web_client.sql`（幂等，含验证段）新建 `web` 客户端记录（2026-10-06，见 SQL 状态表）
-- [ ] 挂 `@unocss/nuxt`：uno.config 以 plus-ui 为蓝本裁剪（去 Element Plus 相关与 auto-import，Nuxt 原生；留 icons/preset-typography）
-- [ ] 自带 AGENTS.md（SETUP §10.4 三条）+ 一个 `nuxt-frontend-coding` skill（`.codex/skills` 实体 + `.qoder/skills` symlink，覆盖：新页面/SSR 数据获取套路、$fetch/Nitro 代理规范、UnoCSS+prose 样式）；不预先建 .claude/agents 子代理，按需再加
-- [ ] 页面清单（D28）：`/` `/page/{n}` `/post/{slug}` `/tag/{slug}` `/search` `/user/{userId}` + 登录/评论弹层；内容页 SSR，评论提交/登录交互 CSR
-- [ ] 认证：cookie + Nitro server route 代理 `/auth/login`（httpOnly，SSR 可读物；顺带规避 CORS）
-- [ ] 开发环境：runtimeConfig 后端基址 `http://localhost:8081`；Windows 浏览器访问注意 WSL2 localhost 转发既有处理（SETUP/记忆登记）
+- [x] 挂 `@unocss/nuxt`（unocss 66.10.5）：uno.config 以 plus-ui 为蓝本裁剪（去 Element Plus 相关 `--el-*` 与 auto-import/`presetWebFonts`，Nuxt 原生；留 wind3/attributify/typography + 补 icons(presetIcons/mdi)，transformers 保留）
+- [x] 自带 AGENTS.md（SETUP §10.4 三条：只调公共/登录读者两层、禁 `/blog/admin/**`、声明对 `../RuoYi-Vue-Plus/docs/` 权威源引用）+ 一个 `nuxt-frontend-coding` skill（`.codex/skills` 实体 + `.qoder/skills` symlink，覆盖新页面/SSR 数据获取、$fetch/Nitro 代理与 cookie 认证、alias 301、UnoCSS+prose、SSR 安全）；不预先建 .claude/agents 子代理
+- [x] 页面清单（D28）：`/` `/page/{n}` `/post/{slug}` `/tag/{slug}` `/search` `/user/{userId}` + 登录/评论弹层；内容页 SSR，评论提交/登录交互 CSR（首页 `/` 已真实对接 §5.1/§7.1/§7.2；`/page/{n}`、`/tag/{slug}` 复用 §5.1 代理；`/post`、`/search`、`/user` 为骨架待接；LoginModal 已建、评论弹层随 `/post` 详情页再接）
+- [x] 认证：cookie + Nitro server route 代理 `/auth/login`（httpOnly，SSR 可读物；顺带规避 CORS）——`server/api/auth/{login,logout,session}` 就位，token 只落 httpOnly cookie，clientId/grantType 服务端注入；`useAuth` SSR 读登录态（验证码链路属后续切片）
+- [x] 开发环境：runtimeConfig 后端基址 `http://localhost:8081`（`NUXT_API_BASE` 覆盖）；`.env` 的 `NUXT_APP_CLIENT_ID` 映射 `runtimeConfig.appClientId`；Windows 浏览器访问注意 WSL2 localhost 转发既有处理（dev 日志实测 WSL IP `172.31.124.129`，转发失效时直连该 IP）
 - [ ] 部署：`nitro.output: 'node-server'` + Dockerfile，docker-compose 新增服务，architecture.md 部署图同步
 - [ ] 验收含移动端视口检查（D27 响应式口径）与 alias 301 链路实测
 
