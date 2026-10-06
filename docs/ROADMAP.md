@@ -202,9 +202,9 @@ S2 遗留接入（已落地）：
 
 开工准备清单（新会话/建仓首日照此执行）：
 
-- [ ] GitHub 建仓 `blogs-web`，同级 clone 为 `blog-web`（workspace 已预登记 folder，clone 后即生效）
+- [x] GitHub 建仓 `blogs-web`，同级 clone 为 `blog-web`（workspace 已预登记 folder，clone 后即生效）
 - [ ] `npm create nuxt@latest . -- -t v4` 初始化；`.env`：`NUXT_APP_CLIENT_ID` = docs/blog_s9_web_client.sql 验证段中的 client_id
-- [ ] 执行 `docs/blog_s9_web_client.sql`（幂等，含验证段）新建 `web` 客户端记录
+- [x] 执行 `docs/blog_s9_web_client.sql`（幂等，含验证段）新建 `web` 客户端记录（2026-10-06，见 SQL 状态表）
 - [ ] 挂 `@unocss/nuxt`：uno.config 以 plus-ui 为蓝本裁剪（去 Element Plus 相关与 auto-import，Nuxt 原生；留 icons/preset-typography）
 - [ ] 自带 AGENTS.md（SETUP §10.4 三条）+ 一个 `nuxt-frontend-coding` skill（`.codex/skills` 实体 + `.qoder/skills` symlink，覆盖：新页面/SSR 数据获取套路、$fetch/Nitro 代理规范、UnoCSS+prose 样式）；不预先建 .claude/agents 子代理，按需再加
 - [ ] 页面清单（D28）：`/` `/page/{n}` `/post/{slug}` `/tag/{slug}` `/search` `/user/{userId}` + 登录/评论弹层；内容页 SSR，评论提交/登录交互 CSR
@@ -263,7 +263,7 @@ S2 遗留接入（已落地）：
 | `blog_s6_menu.sql` | S6 标签治理按钮 + Tag 裸 CRUD 菜单清理 | ✅ 已执行（2026-10-03） |
 | `blog_s7_menu.sql` | S7 评论治理按钮 + Comment/UserProfile 菜单清理 | ✅ 已执行（2026-10-03） |
 | `blog_s10_menu.sql` | S10 治理页 C 型菜单入口（文章/标签/评论，parent=博客目录） | ✅ 已执行（2026-10-05） |
-| `blog_s9_web_client.sql` | S9 开工准备：sys_client 新增 `web` 客户端记录（D28，幂等含验证段） | ⬜ 待执行（S9 建仓时） |
+| `blog_s9_web_client.sql` | S9 开工准备：sys_client 新增 `web` 客户端记录（D28，幂等含验证段） | ✅ 已执行（2026-10-06，验证段 1 行：client_id `f38076e6bb30a1170b9ea3fbebac0815`、grant_type 仅 password、status/del_flag 均 0） |
 
 ## 4. 关键路径与并行
 
