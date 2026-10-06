@@ -8,10 +8,10 @@
 
 ```text
 ┌─────────────────────────── 前端（两个独立仓库，同级 clone）───────────────────────────┐
-│   博客前台站 blog-web（访客）       管理后台 plus-ui（作者 + 管理员共用）              │
-│   首页/文章/标签/用户主页/搜索       我的文章 / 博客治理菜单 / RuoYi 系统管理           │
+│   博客前台站 blog-web（读者/作者）  管理后台 plus-ui（作者 + 管理员共用）              │
+│   首页/文章/标签/搜索/用户/作者中心  我的文章 / 博客治理菜单 / RuoYi 系统管理           │
 └──────────────┬───────────────────────────────┬───────────────────────────────────────┘
-               │ /blog/public/**（匿名）        │ /blog/article|user|admin/**、/auth/**、/system/**（Sa-Token）
+               │ /blog/public/**（匿名）＋作者自助 │ /blog/article|user|admin/**、/auth/**、/system/**（Sa-Token）
                ▼                               ▼
 ┌──────────────────────────── 本仓库：RuoYi-Vue-Plus 6.X 模块化单体 ────────────────────────────┐
 │  ruoyi-admin（唯一启动入口，聚合所有模块）                                                      │
@@ -25,8 +25,8 @@
 
 - 架构形态：**单体多模块 Maven 工程**，唯一部署单元 `ruoyi-admin`；模块间通过 Service 接口调用，无 RPC。
 - 博客不新建用户/认证/RBAC/文件体系，全部复用 RuoYi 既有基础设施（PRD §13）。
-- 前端是**两个独立仓库**（与后端同级 clone）：博客前台 `blog-web`（仓库 `blogs-web`，S9 起建，尚未建仓）与管理后台 `plus-ui`（仓库 `ryblogs-ui`）；
-  两者只分别调公共层与登录用户/管理层 API，仓库与工作区布局见 `docs/SETUP.md` §10 与 ROADMAP D21。
+- 前端是**两个独立仓库**（与后端同级 clone）：博客前台 `blog-web`（仓库 `blogs-web`，S9 起建）与管理后台 `plus-ui`（仓库 `ryblogs-ui`）；
+  blog-web 调公共层 `/blog/public/**` 与登录作者自助层 `/blog/article|user/**`（作者中心，D29），plus-ui 调登录用户/管理层；平台治理 `/blog/admin/**` 仅 plus-ui。仓库与工作区布局见 `docs/SETUP.md` §10 与 ROADMAP D21/D29。
 
 ## 2. sd-blog 内部结构
 

@@ -30,9 +30,10 @@
 | S6 | 标签治理 | §7、§13、§18.10 | 6 | 后端 | ✅ 已验收（2026-10-01，commit 7620186；含 §5.1，D14） | 2d |
 | S7 | 评论 | §10、§12 | 8（提前） | 后端 | ✅ 已验收（2026-10-01，commit 63e68bd） | 1d |
 | S8 | 搜索与阅读量 | §5.2、§6 | 9 | 后端 | ✅ 已验收（2026-10-03，commit 0dfa282；含 §5.1 补参、§9.2，D18） | 1d |
-| S9 | 前台站 | §15 边界 | 7（后移） | 前端 | ⬜（独立仓库 `blogs-web` → 本地 `blog-web`，D21；范围=响应式含移动浏览器适配，D27） | — |
+| S9 | 前台站（读者） | §15 边界 | 7（后移） | 前端 | ⬜（独立仓库 `blogs-web` → 本地 `blog-web`，D21；范围=响应式含移动浏览器适配，D27；作者发文见 S12/D29） | — |
 | S10 | 管理后台前端（博客） | §3、§7、§11、§12、§13 | 5/6/8 前端面 | 前端 | ✅ 已验收（2026-10-06，浏览器验收通过；治理页×3 + 作者发文/编辑/详情/版本 + 个人资料 tab + merge，D23/D24/D26） | 3~5d |
 | S11 | 移动端套件（uni-app） | §15 边界（复用） | — | 移动端 | 🔖 立项待启动（MVP 后，D27） | — |
+| S12 | blog-web 作者中心（发文/编辑/自助治理） | §3、§4、§11（作者侧动作） | 2/4/5 前端面 | 前端 | ⬜ 立项（D29 修订 D24；复用 `/blog/article/**`，WangEditor，零后端改动） | 2~4d |
 
 > 与 PRD §12.1 的顺序差异：评论提前到前台站之前，保证后端 API 闭环先行；
 > S9 前台可在 S5 完成后于前端仓库并行启动（首页/列表/详情依赖 S2+S6+S8 的接口）。
@@ -226,7 +227,7 @@ S2 遗留接入（已落地）：
 
 依赖：S2–S8 后端 API（已全部就绪）。细粒度实现清单见 `plus-ui/docs/frontend-plan.md`（派生自本切片，状态以本 ROADMAP 为准）。
 
-边界（D24 已确认）：作者「发文/编辑」体验落 **plus-ui**，复用框架后台能力（AGENTS.md §5：所有注册用户天然可发文、共用 PLUS-UI 后台）；blog-web（S9）为纯前台，不承担作者发文/编辑。
+边界（D24 原确认，经 D29 修订）：作者「发文/编辑」体验落 **plus-ui**（本切片已交付，保留），复用框架后台能力（AGENTS.md §5：所有注册用户天然可发文）；**D29 起 blog-web 亦增设作者中心**，登录用户可在前台自助发文/编辑/隐藏/删除自己的文章（走 `/blog/article/**`，见 S12）。两端共用同一作者自助接口，平台级治理仍仅 plus-ui。
 
 红线：三层 API 边界不得混用（治理走 `/blog/admin/**`、作者自助走 `/blog/article|user/**`）；不信任前端权限判断，按钮隐藏仅为体验（契约 §1/§15、plus-ui/AGENTS.md）。
 
@@ -244,11 +245,36 @@ S2 遗留接入（已落地）：
 
 立项决策 D27：uni-app 一套代码产出微信小程序 / H5 / App，补足小程序生态触点；不替代 S9 响应式 Web 的移动浏览器场景。
 
-- 范围基线：读者套件——列表 / 详情 / 搜索 / 评论；不做发文与治理（D24 口径延伸到移动端）
+- 范围基线：读者套件——列表 / 详情 / 搜索 / 评论；不做发文与治理（S11 自身基线；D29 只把作者中心加到 blog-web，未纳入移动端，移动端发文入口仍走 plus-ui）
 - API 复用 S9 同一套公共 + 登录用户接口，**零后端改动**（D21 公知事实）
 - 认证：统一 `/auth/login` 携 `clientid`，`sys_client` 已预置 `app` 记录（android），纯配置零代码（SETUP §10.4 备案）
 - 内容渲染：后端净化后 HTML 在小程序端需富文本适配（如 mp-html），启动时定实现
 - 待启动时定：GitHub 仓库名与本地目录、页面级范围切分、建仓后工作区 folders 追加
+
+### S12 blog-web 作者中心 ⬜（blog-web 仓库，D29 修订 D24 后新增）
+
+背景（D29）：原 D24 将作者发文/编辑只落在 plus-ui，导致 blog-web 读者想发文必须跳后台二次登录。用户决定反转：**blog-web 增设作者中心**，登录用户在前台自助管理**自己的**文章。
+
+范围（全部走 `/blog/article/**` 作者自助层，**零后端改动**，接口 S2–S5 已就绪）：
+
+- 我的文章列表：`GET /blog/article/my`（status/visibility/keyword 过滤 + 分页），行内动作 发布/hide/show/delete
+- 新建/编辑：`POST /blog/article`（草稿）、`PUT /blog/article/{id}`（内容变化则建新版本）；**编辑器复用 WangEditor `@wangeditor-next/editor` + `@wangeditor-next/editor-for-vue` 6.4.1**，`<ClientOnly>` 包裹 + 按需加载（`ssr:false`），产出净化前 HTML（后端 jsoup 净化），**不上 Markdown**
+- 封面/正文传图：复用 `/resource/oss/upload`（契约 §2.4，S3 已就位）+ `oss://` 引用解析（照 plus-ui `src/utils/ossContent.ts`）
+- 发布 / 隐藏 / 重新公开 / 删除：`POST /blog/article/{id}/publish|hide|show`、`DELETE /{id}`（服务端按 `author_id` 校验）
+- 版本只读（可选子视图）：`GET /blog/article/{id}/versions[/vId]`
+- 认证：复用 blog-web 已登录 `web` 会话（cookie + Nitro 代理），**无需二次登录**
+
+边界（红线不变）：
+
+- **平台级治理仍只在 plus-ui `/blog/admin/**`**（他人文章下线/恢复、标签 rename/merge、评论审核），blog-web 禁止调用；作者自助管理自己的文章 ≠ 平台治理
+- 不信任前端 `authorId`，归属与权限一律后端强制校验（AGENTS.md §5、契约 §1.2/§1.3）
+- SSR 安全：WangEditor 是纯浏览器组件，作者编辑页必须 `<ClientOnly>` / `ssr:false`，不进服务端渲染；作者中心页面 CSR 为主，不参与读者首屏/SEO
+
+依赖：S2–S8 后端接口（全部就绪）+ S9 blog-web 仓库与 `web` 认证链路（已就位）。
+
+完成标准：登录用户可在 blog-web 完成发文→编辑→发布→隐藏→重新公开→删除全链路，越权（操作他人文章）被后端拒绝；编辑器仅客户端加载、SSR 不报错；不触碰 `/blog/admin/**`。
+
+> 落地方式：本轮仅同步文档（本 ROADMAP、blog-api.md §15、blog-web/AGENTS.md、blog-web/docs/plan.md、docs/architecture.md、AGENTS.md §5）；**代码实现在独立开发对话进行**（新切片 S12，小步 commit 标 S12/D29）。
 
 ### 一次性 SQL 脚本执行状态（docs/）
 
@@ -271,7 +297,8 @@ S2 遗留接入（已落地）：
 S0 → S1 → S2 → S3 → S4 → S5 → S6 → S7 → S8   （后端关键路径，粗估 10~12 人日）
                               ├── S9 前台站（blog-web，S5 后可并行启动）
                               ├── S10 管理后台前端（plus-ui，依赖 S2–S8 接口，S8 后即可启动）
-                              └── S11 移动端套件（uni-app，MVP 后启动，复用 S9 接口面，零后端改动）
+                              ├── S11 移动端套件（uni-app，MVP 后启动，复用 S9 接口面，零后端改动）
+                              └── S12 blog-web 作者中心（blog-web，D29；复用 /blog/article/**，零后端改动）
 ```
 
 - S2 是最大风险点（事务编排 + 权限 + 版本），如超 3 天先拆解再继续。
@@ -336,10 +363,11 @@ S0 → S1 → S2 → S3 → S4 → S5 → S6 → S7 → S8   （后端关键路�
 | 2026-10-03 | D21（端与仓库拓扑）：确认 **PC 博客前台（普通用户看到的站点）= 第三个独立代码仓库**，GitHub `blogs-web`（2026-10-06 建仓前定名，原登记名 ryblogs-web 作废；本地目录名 blog-web 不变），与现有两仓库同级 clone；它只调 `/blog/public/**` 与 `/blog/article·user/**` 两层，不得访问 `/blog/admin/**`；公知事实：公共接口不区分客户端，因此新增前端不需后端改接口。**移动端暂不纳入 MVP**（形态未定，将来讨论从 SETUP §10.4 该行接回，不预先设计）。多根工作区唯一权威副本由**后端仓库托管**（`tooling/blog.code-workspace`），无 meta repo 的决定不变 | docs/SETUP.md §10 |
 | 2026-10-03 | D22（文档治理，用户点头）：将「不要在父目录执行 `mvn`」从 `docs/SETUP.md` §10.3 升格为 `AGENTS.md` §8 构建红线；SETUP §10.3 保留原约束并交叉引用 AGENTS.md §8 | 本文件 |
 | 2026-10-03 | D23（前端工作显性化）：新增 S10 管理后台前端切片、§2 加「涉及端」列；plus-ui 补 `AGENTS.md` 编码规范/技能小节 + 新建 `plus-ui/docs/frontend-plan.md`（派生实现清单，状态单一来源仍在本 ROADMAP）；现存 blog 前端为失效生成骨架（调用已删除的 `/blog/blogXxx`），待按契约重建 | 本文件 / plus-ui |
-| 2026-10-03 | D24（作者端归属，用户确认）：作者「发文/编辑」体验落 **plus-ui**，复用框架后台能力（重申 AGENTS.md §5：所有注册用户天然可发文、共用 PLUS-UI 后台）；blog-web（S9）为纯前台，不承担作者发文/编辑（其登录用户层 API 仅用于评论等读者行为）。S10 范围据此确定 | 本文件 / plus-ui / SETUP §10.4 |
+| 2026-10-03 | D24（作者端归属，用户确认）：作者「发文/编辑」体验落 **plus-ui**，复用框架后台能力（重申 AGENTS.md §5：所有注册用户天然可发文、共用 PLUS-UI 后台）；blog-web（S9）为纯前台，不承担作者发文/编辑（其登录用户层 API 仅用于评论等读者行为）。S10 范围据此确定。**（2026-10-07 经 D29 修订：blog-web 增设作者中心，登录用户可在前台自助发文/编辑/隐藏/删除自己的文章，走 `/blog/article/**`；平台治理仍仅 plus-ui。plus-ui 作者页保留。见 §6 D29 / S12。）** | 本文件 / plus-ui / SETUP §10.4 / blog-web |
 | 2026-10-05 | D26（标签运营属性守卫补全，S10 验收衍生）：① §13.3 `updateOps` 增状态校验，对 MERGED 标签设精选/排序拒绝（对齐 renameTag/adminDelete 的 MERGED 拒绝模式）；② §13.5 合并事务内精选身份转移——source 精选且 target 非精选则 target 继承精选与排序，target 已精选则保持不变，无论 source 是否精选合并后一律 `source.is_featured=0/sort_order=0`，杜绝 MERGED 记录残留精选（数据不变量：不存在 status=1 且 is_featured=1）。契约/后端/前端同步，不新增表/字段/接口；热门标签实时统计不受影响 | 本文件 / blog-api.md §13.3/§13.5 |
 | 2026-10-06 | D27（端与切片扩展，S10 收尾后用户确认，接回 D21「移动端暂不纳入，将来讨论接回」预留口子）：① **S9 范围明确为响应式**（PC + 移动浏览器一套代码），移动适配在 S9 内交付，不再另起移动 Web 切片；② **uni-app 立项为 S11 移动端套件**，MVP 后启动，目标平台微信小程序 / H5 / App，范围基线=读者套件（列表/详情/搜索/评论），不做发文与治理（D24 口径延伸）；复用 S9 同一接口面零后端改动，认证走统一 `/auth/login` + `sys_client` 既有 `app` 记录（纯配置）；③ 仓库名、页面级切分、启动排期待 S11 开工前另决。注：编号顺延 D26——D25 已被待决策占用，已确认表无 D25，属既定事实非缺录 | 本文件 / SETUP §10.4 |
 | 2026-10-06 | D28（S9 技术栈与开工决策，用户逐项拍板）：① **渲染模式弃 SPA 方案 A、选 SSR，且落地版本从讨论中的 Nuxt 3 升为 Nuxt 4**——starter 仓库 v4 模板（Nuxt 3 已 2026-07-31 EOL，v3/v4-compat 排除；content 模板不适用——内容源是后端 API）；Vite/Vue3/TS/文件路由/自动导入/SSR 全内置，回应"不自建基础"诉求；② 集成清单：`@unocss/nuxt`（与 plus-ui 同语法，uno.config 裁剪复用）+ preset-typography、`@nuxtjs/seo`、`@nuxt/image`、shiki 服务端着色、`@nuxt/eslint`；**无组件库**（博客前台无管理端刚需，薄组件+prose 排版）；③ alias 301 由 Nitro server middleware 原生实现，契约 §7.3 边缘层方案作废；④ 认证：token 走 **cookie + Nitro 代理**（httpOnly，SSR 可读，规避 CORS）；**blog-web 新建 `web` 客户端记录**（与 plus-ui `pc` 会话隔离，grantType 仅 password），SQL 落 docs/blog_s9_web_client.sql；备案：跨端无缝登录不存在（localStorage 按 origin 隔离 + 会话隔离，与 clientid 选择无关，非 SSO 改造不做），plus-ui 仍用 pc；⑤ 响应式策略：**只拍一张桌面骨架**，移动/平板形态由既定断点规则推导（断点=UnoCSS 默认 sm640/md768/lg1024/xl1280），实现期真机微调；⑥ 页面清单 7 项+登录/评论弹层（详 S9 节）；⑦ 治理资产：建仓时 AGENTS.md（§10.4 硬要求）+ 一个 nuxt-frontend-coding skill（symlink 规范），子代理资产按需后加；⑧ SSR-safe 纪律由"迁移预备"升为当下硬性要求（SSR 执行环境） | 本文件 / SETUP §10.4 / docs/blog_s9_web_client.sql |
+| 2026-10-07 | D29（作者端归属修订，用户决定反转 D24）：① blog-web 增设**作者中心**——登录用户可在前台发布 / 编辑 / 发布后隐藏 / 重新公开 / 删除**自己的**文章，全部走 `/blog/article/**` 作者自助层（仅登录、服务端按 `author_id` 隔离，**零后端改动**，接口 S2–S5 已就绪）；② 编辑器复用 plus-ui 同款 **WangEditor `@wangeditor-next/*` 6.4.1**，`<ClientOnly>` 包裹 + 按需加载，**不上 Markdown**（与后端 HTML 净化契约、plus-ui 输出一致，无格式分叉）；③ 作者中心复用 blog-web 已登录的 `web` 会话，**无需二次登录**（解决"发文要跳 plus-ui 重登"的割裂）；④ **平台级治理**（他人文章下线/恢复、标签 rename/merge、评论审核）仍**只在 plus-ui `/blog/admin/**`**，blog-web 禁止调用——作者自助 ≠ 平台治理；⑤ 据此新增切片 **S12**，D24 中"blog-web 不承担发文/编辑"的表述作废（plus-ui 作者页保留，两端共用作者自助接口）。本轮仅同步文档，代码实现另起开发对话 | 本文件 / blog-api.md §15 / blog-web/AGENTS.md / blog-web/docs/plan.md / docs/architecture.md / AGENTS.md §5 |
 
 ### 待决策
 

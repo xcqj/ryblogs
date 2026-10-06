@@ -151,7 +151,7 @@ git clone git@github.com:xcqj/blogs-web.git   blog-web
 |---|---|---|---|
 | 后端 | `RuoYi-Vue-Plus`（`ryblogs`） | ✅ 已存在，已验收至 S8 | ROADMAP §2 |
 | 管理后台 | `plus-ui`（`ryblogs-ui`） | ✅ 已存在 | ROADMAP S1~S8 |
-| PC 博客前台 | `blog-web`（`blogs-web`，2026-10-06 定名） | ✅ **已建仓并同级 clone（2026-10-06 S9 开工：Nuxt 4.5.2 脚手架 + Nitro 代理/cookie 认证 + 首页对接 §5.1/§7.1/§7.2 已跑通）** | ROADMAP S9 + D21；**范围=响应式（PC + 移动浏览器一套代码，D27）；技术栈=Nuxt 4 SSR（D28）**；依赖 S2+S6+S8，只调公共与登录用户两层 API；作者发文/编辑不在前台，属 plus-ui（D24） |
+| PC 博客前台 | `blog-web`（`blogs-web`，2026-10-06 定名） | ✅ **已建仓并同级 clone（2026-10-06 S9 开工：Nuxt 4.5.2 脚手架 + Nitro 代理/cookie 认证 + 首页对接 §5.1/§7.1/§7.2 已跑通）** | ROADMAP S9 + D21；**范围=响应式（PC + 移动浏览器一套代码，D27）；技术栈=Nuxt 4 SSR（D28）**；依赖 S2+S6+S8，只调公共层 + 登录作者自助层（`/blog/article|user/**`）；作者中心（发文/编辑/自助治理自己的文章）在 blog-web（D29 修订 D24），平台治理仍属 plus-ui |
 | 移动端 | —（仓库名待建仓时定） | 🔖 **已立项 S11，MVP 后启动**（2026-10-06 决定，D27；接回 D21 预留口子） | uni-app，目标平台微信小程序 / H5 / App；范围基线=读者套件（列表/详情/搜索/评论），无发文；复用公共接口零后端改动，详见 ROADMAP S11 |
 
 > 客观事实备案：`script/sql/ry_vue.sql` 的 `sys_client` 已预置两条客户端记录——`pc`（clientKey `e5cd7e48...`，
