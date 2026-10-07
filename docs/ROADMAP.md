@@ -208,11 +208,19 @@ S2 遗留接入（已落地）：
 - [x] 执行 `docs/blog_s9_web_client.sql`（幂等，含验证段）新建 `web` 客户端记录（2026-10-06，见 SQL 状态表）
 - [x] 挂 `@unocss/nuxt`（unocss 66.10.5）：uno.config 以 plus-ui 为蓝本裁剪（去 Element Plus 相关 `--el-*` 与 auto-import/`presetWebFonts`，Nuxt 原生；留 wind3/attributify/typography + 补 icons(presetIcons/mdi)，transformers 保留）
 - [x] 自带 AGENTS.md（SETUP §10.4 三条：只调公共/登录读者两层、禁 `/blog/admin/**`、声明对 `../RuoYi-Vue-Plus/docs/` 权威源引用）+ 一个 `nuxt-frontend-coding` skill（`.codex/skills` 实体 + `.qoder/skills` symlink，覆盖新页面/SSR 数据获取、$fetch/Nitro 代理与 cookie 认证、alias 301、UnoCSS+prose、SSR 安全）；不预先建 .claude/agents 子代理
-- [x] 页面清单（D28）：`/` `/page/{n}` `/post/{slug}` `/tag/{slug}` `/search` `/user/{userId}` + 登录/评论弹层；内容页 SSR，评论提交/登录交互 CSR（首页 `/` 已真实对接 §5.1/§7.1/§7.2；`/page/{n}`、`/tag/{slug}` 复用 §5.1 代理；`/post`、`/search`、`/user` 为骨架待接；LoginModal 已建、评论弹层随 `/post` 详情页再接）
+- [x] 页面清单（D28）：`/` `/page/{n}` `/post/{slug}` `/tag/{slug}` `/search` `/user/{userId}` + 登录/评论弹层；内容页 SSR，评论提交/登录交互 CSR（六条路由均已接真实数据；另加 `/tags` §7.5 标签页与 `/me` 作者中心入口占位；登录弹层含验证码，评论发表随 `/post` 落地）
 - [x] 认证：cookie + Nitro server route 代理 `/auth/login`（httpOnly，SSR 可读物；顺带规避 CORS）——`server/api/auth/{login,logout,session}` 就位，token 只落 httpOnly cookie，clientId/grantType 服务端注入；`useAuth` SSR 读登录态（验证码链路属后续切片）
 - [x] 开发环境：runtimeConfig 后端基址 `http://localhost:8081`（`NUXT_API_BASE` 覆盖）；`.env` 的 `NUXT_APP_CLIENT_ID` 映射 `runtimeConfig.appClientId`；Windows 浏览器访问注意 WSL2 localhost 转发既有处理（dev 日志实测 WSL IP `172.31.124.129`，转发失效时直连该 IP）
 - [x] 部署：`nitro.preset: 'node-server'` + blog-web `Dockerfile`（多阶段，`.dockerignore` 排除 `.env` 密钥），docker-compose 新增 `web` 服务（`profiles: ["web"]` 门控，默认 `up -d` 仍只基础设施三件套），architecture.md 部署图同步（2026-10-07 实测：镜像 build EXIT=0、容器内首页 200 且 9 篇 SSR、`/tag/js` 容器内 301、镜像层无密钥残留）
-- [~] 验收：alias 301 链路实测已完成（`js`/`thinkphp`/`spring-boot` → canonical 301，无重定向环）；移动视口经浏览器实测初验通过（390 视口零横向溢出、汉堡可用、深浅切换与首屏无闪烁）——S9 **正式验收**（含 SEO 首屏与真机微调）仍待用户确认后收口
+- [x] 验收：alias 301 链路实测完成（`js`/`thinkphp`/`spring-boot` → canonical 301，canonical 自身 200 无重定向环）；移动视口与 SEO 首屏已经浏览器实测通过（M5：42 组宽度×路由零真实横向溢出、断点 16 观测点对齐 `design/responsive.html`、`lang`/`og`/`description`/正文均在 SSR 首屏）——S9 自动化验收齐备，**正式签收待用户确认**
+
+实施结果（2026-10-07，blog-web 仓库，提交标 `S9-*`，全部未 push 待你签收）：
+
+- **读者功能（M1–M3）**：`/post` 详情(§5.2)+评论列表(§10.1)+发表评论(§10.2)、`/search`(§6)、`/user`(§9.1+§9.2 复用 §5.1 `authorId`) 全部 SSR 跑通；登录走 cookie + Nitro 代理并**复刻后端 api-decrypt 加密链路**（`api-decrypt.enabled=true` + `@ApiEncrypt`，AES-256-ECB + RSA/PKCS1，见 `server/utils/apiCrypto.ts`），用户人工验收登录与发评论通过。
+- **桶A 视觉落地（8 步各一 commit）**：token 单一来源 `app/assets/css/tokens.css` + `uno.config` 全 `var(--…)`；`@nuxtjs/color-mode` 深浅与首屏无闪烁；内联双色 SVG 品牌与 favicon；全站 shell（容器两档 1080/68ch、登录态才显示作者中心）；静态 Hero（three.js 属桶B 保留 `<ClientOnly>` 槽位）；`prose` 正文；状态组件一套（骨架/空/错误/404）；响应式与全站数字分页。新增 `/tags`（§7.5）与 `/me` 入口占位；**TOC 与上一篇/下一篇因契约无接口未做**（已备案）。
+- **验收期修的两条根因**：`@unocss/nuxt` 不注入 preflight → 缺 `box-sizing` 造成手机全站横向溢出；preset-typography 的 `.prose` 后注入覆盖 → 深色正文对比度仅 1.83:1（修复后 16.35:1）。
+- **部署与文档**：`nitro.preset: node-server` + 多阶段 Dockerfile（镜像层实测无密钥）+ compose `web` profile 服务 + `architecture.md` §5 同步；本切片**零后端代码改动**（后端仅 infra 与文档）。
+- 页面/组件粒度进度与偏差记录见 `blog-web/docs/plan.md`（本 ROADMAP 仍为状态权威源）。
 
 ### S10 管理后台前端（博客） ✅（plus-ui 仓库，2026-10-06 已验收）
 
