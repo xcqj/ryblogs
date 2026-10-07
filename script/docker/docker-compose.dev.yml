@@ -43,6 +43,32 @@ services:
     volumes:
       - minio-data:/data
 
+  # blog-web 前台（Nuxt 4 SSR，node-server 镜像）——profile 门控，不影响默认 `up -d` 的三件套
+  # 启动：docker compose -f docker-compose.dev.yml --profile web up -d --build
+  # 构建上下文是同级仓库 blog-web（SETUP §10.1 同级 clone 为硬性前提）；镜像内 npm ci + nuxt build
+  # 密钥（web client_id、RSA 公私钥）不入库：由 blog-web/.env 或 shell 导出后 compose 透传
+  web:
+    image: blog-web:dev
+    container_name: blog-web
+    profiles: ["web"]
+    build:
+      context: ../../blog-web
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      NUXT_HOST: 0.0.0.0
+      NUXT_PORT: "3000"
+      # 容器内访问宿主机上跑的后端（DromaraApplication :8081）
+      NUXT_API_BASE: http://host.docker.internal:8081
+      NUXT_APP_CLIENT_ID: ${NUXT_APP_CLIENT_ID:-}
+      NUXT_RSA_PUBLIC_KEY: ${NUXT_RSA_PUBLIC_KEY:-}
+      NUXT_RSA_PRIVATE_KEY: ${NUXT_RSA_PRIVATE_KEY:-}
+    ports:
+      - "3000:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
 volumes:
   mysql-data:
   redis-data:

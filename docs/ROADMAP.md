@@ -211,8 +211,8 @@ S2 遗留接入（已落地）：
 - [x] 页面清单（D28）：`/` `/page/{n}` `/post/{slug}` `/tag/{slug}` `/search` `/user/{userId}` + 登录/评论弹层；内容页 SSR，评论提交/登录交互 CSR（首页 `/` 已真实对接 §5.1/§7.1/§7.2；`/page/{n}`、`/tag/{slug}` 复用 §5.1 代理；`/post`、`/search`、`/user` 为骨架待接；LoginModal 已建、评论弹层随 `/post` 详情页再接）
 - [x] 认证：cookie + Nitro server route 代理 `/auth/login`（httpOnly，SSR 可读物；顺带规避 CORS）——`server/api/auth/{login,logout,session}` 就位，token 只落 httpOnly cookie，clientId/grantType 服务端注入；`useAuth` SSR 读登录态（验证码链路属后续切片）
 - [x] 开发环境：runtimeConfig 后端基址 `http://localhost:8081`（`NUXT_API_BASE` 覆盖）；`.env` 的 `NUXT_APP_CLIENT_ID` 映射 `runtimeConfig.appClientId`；Windows 浏览器访问注意 WSL2 localhost 转发既有处理（dev 日志实测 WSL IP `172.31.124.129`，转发失效时直连该 IP）
-- [ ] 部署：`nitro.output: 'node-server'` + Dockerfile，docker-compose 新增服务，architecture.md 部署图同步
-- [ ] 验收含移动端视口检查（D27 响应式口径）与 alias 301 链路实测
+- [x] 部署：`nitro.preset: 'node-server'` + blog-web `Dockerfile`（多阶段，`.dockerignore` 排除 `.env` 密钥），docker-compose 新增 `web` 服务（`profiles: ["web"]` 门控，默认 `up -d` 仍只基础设施三件套），architecture.md 部署图同步（2026-10-07 实测：镜像 build EXIT=0、容器内首页 200 且 9 篇 SSR、`/tag/js` 容器内 301、镜像层无密钥残留）
+- [~] 验收：alias 301 链路实测已完成（`js`/`thinkphp`/`spring-boot` → canonical 301，无重定向环）；移动视口经浏览器实测初验通过（390 视口零横向溢出、汉堡可用、深浅切换与首屏无闪烁）——S9 **正式验收**（含 SEO 首屏与真机微调）仍待用户确认后收口
 
 ### S10 管理后台前端（博客） ✅（plus-ui 仓库，2026-10-06 已验收）
 

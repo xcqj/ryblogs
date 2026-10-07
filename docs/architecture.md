@@ -77,11 +77,18 @@ sd_blog_article / sys_user 1─N sd_blog_comment（一级，parent_id 恒 NULL�
 docker-compose.dev.yml（script/docker/）
 ├── blog-mysql   mysql:8.4.9    :3306   库 ry-vue（utf8mb4_general_ci, lower_case_table_names=1）
 ├── blog-redis   redis:8.6.3    :6379   requirepass 见 compose
-└── blog-minio   minio          :9000/:9001  OSS 兼容存储（RuoYi oss 配置指向它）
+├── blog-minio   minio          :9000/:9001  OSS 兼容存储（RuoYi oss 配置指向它）
+└── blog-web     自建镜像（profile=web 才启动）:3000
+                 Nuxt 4 SSR node-server 产物；构建上下文 = 同级仓库 blog-web/Dockerfile
+                 NUXT_API_BASE 指向 host.docker.internal:8081；密钥经 env 注入不入库
 本机（WSL2）
 ├── DromaraApplication（ruoyi-admin，dev profile，端口见 application.yml）
+├── blog-web `npm run dev`（前端日常开发方式，与上容器二选一）
 └── IDEA / Maven 3.9.x / JDK 21（sdkman）
 ```
+
+启动前台容器：`docker compose -f docker-compose.dev.yml --profile web up -d --build`（默认 `up -d` 仍只起基础设施三件套）。
+plus-ui 为纯静态前端，日常 `pnpm dev`、生产产物由 Web 服务器托管，不入本 compose。
 
 生产拓扑与 CI/CD 属 MVP 后议题（PRD §15），暂不设计。
 
