@@ -201,6 +201,8 @@ S2 遗留接入（已落地）：
 
 技术栈定案（D28）：**Nuxt 4**（官方 starter v4 模板）+ Vite/Vue3/TS/文件路由/自动导入/SSR 内置 + UnoCSS（照 plus-ui uno.config 裁剪）+ `@nuxtjs/seo` + `@nuxt/image` + shiki（服务端着色）+ `@nuxt/eslint`；**无组件库**，正文排版 preset-typography + 薄组件。
 
+> 范围收编（D30）：上述集成清单中的 `@nuxtjs/seo`/`@nuxt/image`/shiki/`@nuxt/eslint` 与 three.js 装饰（桶B）已调为 **⏸ 按需 / MVP 后再定**；S9 实装 = `@unocss/nuxt` + `@nuxtjs/color-mode`，SEO 基线由 unhead 原生 `useSeoMeta`（title/description/og/robots/lang）承担。清单见 `blog-web/docs/plan.md` §2.6 与 §2.7。
+
 开工准备清单（新会话/建仓首日照此执行）：
 
 - [x] GitHub 建仓 `blogs-web`，同级 clone 为 `blog-web`（workspace 已预登记 folder，clone 后即生效）
@@ -221,6 +223,7 @@ S2 遗留接入（已落地）：
 - **验收期修的两条根因**：`@unocss/nuxt` 不注入 preflight → 缺 `box-sizing` 造成手机全站横向溢出；preset-typography 的 `.prose` 后注入覆盖 → 深色正文对比度仅 1.83:1（修复后 16.35:1）。
 - **部署与文档**：`nitro.preset: node-server` + 多阶段 Dockerfile（镜像层实测无密钥）+ compose `web` profile 服务 + `architecture.md` §5 同步；本切片**零后端代码改动**（后端仅 infra 与文档）。
 - 页面/组件粒度进度与偏差记录见 `blog-web/docs/plan.md`（本 ROADMAP 仍为状态权威源）。
+- ⏸ 未纳入 S9 承诺的增强项（已按 D30 收编，只此登记不重复展开）：`@nuxtjs/seo`（sitemap/结构化数据）、`@nuxt/image`、shiki、`@nuxt/eslint`、three.js 装饰（桶 B，hero 已留 `<ClientOnly>` 槽位）。
 
 ### S10 管理后台前端（博客） ✅（plus-ui 仓库，2026-10-06 已验收）
 
@@ -376,6 +379,7 @@ S0 → S1 → S2 → S3 → S4 → S5 → S6 → S7 → S8   （后端关键路�
 | 2026-10-06 | D27（端与切片扩展，S10 收尾后用户确认，接回 D21「移动端暂不纳入，将来讨论接回」预留口子）：① **S9 范围明确为响应式**（PC + 移动浏览器一套代码），移动适配在 S9 内交付，不再另起移动 Web 切片；② **uni-app 立项为 S11 移动端套件**，MVP 后启动，目标平台微信小程序 / H5 / App，范围基线=读者套件（列表/详情/搜索/评论），不做发文与治理（D24 口径延伸）；复用 S9 同一接口面零后端改动，认证走统一 `/auth/login` + `sys_client` 既有 `app` 记录（纯配置）；③ 仓库名、页面级切分、启动排期待 S11 开工前另决。注：编号顺延 D26——D25 已被待决策占用，已确认表无 D25，属既定事实非缺录 | 本文件 / SETUP §10.4 |
 | 2026-10-06 | D28（S9 技术栈与开工决策，用户逐项拍板）：① **渲染模式弃 SPA 方案 A、选 SSR，且落地版本从讨论中的 Nuxt 3 升为 Nuxt 4**——starter 仓库 v4 模板（Nuxt 3 已 2026-07-31 EOL，v3/v4-compat 排除；content 模板不适用——内容源是后端 API）；Vite/Vue3/TS/文件路由/自动导入/SSR 全内置，回应"不自建基础"诉求；② 集成清单：`@unocss/nuxt`（与 plus-ui 同语法，uno.config 裁剪复用）+ preset-typography、`@nuxtjs/seo`、`@nuxt/image`、shiki 服务端着色、`@nuxt/eslint`；**无组件库**（博客前台无管理端刚需，薄组件+prose 排版）；③ alias 301 由 Nitro server middleware 原生实现，契约 §7.3 边缘层方案作废；④ 认证：token 走 **cookie + Nitro 代理**（httpOnly，SSR 可读，规避 CORS）；**blog-web 新建 `web` 客户端记录**（与 plus-ui `pc` 会话隔离，grantType 仅 password），SQL 落 docs/blog_s9_web_client.sql；备案：跨端无缝登录不存在（localStorage 按 origin 隔离 + 会话隔离，与 clientid 选择无关，非 SSO 改造不做），plus-ui 仍用 pc；⑤ 响应式策略：**只拍一张桌面骨架**，移动/平板形态由既定断点规则推导（断点=UnoCSS 默认 sm640/md768/lg1024/xl1280），实现期真机微调；⑥ 页面清单 7 项+登录/评论弹层（详 S9 节）；⑦ 治理资产：建仓时 AGENTS.md（§10.4 硬要求）+ 一个 nuxt-frontend-coding skill（symlink 规范），子代理资产按需后加；⑧ SSR-safe 纪律由"迁移预备"升为当下硬性要求（SSR 执行环境） | 本文件 / SETUP §10.4 / docs/blog_s9_web_client.sql |
 | 2026-10-07 | D29（作者端归属修订，用户决定反转 D24）：① blog-web 增设**作者中心**——登录用户可在前台发布 / 编辑 / 发布后隐藏 / 重新公开 / 删除**自己的**文章，全部走 `/blog/article/**` 作者自助层（仅登录、服务端按 `author_id` 隔离，**零后端改动**，接口 S2–S5 已就绪）；② 编辑器复用 plus-ui 同款 **WangEditor `@wangeditor-next/*` 6.4.1**，`<ClientOnly>` 包裹 + 按需加载，**不上 Markdown**（与后端 HTML 净化契约、plus-ui 输出一致，无格式分叉）；③ 作者中心复用 blog-web 已登录的 `web` 会话，**无需二次登录**（解决"发文要跳 plus-ui 重登"的割裂）；④ **平台级治理**（他人文章下线/恢复、标签 rename/merge、评论审核）仍**只在 plus-ui `/blog/admin/**`**，blog-web 禁止调用——作者自助 ≠ 平台治理；⑤ 据此新增切片 **S12**，D24 中"blog-web 不承担发文/编辑"的表述作废（plus-ui 作者页保留，两端共用作者自助接口）。本轮仅同步文档，代码实现另起开发对话 | 本文件 / blog-api.md §15 / blog-web/AGENTS.md / blog-web/docs/plan.md / docs/architecture.md / AGENTS.md §5 |
+| 2026-10-07 | D30（S9 技术栈范围收编，不改变 D28 已实装部分）：D28 集成清单里的 `@nuxtjs/seo`、`@nuxt/image`、shiki、`@nuxt/eslint` 四项与 three.js 装饰（桶 B）由“随切片交付”调为 **⏸ 按需 / MVP 后再定**，不计入 S9 完成标准。理由：① S9 实需已覆盖——SEO 基线由 unhead 原生 `useSeoMeta` 交付（lang/title/description/og/robots，已入首屏），无需整块模块；② 不为非 MVP 能力提前绑依赖（与“不为面试亮点提前写死”一致）；③ 桶 B 与数据链/版式已解耦（hero 预留 `<ClientOnly>` 槽位，注入不改取数代码，见 D28/plan §2.7）。**S9 实际实装 = `@unocss/nuxt` + `@nuxtjs/color-mode`**；待办清单见 `blog-web/docs/plan.md` §2.6/§2.7，本文件 S9 技术栈行与实施结果已加注 | 本文件 / blog-web/docs/plan.md / blog-web/uno.config.ts |
 
 ### 待决策
 
