@@ -30,7 +30,7 @@
 | S6 | 标签治理 | §7、§13、§18.10 | 6 | 后端 | ✅ 已验收（2026-10-01，commit 7620186；含 §5.1，D14） | 2d |
 | S7 | 评论 | §10、§12 | 8（提前） | 后端 | ✅ 已验收（2026-10-01，commit 63e68bd） | 1d |
 | S8 | 搜索与阅读量 | §5.2、§6 | 9 | 后端 | ✅ 已验收（2026-10-03，commit 0dfa282；含 §5.1 补参、§9.2，D18） | 1d |
-| S9 | 前台站（读者） | §15 边界 | 7（后移） | 前端 | ⬜（独立仓库 `blogs-web` → 本地 `blog-web`，D21；范围=响应式含移动浏览器适配，D27；作者发文见 S12/D29） | — |
+| S9 | 前台站（读者） | §15 边界 | 7（后移） | 前端 | ✅ 已验收（2026-10-08 用户签收；独立仓库 `blogs-web` → 本地 `blog-web`，D21；范围=响应式含移动浏览器适配，D27；作者发文见 S12/D29） | — |
 | S10 | 管理后台前端（博客） | §3、§7、§11、§12、§13 | 5/6/8 前端面 | 前端 | ✅ 已验收（2026-10-06，浏览器验收通过；治理页×3 + 作者发文/编辑/详情/版本 + 个人资料 tab + merge，D23/D24/D26） | 3~5d |
 | S11 | 移动端套件（uni-app） | §15 边界（复用） | — | 移动端 | 🔖 立项待启动（MVP 后，D27） | — |
 | S12 | blog-web 作者中心（发文/编辑/自助治理） | §3、§4、§11（作者侧动作） | 2/4/5 前端面 | 前端 | ⬜ 立项（D29 修订 D24；复用 `/blog/article/**`，WangEditor，零后端改动） | 2~4d |
@@ -190,7 +190,7 @@ S2 遗留接入（已落地）：
 
 完成标准：搜索仅返回公共可见文章；详情打开计数 +1；ES 替换不改变 API 契约。
 
-### S9 前台站 ⬜（独立仓库，本表仅登记依赖）
+### S9 前台站 ✅（2026-10-08 用户签收；独立仓库，本表仅登记依赖）
 
 仓库形态（D21 已确认）：与后端、`plus-ui` **同级 clone** 的第三个独立仓库，GitHub 仓库名 `blogs-web`、本地目录 `blog-web`；
 建仓后需向 `tooling/blog.code-workspace` 的 `folders` 追加 `"../../blog-web"`，并照 `plus-ui/AGENTS.md` 形式自带 AGENTS.md（只调公共与登录用户两层 API）。布局约定见 `docs/SETUP.md` §10。
@@ -214,9 +214,9 @@ S2 遗留接入（已落地）：
 - [x] 认证：cookie + Nitro server route 代理 `/auth/login`（httpOnly，SSR 可读物；顺带规避 CORS）——`server/api/auth/{login,logout,session}` 就位，token 只落 httpOnly cookie，clientId/grantType 服务端注入；`useAuth` SSR 读登录态（验证码链路属后续切片）
 - [x] 开发环境：runtimeConfig 后端基址 `http://localhost:8081`（`NUXT_API_BASE` 覆盖）；`.env` 的 `NUXT_APP_CLIENT_ID` 映射 `runtimeConfig.appClientId`；Windows 浏览器访问注意 WSL2 localhost 转发既有处理（dev 日志实测 WSL IP `172.31.124.129`，转发失效时直连该 IP）
 - [x] 部署：`nitro.preset: 'node-server'` + blog-web `Dockerfile`（多阶段，`.dockerignore` 排除 `.env` 密钥），docker-compose 新增 `web` 服务（`profiles: ["web"]` 门控，默认 `up -d` 仍只基础设施三件套），architecture.md 部署图同步（2026-10-07 实测：镜像 build EXIT=0、容器内首页 200 且 9 篇 SSR、`/tag/js` 容器内 301、镜像层无密钥残留）
-- [x] 验收：alias 301 链路实测完成（`js`/`thinkphp`/`spring-boot` → canonical 301，canonical 自身 200 无重定向环）；移动视口与 SEO 首屏已经浏览器实测通过（M5：42 组宽度×路由零真实横向溢出、断点 16 观测点对齐 `design/responsive.html`、`lang`/`og`/`description`/正文均在 SSR 首屏）——S9 自动化验收齐备，**正式签收待用户确认**
+- [x] 验收：alias 301 链路实测完成（`js`/`thinkphp`/`spring-boot` → canonical 301，canonical 自身 200 无重定向环）；移动视口与 SEO 首屏已经浏览器实测通过（M5：42 组宽度×路由零真实横向溢出、断点 16 观测点对齐 `design/responsive.html`、`lang`/`og`/`description`/正文均在 SSR 首屏）。**2026-10-08 用户已签收，S9 转 ✅**
 
-实施结果（2026-10-07，blog-web 仓库，提交标 `S9-*`，全部未 push 待你签收）：
+实施结果（2026-10-07，blog-web 仓库，提交标 `S9-*`；2026-10-08 用户签收）：
 
 - **读者功能（M1–M3）**：`/post` 详情(§5.2)+评论列表(§10.1)+发表评论(§10.2)、`/search`(§6)、`/user`(§9.1+§9.2 复用 §5.1 `authorId`) 全部 SSR 跑通；登录走 cookie + Nitro 代理并**复刻后端 api-decrypt 加密链路**（`api-decrypt.enabled=true` + `@ApiEncrypt`，AES-256-ECB + RSA/PKCS1，见 `server/utils/apiCrypto.ts`），用户人工验收登录与发评论通过。
 - **桶A 视觉落地（8 步各一 commit）**：token 单一来源 `app/assets/css/tokens.css` + `uno.config` 全 `var(--…)`；`@nuxtjs/color-mode` 深浅与首屏无闪烁；内联双色 SVG 品牌与 favicon；全站 shell（容器两档 1080/68ch、登录态才显示作者中心）；静态 Hero（three.js 属桶B 保留 `<ClientOnly>` 槽位）；`prose` 正文；状态组件一套（骨架/空/错误/404）；响应式与全站数字分页。新增 `/tags`（§7.5）与 `/me` 入口占位；**TOC 与上一篇/下一篇因契约无接口未做**（已备案）。
