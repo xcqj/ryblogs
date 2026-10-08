@@ -33,7 +33,7 @@
 | S9 | 前台站（读者） | §15 边界 | 7（后移） | 前端 | ✅ 已验收（2026-10-08 用户签收；独立仓库 `blogs-web` → 本地 `blog-web`，D21；范围=响应式含移动浏览器适配，D27；作者发文见 S12/D29） | — |
 | S10 | 管理后台前端（博客） | §3、§7、§11、§12、§13 | 5/6/8 前端面 | 前端 | ✅ 已验收（2026-10-06，浏览器验收通过；治理页×3 + 作者发文/编辑/详情/版本 + 个人资料 tab + merge，D23/D24/D26） | 3~5d |
 | S11 | 移动端套件（uni-app） | §15 边界（复用） | — | 移动端 | 🔖 立项待启动（MVP 后，D27） | — |
-| S12 | blog-web 作者中心（发文/编辑/自助治理） | §3、§4、§11（作者侧动作） | 2/4/5 前端面 | 前端 | ⬜ 立项（D29 修订 D24；复用 `/blog/article/**`，WangEditor，零后端改动） | 2~4d |
+| S12 | blog-web 作者中心（发文/编辑/自助治理） | §3、§4、§11（作者侧动作） | 2/4/5 前端面 | 前端 | 🔄 已实现待验收（2026-10-08，blog-web `47b9e40`/`366488d`/`28ffc36`；复用 `/blog/article/**`，WangEditor，零后端改动） | 2~4d |
 
 > 与 PRD §12.1 的顺序差异：评论提前到前台站之前，保证后端 API 闭环先行；
 > S9 前台可在 S5 完成后于前端仓库并行启动（首页/列表/详情依赖 S2+S6+S8 的接口）。
@@ -262,7 +262,7 @@ S2 遗留接入（已落地）：
 - 内容渲染：后端净化后 HTML 在小程序端需富文本适配（如 mp-html），启动时定实现
 - 待启动时定：GitHub 仓库名与本地目录、页面级范围切分、建仓后工作区 folders 追加
 
-### S12 blog-web 作者中心 ⬜（blog-web 仓库，D29 修订 D24 后新增）
+### S12 blog-web 作者中心 🔄（blog-web 仓库，D29 修订 D24 后新增；2026-10-08 已实现，待人工验收）
 
 背景（D29）：原 D24 将作者发文/编辑只落在 plus-ui，导致 blog-web 读者想发文必须跳后台二次登录。用户决定反转：**blog-web 增设作者中心**，登录用户在前台自助管理**自己的**文章。
 
@@ -286,6 +286,14 @@ S2 遗留接入（已落地）：
 完成标准：登录用户可在 blog-web 完成发文→编辑→发布→隐藏→重新公开→删除全链路，越权（操作他人文章）被后端拒绝；编辑器仅客户端加载、SSR 不报错；不触碰 `/blog/admin/**`。
 
 > 落地方式：本轮仅同步文档（本 ROADMAP、blog-api.md §15、blog-web/AGENTS.md、blog-web/docs/plan.md、docs/architecture.md、AGENTS.md §5）；**代码实现在独立开发对话进行**（新切片 S12，小步 commit 标 S12/D29）。
+
+实施结果（2026-10-08，blog-web 仓库，零后端代码改动）：
+
+- **S12-1 `47b9e40`**：作者自助代理层 `server/api/blog/article/[...path].ts`（catch-all + 方法/路径白名单，覆盖 §3.2~3.8 与 §4.1/4.2）；`/me` 我的文章列表：5 个状态 tab + 并发取计数 + 数字分页 + 骨架/空/错误态；`AuthorArticleRow` 动作可见性严格按契约状态机与 D13（ADMIN_HIDDEN 编辑禁用、不可自恢复）；`useRequireAuth` 客户端守卫复用 `LoginModal`（§2.8 锁定，不做 RBAC 动态路由）。
+- **S12-2 `366488d`**：WangEditor 6.4.1（与 plus-ui 同版本）`ArticleEditor` + `TagChipsInput`(1~6) + `CoverField` + `ArticleForm`；`/me/new` 与 `/me/{id}/edit` 均 `ssr:false`+`noindex`；新建后自动转编辑路由避免重复创建；图片上传经本站 OSS 代理，前端不碰 token/clientid。实测 WangEditor 为独立 chunk（661KB）**不进读者首屏 bundle**。
+- **S12-3 `28ffc36`**：`/me/profile`（§8.1/8.2，仅 bio 可改≤500，头像/昵称只读）+ `VersionHistory`（§4.1/4.2 折叠面板与快照弹层，**append-only 不提供恢复**）。
+- **两个已备案偏差**：① 图片存**真实 URL** 而非 `oss://` 标记（D31，根因是解析接口需登录致匿名读者破图）；② mockup 的「更换头像」未做——属 `/system/user/**`，超出 blog-web 允许 API 层（红线），改为文案提示。
+- 实测：`npm run build` 全绿；`/me`、`/me/profile`、`/me/new`、`/me/{id}/edit` 均 200；作者侧代理（my / detail / create / save / versions / profile）无 cookie 均 **401**，白名单外 **405**；读者首页 SSR 无回归。**待人工验收**：登录→发文→编辑→发布→隐藏→重新公开→删除 全链路，以及越权（改他人文章）被后端拒绝。
 
 ### 一次性 SQL 脚本执行状态（docs/）
 
