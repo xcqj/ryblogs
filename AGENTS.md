@@ -132,5 +132,5 @@ Generator 定位是生成 RuoYi 风格骨架，不是完成博客业务。Entity
 | `docs/blog-api.md` | 博客 MVP API 契约 v0.2：三层 API 边界、接口清单、权限标识、状态动作规则 | 接口实现与文档冲突时，先报告冲突再修订，不得默默偏离契约 |
 | `docs/database-design-v0.1.md` | 数据库设计：字段语义、约束、索引、生命周期、实体映射 | 文中表名为 `blog_*` 逻辑命名 |
 | `docs/blog_schema_v0.1.sql` | 实际建表 SQL | **表前缀 `sd_blog_`，以此与实际库为准** |
-| `.codex/skills/ruoyi-plus-ai-coding/` | 编码规范 skill（SKILL.md + references）；`.qoder/skills/` 下同名条目是指向它的符号链接（Qoder 自动加载用，勿复制出第二份） | 后端/前端任务动手前先读对应 reference |
+| `.codex/skills/ruoyi-plus-ai-coding/` | 编码规范 skill（SKILL.md + references）；`.qoder/skills/` 与 `.dsh/skills/` 下同名条目是指向它的符号链接（Qoder / DSH 自动加载用，勿复制出第二份） | 后端/前端任务动手前先读对应 reference |
 | `.claude/agents/backend-*.md` | 后端任务型子代理规则 | 按任务类型选用 |
