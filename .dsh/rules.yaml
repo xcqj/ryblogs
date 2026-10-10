@@ -1,0 +1,28 @@
+# DSH 网络策略规则（dsh-permission-rules）
+# 工作区链文件：由「设置 → 权限规则 → 放行」维护，也可手工编辑。
+# 与宿主链文件 ~/.dsh/rules.yaml 保持同一份规则（profile 已开 searchUp: true，从会话 cwd 向上逐级合并，就近优先）。
+rules:
+  - match:
+      network:
+        domains:
+          - mirrors.cloud.tencent.com
+    action: allow
+    reason: Allow mirrors.cloud.tencent.com (added from the settings page)
+  - match:
+      network:
+        domains:
+          - awesome-dsh-plugin.com
+    action: allow
+    reason: Allow awesome-dsh-plugin.com (added from the settings page)
+  - match:
+      network:
+        domains:
+          - registry.npmjs.org
+          - cdn.jsdelivr.net
+          - github.com
+          - codeload.github.com
+          - objects.githubusercontent.com
+          - raw.githubusercontent.com
+          - api.githubcopilot.com
+    action: allow
+    reason: "npm registry / jsDelivr / GitHub（插件市场、MCP 目录、git 源插件安装）与 GitHub MCP 远程端点"
