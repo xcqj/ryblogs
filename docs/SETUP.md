@@ -159,3 +159,23 @@ git clone git@github.com:xcqj/blogs-web.git   blog-web
 > `grantType=password,sms,social`）。纯浏览的公共页面走 `security.excludes` 匿名接口不需要 client；
 > 前台一旦要登录 / 发文 / 评论，就得携 `clientid` 头（本文 §8），复用 `pc` 记录或按需新增一条；**D28 已定：blog-web 新建独立 `web` 记录**（clientKey `web`、grantType 仅 password，与 `pc` 会话隔离），SQL 见 `docs/blog_s9_web_client.sql`（幂等含验证段，待 S9 建仓时执行）；plus-ui 继续用 `pc` 不变；
 > S11 移动端可直接复用既有 `app` 记录（`grantType=password,sms,social`，是否按短信/社交收缩其授权类型属 S11 开工时定，纯配置零代码，D27 备案）。
+
+### 10.5 多 harness 的 Agent 编排层（D32）
+
+接入新的 Agent 工具 / harness 时，**不要为每个工具复制一套资产，也不要把 §10.2 的工作区文件迁走**。三类东西各归其位：
+
+| 概念 | 谁在用 | 位置 |
+|---|---|---|
+| IDE 多根工作区 | VS Code / Cursor 可视化同时打开三仓 | `RuoYi-Vue-Plus/tooling/blog.code-workspace`（唯一权威副本，由本仓库托管） |
+| Agent 会话根 | WorkBuddy 等 harness 的工作目录 | 父目录 `sd-blog/`（非 Git 仓库，见 §10.3） |
+| 跨仓路由枢纽 | 会话根落在父目录时的入口 | `sd-blog/AGENTS.md`（hub，只做路由） |
+| 各仓领域权威 | 单独打开某一个仓库时 | 该仓 `AGENTS.md` + `.codex/skills/` + `.claude/agents/` |
+
+四条硬约束：
+
+1. **hub 只做路由**：仓库地图 + 权威源指针 + 跨仓环境红线。**禁止复制子仓 `AGENTS.md` 里的规则正文**（D1「避免双源漂移」同一原则）；与子仓冲突时一律以子仓为准，并回头修订 hub。
+2. **技能一律用转发 shim**：父目录 `.workbuddy/skills/<name>/SKILL.md` 只含 frontmatter + 必读清单 + 跨工具补充纪律，正文唯一存在于各仓 `.codex/skills/`。**禁止产出第二份 SKILL.md 实体**。`.qoder/skills` 沿用既有 symlink 口径**保留不删**（它只是历史 harness 的加载入口，非事实源）。
+3. **hub 与 shim 不入库**：父目录不是 Git 仓库（§10.3 的有意取舍），代价是换机器需重建；因此其每条约定必须在 `docs/ROADMAP.md` §6（D32）与本仓库 `AGENTS.md` §3 / §11 **双向登记，登记缺失即视为该约定失效**。
+4. **一个 Agent 会话只动一个仓库**：跨仓联调拆成多步、各自独立提交，避免单次改动横跨多个 Git 仓库而无法原子回滚。构建命令沿用 §10.3：`mvn` 只在 `RuoYi-Vue-Plus/` 内跑，`npm` / `pnpm` 只在对应前端仓目录内跑，**一律不在父目录执行**。
+
+> 边界澄清：单独打开任一子仓（比如只开 `plus-ui`）时，该仓 `AGENTS.md` 已自洽；hub 只服务跨仓场景——两者互补而非替代，**不要把 hub 写成第四个仓库**。

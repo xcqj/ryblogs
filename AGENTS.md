@@ -8,7 +8,7 @@
 - 基于 **RuoYi-Vue-Plus 6.X** 的后端仓库，构建**多用户 / 多作者技术博客 / 内容平台**。
 - 博客业务通过独立 Maven 模块 `sd-blog` 接入，Java 包名 `org.dromara.blog`。
 - 前端有两个独立仓库：`plus-ui`（PLUS-UI 6.X-Vue，管理后台）与已确认待建仓的 `blogs-web`（本地 `blog-web`，PC 博客前台，S9）；均与本仓库**同级 clone**（布局与工作区见 `docs/SETUP.md` §10）。本仓库只负责后端（含 generator 前端模板产物），移动端暂不纳入（ROADMAP D21）。
-- 策略：先完成可真实运行的博客 MVP；ES、多级缓存、PWA、SEO、CI/CD 等 MVP 后再决定，不为“面试亮点”提前写死非 MVP 技术。
+- 策略：先完成可真实运行的博客 MVP；ES、多级缓存、PWA、SEO、CI/CD 等 MVP 后再决定，不为"面试亮点"提前写死非 MVP 技术。
 
 ## 2. 工具链
 
@@ -26,6 +26,7 @@
 | Mapper XML | `sd-blog/src/main/resources/mapper/blog/` |
 | 数据库表前缀 | `sd_blog_`（以 `docs/blog_schema_v0.1.sql` 与实际库为准） |
 | IDE 工作区文件 | `tooling/blog.code-workspace`（多根工作区**唯一权威副本**，由本仓库托管；新增前端仓库时向其 `folders` 追加，不在父目录另存一份） |
+| 父目录路由枢纽 | `../AGENTS.md`（父目录 `sd-blog/AGENTS.md`）：Agent 会话根落在父目录时的跨仓路由入口，**只做地图 / 指针 / 跨仓红线，不重复本文已有规则**；与本文冲突时以本文件为准（D32） |
 
 Maven 接入点（三处必须同时一致，已配置完成）：根 `pom.xml` 的 `<dependencyManagement>`、`ruoyi-modules/pom.xml` 的 `<modules>`、`ruoyi-admin/pom.xml` 的 `<dependencies>`。
 
@@ -77,10 +78,10 @@ Generator 定位是生成 RuoYi 风格骨架，不是完成博客业务。Entity
 
 已验证的坑（务必遵守）：
 
-- 生成器字段配置里，主键列必须勾选“查询”：BO 模板只为勾选了“查询/新增/修改”的列生成字段，而 ServiceImpl 模板无条件引用 `bo.setXxxId(...)` 主键回填，漏勾会直接编译错误。
+- 生成器字段配置里，主键列必须勾选"查询"：BO 模板只为勾选了"查询/新增/修改"的列生成字段，而 ServiceImpl 模板无条件引用 `bo.setXxxId(...)` 主键回填，漏勾会直接编译错误。
 - 导入表时 `packageName` 填 `org.dromara.blog`、`moduleName` 填 `blog`：模块目录名 `sd-blog` 含连字符，不能用作 Java 包名。
 - 生成只支持下载 zip，需人工解压放入模块与前端工程；菜单 SQL 需手动执行。
-- 修改表结构后先用“同步”功能刷新字段配置再重新生成。
+- 修改表结构后先用"同步"功能刷新字段配置再重新生成。
 
 ## 8. 构建与排障
 
@@ -92,6 +93,7 @@ Generator 定位是生成 RuoYi 风格骨架，不是完成博客业务。Entity
 - 复制模块目录时不要带上 `target/` 与 `.flattened-pom.xml` 残留；模块改名后必须 clean。
 - IDEA Maven 同步报错（未解析插件等）时，先对齐 IDEA 与命令行的 Maven home / settings.xml，再判断是不是代码问题。
 - ⚠️ **不要在父目录（多仓库同级的上层目录，如 `sd-blog/`）执行 `mvn`**：会在不受任何 `.gitignore` 保护的父目录落下游离 `target/`（mapstruct-plus 编译期产物）长期残留成噪音；构建一律在 `RuoYi-Vue-Plus/` 目录内执行（`./mvnw` 或 `mvn`）。详见 `docs/SETUP.md` §10.3。
+- ⚠️ 同理，前端构建（`npm` / `pnpm`）只在各自前端仓库目录内执行，也不要在父目录跑（D32 抬升为通用约束）。
 
 测试策略（切片级约定）：
 
@@ -117,8 +119,9 @@ Generator 定位是生成 RuoYi 风格骨架，不是完成博客业务。Entity
 ```
 
 - 一次只实现一个明确 Feature，一个 feature 一个小步 commit；修改代码前建立 Git checkpoint；不要让两个 Agent 同时修改同一工作区；关键权限/删除逻辑人工复核。
+- 一次 Agent 会话原则上只动**一个仓库**：跨仓联调拆成多步、各自独立提交，避免一次改动横跨多个 Git 仓库而无法原子回滚（D32）。
 - 开发切片顺序、功能需求编号、MVP 验收标准以 PRD §5 / §12.1 / §14 为准；每个切片闭环：数据库/后端 → Apifox → 前端 → 联调 → 浏览器验收。
-- MVP 范围与“明确不做”清单以 PRD §2.3 / §15 为准（ES、多级缓存、PWA、第三方登录、点赞/收藏/关注、多级评论、评论前置审核、版本恢复、回收站、定时发布、AI 功能等，除需求文档明确加入外不主动实现）。
+- MVP 范围与"明确不做"清单以 PRD §2.3 / §15 为准（ES、多级缓存、PWA、第三方登录、点赞/收藏/关注、多级评论、评论前置审核、版本恢复、回收站、定时发布、AI 功能等，除需求文档明确加入外不主动实现）。
 - 发现设计与现有代码冲突时，先明确指出冲突，不要默默改变设计；文档冲突时先识别冲突并报告，由最新明确决定裁决。
 
 ## 11. 参考文档
@@ -132,5 +135,6 @@ Generator 定位是生成 RuoYi 风格骨架，不是完成博客业务。Entity
 | `docs/blog-api.md` | 博客 MVP API 契约 v0.2：三层 API 边界、接口清单、权限标识、状态动作规则 | 接口实现与文档冲突时，先报告冲突再修订，不得默默偏离契约 |
 | `docs/database-design-v0.1.md` | 数据库设计：字段语义、约束、索引、生命周期、实体映射 | 文中表名为 `blog_*` 逻辑命名 |
 | `docs/blog_schema_v0.1.sql` | 实际建表 SQL | **表前缀 `sd_blog_`，以此与实际库为准** |
+| `../AGENTS.md`（父目录 `sd-blog/`） | 跨仓路由枢纽：仓库地图、权威源指针、跨仓环境红线 | Agent 会话根在父目录时的入口；属**本机工具接线层不入库**，其每条约定须与本文 + `SETUP.md` §10.5 双向登记，否则视为失效（D32） |
 | `.codex/skills/ruoyi-plus-ai-coding/` | 编码规范 skill（SKILL.md + references）；`.qoder/skills/` 与 `.dsh/skills/` 下同名条目是指向它的符号链接（Qoder / DSH 自动加载用，勿复制出第二份） | 后端/前端任务动手前先读对应 reference |
 | `.claude/agents/backend-*.md` | 后端任务型子代理规则 | 按任务类型选用 |
