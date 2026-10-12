@@ -9,6 +9,8 @@
       "**/target": true,
       "**/node_modules": true,
       "**/dist": true,
+      "**/.nuxt": true,
+      "**/.output": true,
       "**/*.log": true,
       "**/*.log.gz": true
     },
@@ -16,6 +18,8 @@
       "**/target/**": true,
       "**/node_modules/**": true,
       "**/dist/**": true,
+      "**/.nuxt/**": true,
+      "**/.output/**": true,
       "**/logs/**": true
     }
   }
