@@ -1,6 +1,6 @@
 # 博客 MVP 开发路线图（ROADMAP）
 
-> 状态：v0.3 · 2026-10-06
+> 状态：v0.4 · 2026-10-13（新增 S13~S21 面试亮点切片；MVP S0–S12 已全部关闭）
 > 定位：排期文档——做什么、按什么顺序做、每一步的完成标准是什么。
 > 本文件不重复权威内容，只引用：
 >
@@ -34,6 +34,15 @@
 | S10 | 管理后台前端（博客） | §3、§7、§11、§12、§13 | 5/6/8 前端面 | 前端 | ✅ 已验收（2026-10-06，浏览器验收通过；治理页×3 + 作者发文/编辑/详情/版本 + 个人资料 tab + merge，D23/D24/D26） | 3~5d |
 | S11 | 移动端套件（uni-app） | §15 边界（复用） | — | 移动端 | 🔖 立项待启动（MVP 后，D27） | — |
 | S12 | blog-web 作者中心（发文/编辑/自助治理） | §3、§4、§11（作者侧动作） | 2/4/5 前端面 | 前端 | ✅ 已验收（2026-10-08 用户确认；发文/编辑/发布/版本链路跑通，三条交互修正回归通过；blog-web `47b9e40`/`366488d`/`28ffc36`，零后端改动） | 2~4d |
+| S13 | 线上部署与生产化 | — | — | 后端+前端 | ⏳ 待启动（D0 采购/备案先行，等待期并行 S14/S15） | 1~2d+备案 |
+| S14 | GitHub/Gitee 社交登录 | §2.8（登录，复用） | — | 后端+前端(blog-web) | ⏳ 待启动 | 2d |
+| S15 | 阅读量 Redis 异步计数 | §5.2 | — | 后端(+blog-web 小改) | ⏳ 待启动 | 1d |
+| S16 | ES 搜索替换 MySQL LIKE | §6 | — | 后端(+blog-web 高亮 UI) | ⏳ 待启动（D36 已关闭：服务端高亮，含契约变更） | 3~5d |
+| S17 | PWA + SEO 三件套 | — | — | 前端(blog-web) | ⏳ 待启动 | 1~1.5d |
+| S18 | 接口限流 | — | — | 后端 | ⏳ 待启动 | 0.5d |
+| S19 | plus-ui 登录页/后台首页改版 | — | — | 前端(plus-ui) | ⏳ 待启动（核心完成后） | 0.5~1d |
+| S20 | Lenis 平滑滚动（动效收缩，D38） | — | — | 前端(blog-web) | ⏸ 待定（核心完成后，可砍） | 0.5d |
+| S21 | CI/CD 补全（可选） | — | — | 后端+前端 | ⏸ 可选 | 1d |
 
 > 与 PRD §12.1 的顺序差异：评论提前到前台站之前，保证后端 API 闭环先行；
 > S9 前台可在 S5 完成后于前端仓库并行启动（首页/列表/详情依赖 S2+S6+S8 的接口）。
@@ -300,6 +309,156 @@ S2 遗留接入（已落地）：
 - 实测：`npm run build` 全绿；`/me`、`/me/profile`、`/me/new`、`/me/{id}/edit` 均 200；作者侧代理（my / detail / create / save / versions / profile）无 cookie 均 **401**，白名单外 **405**；读者首页 SSR 无回归。
 - **验收结论（2026-10-08，用户确认）**：发文→保存→发布→编辑→历史版本→个人资料链路跑通；后续三轮为**样式与交互打磨**（对照掘金列表/写作页，见 `blog-web/docs/plan.md` §2.10），不再属于 S12 功能范围；MVP 至此 S0–S12 全部关闭，余下仅 S11（移动端，MVP 后）。
 
+### S13 线上部署与生产化 ⏳（2026-10-13 规划；D0 采购/备案先行）
+
+背景（D33/D37）：面试项目需要"可访问"的线上环境，用户倾向优先白嫖方案。**本切片最先启动的只有采购与备案时钟**（1~2 周等待），实际配置工作在等待期内或之后进行。方案细节（规格/带宽/成本/清单）见 `docs/cloud-deployment.md`。
+
+依赖：无（S16 的 ES 上线需 4G+ 内存，选型时预留）。
+
+范围与步骤：
+
+1. 服务器 + 域名到位（白嫖 Oracle / 国内轻量，D37 拍板），提交 ICP 备案（大陆）或选香港节点；
+2. 按 `docs/cloud-deployment.md` 执行：生产 compose 化（mysql / redis / minio 或云 OSS、nginx、ruoyi-admin、blog-web；S16 后加 ES）、nginx 反代 + Let's Encrypt HTTPS、安全组仅暴露 80/443、env 密钥注入、mysqldump 定时 + 一次恢复演练；完成后同步 `architecture.md` §5 部署拓扑（补生产形态，S9 同例）；
+3. 后端镜像：`ruoyi-admin/Dockerfile` 已存在，构建验证；blog-web 镜像 S9 已交付，补生产 `NUXT_API_BASE`（内网服务名）与密钥 env；
+4. OSS 决策落地（D31 生产约定：公有读 + CDN 域名，或 MinIO + CDN 回源）；
+5. 上线冒烟：首页 / 详情 / 搜索 / 登录 / 注册 / 作者中心 / 后台登录；uptime 监控（UptimeRobot 免费档）。
+
+验收清单：
+
+- [ ] 域名 HTTPS 200，HTTP 跳转 HTTPS；
+- [ ] 仅 80/443 暴露；3306/6379/9000/9200 内网 + 强密码（开发环境口令不带入生产）；
+- [ ] 镜像层无密钥（`docker history` 抽验，S9 同法）；
+- [ ] 冒烟七条全过；图片经 CDN/OSS 域无破图；
+- [ ] 备份任务在跑 + 恢复演练一次；
+- [ ] 备案号页脚展示（大陆）。
+
+> D32 纪律：产物横跨三仓（后端 compose/镜像、blog-web env、plus-ui 构建），按仓分步提交，每仓独立可回滚。
+
+### S14 GitHub/Gitee 社交登录 ⏳（2026-10-13 规划；2d）
+
+背景（D34）：框架 JustAuth 全链路已内置，但**默认只支持"已绑定账号登录"**（`SocialAuthStrategy` 未绑定直接抛错，绑定入口又要求先登录）。读者场景需要"首次 GitHub 登录自动注册"，需小改造。**微信/QQ/钉钉因企业资质门槛不接入**（已评估边界，写进 README）。
+
+依赖：无硬依赖（GitHub OAuth App callback 支持 localhost，本地可开发演示；上线后体验更完整，故排 S13 之后）。
+
+范围与步骤（跨仓，按 D32 分两个提交周期）：
+
+1. 后端（ruoyi-admin）：
+   - `SocialAuthStrategy` 扩展：未绑定 → 自动建号（随机不可用密码 / 禁账密登录 / 默认角色 / 昵称冲突处理）→ 写 `sys_social` 绑定 → 直接登录（约 100 行）；**安全边界按红线人工复核**（AGENTS.md §9/§10）；
+   - `application.yml` justauth 配置 GitHub/Gitee（client id/secret 走 env；redirectUri 指向 blog-web 落地页）；
+   - `web` 客户端 `grant_types` 加 `social`（plus-ui 后台客户端管理修改，**不落 SQL 脚本**；`AuthController` 登录时会校验客户端 grantType，漏加直接拒）。
+2. blog-web（细项见 `blog-web/docs/plan.md` §2.15）：
+   - `LoginModal` 加 GitHub/Gitee 按钮，经服务端代理取 `/auth/binding/{source}` 授权 URL 跳转；
+   - Nitro 落地路由收 `code/state` → 调 `/auth/login`（grantType=social，clientid=web）→ 种 httpOnly cookie → 跳回原页面；
+   - 失败分支：授权失败 / 平台错误 / 账号停用的统一错误提示。
+
+验收清单：
+
+- [ ] 新用户 GitHub 首次登录自动建号并进入登录态，`sys_user` / `sys_social` 记录正确；
+- [ ] 二次 GitHub 登录直达已绑定账号；
+- [ ] 自动创建的账号**不能账密登录**（安全边界人工复核通过）；
+- [ ] 解绑（`DELETE /auth/unlock/{socialId}`）后该社交账号登录走本地账号；
+- [ ] Apifox 五类用例更新（正向 / 鉴权失败 / 参数校验 / 资源不存在 / 越权）；
+- [ ] plus-ui 登录页账密登录可用、SocialCallback 路由保留（S19 改版纪律）。
+
+契约：无新增端点（复用 `/auth/login`、`/auth/binding/{source}`、`/auth/unlock/{socialId}`），`blog-api.md` 不动。
+
+### S15 阅读量 Redis 异步计数 ⏳（2026-10-13 规划；1d）
+
+背景（D35，修订 D8 的"MVP 不上 Redis/异步"）：详情读接口不再每次写 DB 行锁，改 Redis 内存自增 + 定时批量回写。
+
+依赖：Redis 已在 compose 运行；blog-web 需在详情代理补 visitorId cookie（跨仓小改，同切片第二个提交周期）。
+
+范围与步骤：
+
+1. `ViewCountService`（新；纯逻辑部分独立成类便于单测）：
+   - 计数：Lua 脚本原子执行「窗口去重 SETNX（登录 userId / 匿名 visitorId，TTL 30min 可配）+ HINCRBY 待增量」；
+   - 读：详情返回 `DB view_count + 待增量`（契约响应结构不变，语义登记 §6）；
+   - flush：`@Scheduled(fixedDelay=10s)` HGETALL → 逐条 `UPDATE ... SET view_count = view_count + delta` → HDEL；
+   - 降级：Redis 不可用 → catch 后直连 DB `UPDATE +1`（维持 S8 行为）。
+2. blog-web：详情代理种 visitorId cookie（httpOnly，随机 UUID）；
+3. redis 配置 `appendonly yes`（compose 挂载的 conf 目录）；
+4. 单测（纯逻辑）：delta 合并 → 批量 SQL 构造、去重 key 生成与 TTL 参数。
+
+验收清单：
+
+- [ ] 连续刷新：同一访客 30min 内只 +1；换访客 / 过期后 +1；
+- [ ] flush 后 DB 值与预期一致（`docker exec blog-mysql` 只读核验）；
+- [ ] 杀进程重启：阅读量不回退、不跳变；
+- [ ] 停 Redis：详情仍 200，降级直写 DB；
+- [ ] 并发刷新无负值（脚本或 JMeter 压测）；
+- [ ] Apifox 详情用例语义更新并回归。
+
+### S16 ES 搜索替换 MySQL LIKE ⏳（2026-10-13 规划；3~5d；D36 已关闭：服务端高亮）
+
+背景（D19 预留）：`ArticleSearchService` 接口注释已写明"引入 ES 时替换实现即可，不改变契约"。本切片兑现该预留。
+
+依赖：S13（线上 ES 需 4G+；本地 WSL2 16G 无压力）。D36 已关闭：服务端高亮（含 `blog-api.md` §6 契约变更，实现前先修订）。
+
+范围与步骤：
+
+1. 基础设施：compose 加 ES 8 单节点（`ES_JAVA_OPTS=-Xms512m -Xmx512m`，xpack.security 按需关闭或设密码，宿主机 `vm.max_map_count` 调够）；IK 分词插件用自建 Dockerfile 安装（版本匹配，**第一步先验证网络/安装可行性**，失败退 OpenSearch）；
+2. 索引：mapping（`articleId` keyword / `title` text(ik_max_word, boost) / `summary` / `content`（净化后纯文本）/ `tags` keyword / `publishedAt` date）+ alias `blog_article`；**只索引公共可见文章**（发布/重新公开入索引，隐藏/下线/删除删文档——三条件内建为索引生命周期，查询端不再过滤）；
+3. 同步：文章 Service 事务成功后发 Spring 事件 → 同步 ES；对账定时任务（比对公共文章集合）兜底；
+4. 查询：`EsArticleSearchService` 新实现——ES 返回 id + score → 批量回表 MySQL 拼 VO（复用 `ArticleTagFiller`）→ 深翻页用 `search_after`；
+5. 零停机重建演示：建 v2 → reindex → 原子切 alias；
+6. 演示数据：20~30 篇中文技术文章（脚本化、标注可清理）+ 灌 1~5 万篇压测数据跑 LIKE vs ES 延迟对比（**用完清理，清理方式随切片登记**）；
+7. 高亮（D36 服务端方案）：**先修订 `blog-api.md` §6**（`/blog/public/search` 响应新增可选 `highlight` 字段，向后兼容）再实现——ES `highlight` 查询取 title/summary/content 匹配片段（`<em>` 包裹；ES 默认编码器会转义片段内其余 HTML，前端可信任）；blog-web 搜索页渲染片段（`ArticleCard` 摘要位，命中词高亮）。
+
+验收清单：
+
+- [ ] 中文分词实测："Python爬虫"命中"Python 爬虫"；自定义词典技术词整词匹配；
+- [ ] 草稿 / 用户隐藏 / 管理员下线 / 逻辑删除文章**不出现在搜索**（红线核验，Apifox 越权类用例）；
+- [ ] 编辑内容后索引同步更新（title/summary/content 变化均触发）；
+- [ ] alias 切换零停机；对账任务能发现并修复不同步；
+- [ ] LIKE vs ES 对比数据留档（面试材料）；
+- [ ] **契约先行**：实现前完成 `blog-api.md` §6 修订（响应新增可选 `highlight` 字段，D36）；Apifox 五类用例全过（含高亮片段抽查：命中词 `<em>` 包裹、其余内容转义）；
+
+### S17 PWA + SEO 三件套 ⏳（blog-web；1~1.5d）
+
+依赖：S13（HTTPS 下完整体验）；无后端改动。细项见 `blog-web/docs/plan.md` §2.16。
+
+范围与步骤：
+
+1. `@vite-pwa/nuxt`：manifest + Workbox 策略——app shell precache / 文章页 stale-while-revalidate / API network-first；离线回退页；**`/me/**` 与需登录 API 不进 SW 缓存**（红线）；
+2. SEO 三件套（不引整模块，Nitro route 手写更轻）：`sitemap.xml`（查公共列表生成，含 lastmod）、`rss.xml`（RSS 2.0 最新 N 篇）、JSON-LD `Article`（`/post`，在现有 `useSeoMeta` 基线上扩展）；`robots.txt` 声明 sitemap；
+3. 验收：Lighthouse（本地 Chrome）PWA + SEO 分数留档；断网刷新已加载文章可读；view-source 抽验结构化数据；移动视口回归；iOS 无 SW 的限制写进 README（实事求是）。
+
+### S18 接口限流 ⏳（后端；0.5d）
+
+依赖：无（复用框架 `@RateLimiter`，Redis 已在位）。
+
+范围与步骤：
+
+1. 限流点：`/auth/login`（IP+username 键，防暴力破解，与 S14 成对）、发表评论（用户键）、`/blog/public/search`（IP 键）；
+2. 规则配置化（application.yml 或 sys_config，不硬编码）；
+3. 超限行为确认（框架默认拒绝码与文案）并在 Apifox 登记用例。
+
+验收：超限返回符合预期且正常用户无感；限流键与阈值文档化（§6 备案）。
+
+### S19 plus-ui 登录页 / 后台首页改版 ⏳（plus-ui；0.5~1d，核心完成后）
+
+背景：后台首页与登录页仍是框架默认样式，与博客项目气质不符；与业务逻辑零关联，排最后。细项见 `plus-ui/docs/frontend-plan.md` §4。
+
+范围与步骤：
+
+1. 登录页博客化改造（Impeccable skill，**必须按项目 token 体系重构**，不照抄默认）；**保留登录逻辑、验证码链路、SocialCallback 路由不动**；
+2. 后台首页：博客数据概览（文章/评论/标签计数、待治理评论，调 `blog:article:list` 等已有接口）或静态欢迎页（开工前拍板）；
+3. 响应式与框架风格保持一致。
+
+验收：浏览器验收（桌面 + 移动视口）；`vue-tsc` 0 错 + 构建通过；治理页/作者页无回归；不动权限与路由结构（三层 API 边界红线）。
+
+### S20 Lenis 平滑滚动 ⏸（blog-web；待定，核心完成后；0.5d）
+
+范围（D38 收缩后）：仅 Lenis；hero 视差 / 逐字进场待定；**不做 three.js 背景、不引 GSAP**（内容站违和，SSR 与首屏成本不成比例；GSAP 与 Lenis 收益重叠）。纯表现层：无契约/数据/状态机改动，独立 commit，随时插拔。
+
+验收：与页面过渡、PWA 叠加无冲突；`prefers-reduced-motion` 兜底生效（transitions.css 已有，确认 Lenis 同样尊重）；移动端滚动手感人工确认。
+
+### S21 CI/CD 补全 ⏸（可选；1d）
+
+范围：后端 `mvn compile + test`、blog-web `typecheck + build` 的 GitHub Actions 工作流（plus-ui 已有最小 CI 可扩展）；public 仓库 Actions 免费额度无限。
+
+验收：push / PR 触发全绿；失败可阻断合并（branch protection 可选）。
+
 ### 一次性 SQL 脚本执行状态（docs/）
 
 > 下列迁移 / 清理 / 菜单脚本均为一次性执行，截至 2026-10-05 已全部在 `ry-vue` 库执行完毕，在此登记以免被误当作待办或重复执行。建表基线 `blog_schema_v0.1.sql` 属环境初始化（见 SETUP §3），不列入本表。
@@ -315,6 +474,8 @@ S2 遗留接入（已落地）：
 | `blog_s10_menu.sql` | S10 治理页 C 型菜单入口（文章/标签/评论，parent=博客目录） | ✅ 已执行（2026-10-05） |
 | `blog_s9_web_client.sql` | S9 开工准备：sys_client 新增 `web` 客户端记录（D28，幂等含验证段） | ✅ 已执行（2026-10-06，验证段 1 行：client_id `f38076e6bb30a1170b9ea3fbebac0815`、grant_type 仅 password、status/del_flag 均 0） |
 
+> S14 的 `web` 客户端 grant_types 追加 `social` 经 plus-ui 后台「客户端管理」执行，**不落 SQL 脚本**；若后续改由脚本执行，在此登记。
+
 ## 4. 关键路径与并行
 
 ```text
@@ -327,6 +488,7 @@ S0 → S1 → S2 → S3 → S4 → S5 → S6 → S7 → S8   （后端关键路�
 
 - S2 是最大风险点（事务编排 + 权限 + 版本），如超 3 天先拆解再继续。
 - 切片间不允许功能倒灌：S5 之前的 Article 保存不得夹带 hide/admin-hide 逻辑。
+- **亮点阶段（v0.4 起，S13~S21）**：D0 采购/备案先行（等待期并行 S14/S15）→ S16 ES 主菜 → S17/S18/S19 → S20/S21 待定/可选。节奏 15h/周 ≈ 2 人日/周，核心（S13~S19）约 10.5~12.5 人日，预计 6~7 周（2026-11 底~12 月初完成核心）。S16 是亮点阶段最大风险点（IK 安装 / 同步一致性 / D36 契约变更），第一步先验证 IK 可行性。
 
 ## 5. 通用完成定义（每个切片都要满足）
 
@@ -395,12 +557,19 @@ S0 → S1 → S2 → S3 → S4 → S5 → S6 → S7 → S8   （后端关键路�
 | 2026-10-07 | D30（S9 技术栈范围收编，不改变 D28 已实装部分）：D28 集成清单里的 `@nuxtjs/seo`、`@nuxt/image`、shiki、`@nuxt/eslint` 四项与 three.js 装饰（桶 B）由“随切片交付”调为 **⏸ 按需 / MVP 后再定**，不计入 S9 完成标准。理由：① S9 实需已覆盖——SEO 基线由 unhead 原生 `useSeoMeta` 交付（lang/title/description/og/robots，已入首屏），无需整块模块；② 不为非 MVP 能力提前绑依赖（与“不为面试亮点提前写死”一致）；③ 桶 B 与数据链/版式已解耦（hero 预留 `<ClientOnly>` 槽位，注入不改取数代码，见 D28/plan §2.7）。**S9 实际实装 = `@unocss/nuxt` + `@nuxtjs/color-mode`**；待办清单见 `blog-web/docs/plan.md` §2.6/§2.7，本文件 S9 技术栈行与实施结果已加注 | 本文件 / blog-web/docs/plan.md / blog-web/uno.config.ts |
 | 2026-10-08 | D31（图片 URL 存储策略，S12 开发中遇 S10 遗留“正文图片协议”问题的正式收口）：① blog-web 作者中心的**封面与正文图片均存后端返回的真实访问 URL**，不写 `oss://{ossId}` 标记（与 plus-ui 现有做法有意分叉）；② 生产 OSS 约定为**公有读(access_policy=2) + CDN 域名**，并把开发环境当前的 `1 公有读写` 收紧为 `2 公有读`（写入仍只走后端 SDK 凭据）；③ 依据（均为代码实测而非推测）：`SysOssServiceImpl.matchingUrl()` 仅当桶为 PRIVATE(0) 时才换成 `presignGetUrl(...,120s)` 硬编码签名，当前 `sys_oss_config.access_policy` 全为 1 故不过期；`SdBlogArticleServiceImpl.validateCoverUrl()` 只允许 `/`、`http(s)://` 即**封面本就不允许存 oss://**；而解析标记的 `/resource/oss/listByIds` 需登录，**匿名读者无法解析**（即 S10 备案的遗留项根因）；④ **私有桶预案**（仅当真要私有存储时开后端切片）：新增 `OssContentResolver`（正则 `oss://(\d+)` → 已存在的 `OssService.selectByIds` 回填，约 60~80 行，无表结构/契约变更，`sd-blog` 已依赖 `ruoyi-api`）**且必须同时把 120s 有效期配置化调长或改走图片代理**，否则只是把破图率从 100% 降到一两成；⑤ 本决策不改后端代码（零后端改动边界保持），仅约定生产 OSS 配置方向；S10 备案的“正文图片协议缺陷”仍限于 **plus-ui 旧数据里的 oss:// 标记**，不因此产生新数据 | 本文件 / blog-web/docs/plan.md §2.8 / SysOssServiceImpl / SdBlogArticleServiceImpl |
 | 2026-10-11 | D32（多 harness 下的 Agent 编排层与跨仓路由枢纽，起因：从 Qoder / DeepSeek harness 切到 WorkBuddy，Agent 会话根落在父目录 `sd-blog/`）：① **工作区文件位置不动**——`tooling/blog.code-workspace` 仍为本仓库托管的唯一权威副本，**不迁到父目录、也不为它单独建仓**。理由：该文件只有版本化才有意义，父目录非 Git 仓库会使其变成换机即失、可被随意改坏的孤儿文件；为一份 555 字节的配置单独建仓，收益远低于其维护成本；且它是所有前端的公共前提而后端不依赖任何前端，托管在本仓库最合理（§10.3 口径）。② **父目录 `sd-blog/` 保持非 Git 仓库**，重申 §10.3：各仓独立提交/分支/上游，无需原子提交，故不做 meta repo、不用 git submodule。③ **新增父目录 `sd-blog/AGENTS.md` 作为跨仓路由枢纽（hub）**，只做三件事——仓库地图（目录↔远端↔角色↔领域 AGENTS.md 入口）、权威源指针（契约/路线图/环境一律指本仓 `docs/`，编码细则指各仓 `.codex/skills` 与 `.claude/agents`）、跨仓环境红线（三层 API 边界、不在父目录执行任何构建、一个 Agent 会话只动一个仓库）；**禁止在 hub 里复制任何子仓规则正文**（沿用 D1「避免双源漂移」），与子仓 `AGENTS.md` 冲突时**一律以子仓为准**并回头修订 hub。④ **新 harness 接技能一律用转发 shim 指向本体**，禁止产出第二份 SKILL.md 实体：父目录 `.workbuddy/skills/` 下三个 shim（`ruoyi-plus-ai-coding` / `frontend-crud-coding` / `nuxt-frontend-coding`）各只含 frontmatter + 必读清单 + 跨工具补充纪律，正文仍唯一存在于各仓 `.codex/skills/`；`.qoder/skills` 沿用既有 symlink 口径**保留不删**（用户决定：它只是历史 harness 的加载入口而非事实源，其本体缺失属资产管理问题，不在此决策范围）。⑤ hub 与 shim 属**本机工具接线层**：因父目录不入库而天然不版本化，这是有意取舍，换取对三个仓库零污染；代价是换机需重建，故其每一条约定必须在本文与 `docs/SETUP.md` §10.5 有对应登记，**登记缺失即视为该约定失效**。⑥ 边界澄清：单独打开任一子仓（如只开 `plus-ui`）时该仓 `AGENTS.md` 已自洽，hub 只服务跨仓场景——两者互补而非替代，**不要把 hub 写成第四个仓库** | 本文件 / SETUP §10.5 / AGENTS.md §3 §11 / 父目录 sd-blog/AGENTS.md |
+| 2026-10-13 | D33（亮点阶段规划，MVP 后面试向，用户确认）：新增切片 S13~S21——S13 线上部署（**D0 采购/备案时钟先行**，等待期并行开发）、S14 社交登录、S15 阅读量异步、S16 ES 搜索、S17 PWA+SEO、S18 限流、S19 plus-ui 登录页/后台改版、S20 Lenis（待定）、S21 CI（可选）。节奏 15h/周 ≈ 2 人日/周，核心 S13~S19 约 10.5~12.5 人日，预计 6~7 周。**明确不做**：多级缓存失效链路（以"为什么先不上"作为面试答案）、消息队列（判断力叙事）、多级评论、点赞收藏、可观测性全套、three.js/GSAP（D38）。新建 `docs/cloud-deployment.md` 作为部署方案备忘（个人理解 + 项目记录双用途） | 本文件 / docs/cloud-deployment.md |
+| 2026-10-13 | D34（社交登录语义扩展与落地，依据框架源码实测）：① 框架默认仅支持**已绑定账号**登录（`SocialAuthStrategy` 未绑定抛"你还没有绑定第三方账号"，绑定入口 `/auth/social/callback` 又要求先登录），读者场景需扩展为**首次社交登录自动注册**（自动建号+绑定+登录；随机不可用密码/禁账密/默认角色/昵称冲突处理；**安全边界按红线人工复核**）；② 社交登录**只在 blog-web 落地**（读者主场景；GitHub OAuth App callback 单 URL 限制，plus-ui 保持账密）；③ `web` 客户端 `grant_types` 加 `social`（`AuthController` 登录校验客户端 grantType，漏加直接拒；经后台客户端管理执行，不落 SQL 脚本）；④ **微信/QQ/钉钉因企业资质门槛不接入**（微信开放平台仅限企业/机构资质，PC 网站应用需审核+300元/年认证），作为已评估边界写进 README | 本文件 / AuthController / SocialAuthStrategy |
+| 2026-10-13 | D35（阅读量异步语义，修订 D8"MVP 不上 Redis/异步"）：① 计数 = PV 口径 + **同人窗口去重**（登录 userId / 匿名 visitorId cookie，窗口 30min 可配，Lua 原子执行 SETNX+HINCRBY）；② 落库 = 10s 定时批量**增量** UPDATE（HGETALL→`view_count = view_count + delta`→HDEL），增量合并不覆盖，**不回退**；③ 读 = DB 值 + 待增量（契约响应结构不变，语义变更登记 Apifox）；④ Redis 不可用降级直连 DB；⑤ redis 开 AOF everysec，崩溃最多丢 1s；异常模式（重复/丢失计数）为计数场景可接受取舍 | 本文件 / S15 |
+| 2026-10-13 | D36（ES 高亮实现位置，用户拍板）：**服务端高亮**——ES `highlight` 查询返回 title/summary/content 匹配片段（`<em>` 包裹，ES 默认编码器转义片段内其余 HTML，前端可信任），`/blog/public/search` 响应**新增可选 `highlight` 字段**（向后兼容）；按项目流程**实现前先修订 `blog-api.md` §6**（本决策即授权）；否决客户端高亮（匹配质量弱、前端解析成本高）。S16 因此含一次契约变更（仅新增可选字段） | 本文件 / blog-api.md §6 / S16 |
+| 2026-10-13 | D38（动效收缩，承接 D30 桶 B 与批 1/批 2 已交付部分）：零依赖机制（reveal/路由过渡/骨架淡入/阅读进度条/顶栏感知/懒加载+CLS）已交付，动效工程故事已成立；批 3 收缩为**仅 Lenis**（约 30KB），hero 视差 / 逐字进场待定；**不做 three.js 背景、不引 GSAP**（内容站违和、SSR 与首屏成本不成比例、与 Lenis 收益重叠）。S20 纯表现层：无契约/数据/状态机改动，排核心之后，随时可砍 | 本文件 / blog-web plan §2.17 |
+| 2026-10-13 | D39（plus-ui 门面改版）：登录页与后台首页由框架默认改为博客项目视觉（Impeccable skill + **按项目 token 体系重构**，不照抄默认）；后台首页优先做"博客数据概览"（真实接口），否则静态欢迎页；**保留 SocialCallback 路由、登录逻辑、验证码链路、权限与路由结构不动**；与业务零关联，排核心之后 | 本文件 / plus-ui frontend-plan §4 |
 
 ### 待决策
 
 | # | 决策 | 建议 | 截止 |
 |---|------|------|------|
 | D25 | 版本只读接口（§4.1/§4.2，`BlogArticleController.versions/version`）的管理员判定用 `LoginHelper.isSuperAdmin()`，比契约 §4.1「作者本人、管理员」更严——非超管但持 `blog:article:query` 的自定义治理角色能看 §11.2 详情（`getInfo` 硬编 `admin=true`）却看不了版本历史。S10 详情抽屉已兜底提示不白屏，超管验收不受影响 | 若后续把治理权授给非超管角色，将版本接口判定从 `isSuperAdmin()` 放宽为「作者本人 或 有 `blog:article:query`」，与 §11.2 详情口径对齐 | 出现非超管治理角色前 |
+| D37 | S13 部署资源选型：白嫖（Oracle Always Free 4C/24G，需信用卡、有回收风险）vs 国内轻量付费（约 50~150/年、需备案、最稳）vs 香港节点（免备案、线路波动） | 演示期可白嫖 Oracle + 域名自持；**挂简历前落付费轻量**（面试前被回收的代价高于一年费用）；细节见 `docs/cloud-deployment.md` §2 | S13 采购时（D0） |
 
 > **D7 说明（摘要，全文见 AGENTS.md §8）**：单测只覆盖"不碰数据库、不启 Spring 容器就能算对错的纯逻辑"——
 > ① 标签规范化（`"Python 爬虫"` → `python-爬虫` 等契约 §18.10 规则）；
