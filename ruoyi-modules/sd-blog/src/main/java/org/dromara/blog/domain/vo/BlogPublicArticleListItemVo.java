@@ -1,5 +1,6 @@
 package org.dromara.blog.domain.vo;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Data;
 import org.dromara.common.translation.annotation.Translation;
 import org.dromara.common.translation.constant.TransConstant;
@@ -69,5 +70,12 @@ public class BlogPublicArticleListItemVo implements Serializable {
      * 标签列表
      */
     private List<SdBlogTagVo> tags;
+
+    /**
+     * 搜索高亮（契约 §6 / D36，S16）：仅 ES 引擎且该行命中时出现；
+     * mysql 引擎/降级路径无此字段（{@code NON_NULL} 不出现在 JSON 中）
+     */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private ArticleHighlightVo highlight;
 
 }
