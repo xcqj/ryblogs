@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">
+<properties>
+  <comment>IK Analyzer 扩展配置（S16 博客搜索自定义技术词典）</comment>
+  <!-- 扩展词：技术词整词匹配（ik_max_word / ik_smart 均生效；文件需 UTF-8 无 BOM，一词一行） -->
+  <entry key="ext_dict">tech.dic</entry>
+  <!-- 不停用任何默认停用词，避免误伤正文检索 -->
+  <entry key="ext_stopwords"></entry>
+</properties>

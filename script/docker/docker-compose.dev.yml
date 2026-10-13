@@ -43,6 +43,28 @@ services:
     volumes:
       - minio-data:/data
 
+  # Elasticsearch 7.17.28 单节点 + IK 中文分词（S16 博客搜索，D19 预留的 LIKE 替换点）
+  # 构建上下文 script/docker/es：IK 7.17.28 经 ghproxy 镜像安装 + 自定义技术词典（详见 Dockerfile 注释）
+  # 前置：宿主机 vm.max_map_count ≥ 262144（当前环境 1048576 已达标；未达标时 ES 起不来）
+  # xpack.security 在 7.17 默认发行版默认关闭，本地开发免鉴机；9200 仅监听本机
+  es:
+    build:
+      context: ./es
+      dockerfile: Dockerfile
+    image: blog-es:7.17.28-ik
+    container_name: blog-es
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      xpack.monitoring.enabled: "false"
+    ports:
+      - "9200:9200"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+
   # blog-web 前台（Nuxt 4 SSR，node-server 镜像）——profile 门控，不影响默认 `up -d` 的三件套
   # 启动：docker compose -f docker-compose.dev.yml --profile web up -d --build
   # 构建上下文是同级仓库 blog-web（SETUP §10.1 同级 clone 为硬性前提）；镜像内 npm ci + nuxt build
@@ -73,3 +95,4 @@ volumes:
   mysql-data:
   redis-data:
   minio-data:
+  es-data:
