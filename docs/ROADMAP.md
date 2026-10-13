@@ -36,7 +36,7 @@
 | S12 | blog-web 作者中心（发文/编辑/自助治理） | §3、§4、§11（作者侧动作） | 2/4/5 前端面 | 前端 | ✅ 已验收（2026-10-08 用户确认；发文/编辑/发布/版本链路跑通，三条交互修正回归通过；blog-web `47b9e40`/`366488d`/`28ffc36`，零后端改动） | 2~4d |
 | S13 | 线上部署与生产化 | — | — | 后端+前端 | ⏳ 待启动（D0 采购/备案先行，等待期并行 S14/S15） | 1~2d+备案 |
 | S14 | GitHub/Gitee 社交登录 | §2.8（登录，复用） | — | 后端+前端(blog-web) | ✅ 已验收（2026-10-14；后端 4 commit + blog-web 5 commit，详 §3 S14；Apifox 用例补录留人工） | 2d |
-| S15 | 阅读量 Redis 异步计数 | §5.2 | — | 后端(+blog-web 小改) | ⏳ 待启动 | 1d |
+| S15 | 阅读量 Redis 异步计数 | §5.2 | — | 后端(+blog-web 小改) | 🔧 后端 ✅（2026-10-14，详 §3 S15）；blog-web 小改同会话第二个提交周期 | 1d |
 | S16 | ES 搜索替换 MySQL LIKE | §6 | — | 后端(+blog-web 高亮 UI) | ⏳ 待启动（D36 已关闭：服务端高亮，含契约变更） | 3~5d |
 | S17 | PWA + SEO 三件套 | — | — | 前端(blog-web) | ⏳ 待启动 | 1~1.5d |
 | S18 | 接口限流 | — | — | 后端 | ⏳ 待启动 | 0.5d |
@@ -394,12 +394,23 @@ S2 遗留接入（已落地）：
 
 验收清单：
 
-- [ ] 连续刷新：同一访客 30min 内只 +1；换访客 / 过期后 +1；
-- [ ] flush 后 DB 值与预期一致（`docker exec blog-mysql` 只读核验）；
-- [ ] 杀进程重启：阅读量不回退、不跳变；
-- [ ] 停 Redis：详情仍 200，降级直写 DB；
-- [ ] 并发刷新无负值（脚本或 JMeter 压测）；
-- [ ] Apifox 详情用例语义更新并回归。
+- [ ] 连续刷新：同一访客 30min 内只 +1；换访客 / 过期后 +1（待重启 8081 后人工联调；Agent 已用 redis-cli EVAL 实证两段 Lua 语义）；
+- [ ] flush 后 DB 值与预期一致（`docker exec blog-mysql` 只读核验；人工）；
+- [ ] 杀进程重启：阅读量不回退、不跳变（依赖 redis AOF，人工）；
+- [ ] 停 Redis：详情仍 200，降级直写 DB（人工演练）；
+- [ ] 并发刷新无负值（脚本或 JMeter 压测；人工）；
+- [ ] Apifox 详情用例语义更新并回归（人工）。
+
+实施结果（2026-10-14，后端仓 + blog-web 仓各一提交周期，均标 S15；D32 偏差备案：经用户指示两半场同会话完成，blog-web 仅动详情代理与 blogGet，独立 commit）：
+
+- 后端新增 `ViewCountService`/`Impl`（sd-blog）：两段 Lua——计数「`SETNX NX EX` + `HINCRBY`」同 RTT 原子完成去重与计数；flush「`HGETALL`+`DEL`」同脚本原子 drain，避免先读后删丢增量；10s 定时逐条 `view_count = view_count + delta`（`del_flag='0'` 守卫，**人工复核点**）；Redis 异常 catch 降级直写 DB +1（S8 行为）；无访客标识同样直写
+- 读路径零 DB 写：`queryPublicDetail` 改调 `countAndGetViewCount(articleId, userId, visitorId, dbViewCount)`——库内值由调用方已读文章行传入，**不新增 SELECT**；返回 `DB + 待增量`；登录态经 `LoginHelper.isLogin()` 取 userId 优先（公开端点转发 token 时可用）
+- 访客标识：controller §5.2 加可选 `visitorId` 参数（D19 的 required=false 防 500 约定）；blog-web 详情代理种 `blog-web-visitor` httpOnly cookie（`crypto.randomUUID()`，1 年）并 query 转发，已登录时经 `blogGet` 新增可选 headers 转发 token
+- 纯逻辑 `ViewCountSupport`（support 包，零框架依赖）：键生成/TTL 换算/扁平配对（畸形逐条跳过）/批量排序/读值合并/访客键优先级 + 7 条 JUnit5 单测全绿（sd-blog 新建 src/test，根 pom 已统一 test 依赖）
+- 基建：`BlogSchedulingConfig` 最小 `@EnableScheduling`（全仓此前无该基建）；`blog.view.dedup-ttl-minutes:30`/`flush-interval-ms:10000` 入 application.yml（`@Value`/`fixedDelayString` 同名默认值兜底）；`SdBlogArticleMapper.addViewCount` 增量 UPDATE（`increaseViewCount` 保留供降级复用）
+- 契约 `blog-api.md` §5.2 已按 D35 修订（**先报告冲突再修订**：原「每次打开 view_count +1」及「MVP 不做 Redis 热点计数/异步刷盘」与新语义冲突）：新增可选 `visitorId` 参数表、重写「阅读量」条款（窗口去重/异步回写/降级/滞后说明）、收窄「不做」清单为 IP 去重与设备指纹；响应结构不变，头部版本说明补记
+- 自测协议：`mvn compile -pl ruoyi-admin -am` 绿 + 单测 7/7 + 静态断言 + git diff 自审 + **redis-cli EVAL 实证两段 Lua 语义**；blog-web `npm run build` 绿
+- 备案边界（S15-D1）：① 列表页 viewCount 仍只读 DB（滞后 ≤10s，与掘金等站行为一致）；② 无访客标识（未登录且无 visitorId，如裸调 API）→ 每请求 +1 无去重（与 S8 一致）；③ 单条 flush DB 失败丢该 delta（已 drain 无法回退，D35 接受取舍，记 error 日志）；④ 计数与读 pending 分两次 RTT，极端并发展示值可能相差 1（D35 口径覆盖）；⑤ 宿主 `/docker/redis/conf/redis.conf` **未开 AOF**（仓库外文件，用户手动开 `appendonly yes`+`appendfsync everysec` 并重启容器，会丢内存中未 flush 待增量，dev 可接受）；⑥ 生产 redis AOF 属 S13 部署清单
 
 ### S16 ES 搜索替换 MySQL LIKE ⏳（2026-10-13 规划；3~5d；D36 已关闭：服务端高亮）
 
@@ -577,6 +588,7 @@ S0 → S1 → S2 → S3 → S4 → S5 → S6 → S7 → S8   （后端关键路�
 | 2026-10-13 | D38（动效收缩，承接 D30 桶 B 与批 1/批 2 已交付部分）：零依赖机制（reveal/路由过渡/骨架淡入/阅读进度条/顶栏感知/懒加载+CLS）已交付，动效工程故事已成立；批 3 收缩为**仅 Lenis**（约 30KB），hero 视差 / 逐字进场待定；**不做 three.js 背景、不引 GSAP**（内容站违和、SSR 与首屏成本不成比例、与 Lenis 收益重叠）。S20 纯表现层：无契约/数据/状态机改动，排核心之后，随时可砍 | 本文件 / blog-web plan §2.17 |
 | 2026-10-13 | D39（plus-ui 门面改版）：登录页与后台首页由框架默认改为博客项目视觉（Impeccable skill + **按项目 token 体系重构**，不照抄默认）；后台首页优先做"博客数据概览"（真实接口），否则静态欢迎页；**保留 SocialCallback 路由、登录逻辑、验证码链路、权限与路由结构不动**；与业务零关联，排核心之后 | 本文件 / plus-ui frontend-plan §4 |
 | 2026-10-14 | S14-D2（社交登录邮箱与账号归并口径，联调期用户提问触发、零代码改动）：① 社交自动注册**不写 `sys_user.email`**（平台邮箱未验证，GitHub 默认 scope 还不返回非公开邮箱）；② **不按邮箱归并账号**——未验证邮箱隐式归并 = 账号接管漏洞（A 在平台资料填 B 邮箱即可登入 B 账号）；同一人授权多平台视为多个独立账号，代价仅是作者中心多一组文章，博客场景可接受；③ 身份模型维持框架既定语义（`authId=source+uuid` 平台维度唯一，框架绑定流程本就是「已登录用户主动绑更多平台到同一账号」）；④ 将来如需归并，做成「登录后 `/auth/social/callback` 主动绑定」显式功能（独立切片，需定契约 + plus-ui 入口），**不做登录时隐式合并**；⑤ 本条为备忘录性质，防止未来把「社交用户无邮箱/同人多账号」误当 bug 去"修"而引入接管风险 | 本文件 / SysLoginService / AuthController |
+| 2026-10-14 | S15-D1（阅读量异步计数实现口径，实施期沉淀，零新决策）：① 计数/读值分两次 RTT（Lua 计数 + HGET pending），不套 MULTI——并发展示值可能相差 1，D35「计数场景可接受」口径覆盖，换不来读路径零 DB 写的简洁；② flush 逐条独立提交不套整批事务——单条 DB 失败仅丢该 delta 并续跑，与 D35 取舍一致（套事务会一损俱损）；③ 库内 view_count 由详情路径已读文章行传入，服务层不回查（省一次 SELECT）；④ 无访客标识退化直写（裸调 API 场景，与 S8 一致）；⑤ 列表页不合成待增量（滞后 ≤10s 可接受，避免列表查询打 Redis）；⑥ 宿主 redis AOF 为仓库外手动步骤，生产 AOF 归 S13 部署清单 | 本文件 / ViewCountService / ViewCountSupport |
 | 2026-10-13 | S14-D1（社交登录自动注册实现口径，依据框架源码与库表实证）：① 锁与事务同方法——lock4j-core 2.2.7 的 `LockAnnotationAdvisor` 为 `Ordered.HIGHEST_PRECEDENCE`，锁包裹事务，锁内双查绑定关系保证并发首登只建一号（与 workflow 模块 `@Lock4j + @Transactional` 既有用法一致）；② "禁账密登录"= 随机 UUID 的 BCrypt 哈希密码（`sys_user` 无专用禁用列，明文不可获知即不可登录，密码永不下发）；③ 不分配任何角色/部门，与框架 `/auth/register` 的 `registerUser` 口径一致（博客红线：所有注册用户天然可发文、不授予管理权限）；④ 账号派生：平台用户名清洗（仅保留 `[a-z0-9_-]` 并小写）→ 冲突 `base_1~base_9` → `source_uuid` 确定性兜底（`user_name` 无唯一约束，必须应用层消歧）；昵称空值回退账号名、截断 30、冲突追加 4 位随机后缀（仅展示用途、无唯一约束）；⑤ 社交头像 URL **不落** `sys_user.avatar`（bigint OSS id，类型不匹配），仅存 `sys_social.avatar`——社交注册用户的博客公共资料头像为空，属已备案边界（S1-D1 头像机制不变，不新建头像链路）；⑥ justauth 只配 dev（`github` 新增 + `gitee` 假凭据清除，均 env 占位），**prod 配置留 S13**（生产域名未定，避免空 redirect-uri 破坏授权链接） | 本文件 / SysLoginService / SocialAccountNamer / AuthController |
 
 ### 待决策
