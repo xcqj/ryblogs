@@ -8,6 +8,7 @@ import org.dromara.blog.service.support.ViewCountSupport;
 import org.dromara.common.redis.utils.RedisUtils;
 import org.redisson.api.RScript;
 import org.redisson.api.RedissonClient;
+import org.redisson.client.codec.StringCodec;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,14 @@ import java.util.Map;
  * <p>
  * 人工复核点（AGENTS.md §9）：flush 逐条增量写（{@code view_count + delta} + {@code del_flag='0'} 守卫）、
  * Redis 故障降级路径（见 {@code countAndGetViewCount} 分支注释）。
+ * <p>
+ * ⚠️ Codec 陷阱（2026-10-14 联调实测，改动前必读）：本仓 Redisson 全局配置为
+ * {@code CompositeCodec(StringCodec, TypedJsonJackson3Codec, ...)}（见 RedisConfig），
+ * 而 {@code RedissonClient#getScript()} 默认继承全局 codec——**脚本的 VALUE 参数会按 JSON 编码**
+ * （字符串 "1800" 被序列化成带引号的 {@code "1800"}，6 字节），Lua 收到的 ARGV 是带引号的垃圾值，
+ * {@code SET ... EX ARGV[2]} 直接报 {@code ERR value is not an integer or out of range}，
+ * 表现为「计数全走降级、每次刷新都 +1」。**所有 Lua eval 必须显式 {@code getScript(StringCodec.INSTANCE)}**，
+ * 使参数按纯 UTF-8 字符串编码；key 走 CompositeCodec 的首位 StringCodec 所以看似正常，极具迷惑性。
  *
  * @author Xu
  * @date 2026-10-14
@@ -31,14 +40,17 @@ public class ViewCountServiceImpl implements ViewCountService {
 
     /**
      * 计数 Lua：KEYS[1]=去重键, KEYS[2]=待增量 hash, ARGV[1]=articleId, ARGV[2]=TTL(秒)。
-     * SETNX NX EX 成功才 HINCRBY——去重与计数同一次 RTT 原子完成，杜绝「SETNX 后崩溃丢计数」；
-     * 返回 1=本次计入（hincrby 结果），0=窗口内重复访问被去重。
+     * SETNX NX EX 成功才 HINCRBY——去重与计数原子完成，杜绝「SETNX 后崩溃丢计数」；
+     * 末尾统一 HGET 返回该文当前待增量（含本次），一次 RTT 同时完成「计数 + 读展示增量」，
+     * 避免第二次 RTT 与 RMap 读取（那条路同样踩全局 codec 的坑）。
+     * 返回：待增量字符串（如 "3"）；窗口去重且待增量已被 flush 清掉时返回 nil（调用方按 0 处理，
+     * 此时增量已在 DB，合成后展示值正确）。
      */
     private static final String LUA_COUNT = ""
         + "if redis.call('set', KEYS[1], '1', 'EX', ARGV[2], 'NX') then "
-        + "return redis.call('hincrby', KEYS[2], ARGV[1], 1) "
+        + "redis.call('hincrby', KEYS[2], ARGV[1], 1) "
         + "end "
-        + "return 0";
+        + "return redis.call('hget', KEYS[2], ARGV[1])";
 
     /**
      * flush Lua：KEYS[1]=待增量 hash。hgetall + del 在同一脚本内原子完成
@@ -70,17 +82,15 @@ public class ViewCountServiceImpl implements ViewCountService {
         }
         try {
             RedissonClient client = RedisUtils.getClient();
-            client.getScript().eval(
+            // StringCodec 必须显式指定：全局 CompositeCodec 会把脚本参数按 JSON 编码（见类注释 codec 陷阱）
+            Object pending = client.getScript(StringCodec.INSTANCE).eval(
                 RScript.Mode.READ_WRITE,
                 LUA_COUNT,
-                RScript.ReturnType.LONG,
+                RScript.ReturnType.VALUE,
                 List.of(ViewCountSupport.dedupKey(articleId, visitorKey), ViewCountSupport.pendingKey()),
                 String.valueOf(articleId),
                 String.valueOf(ViewCountSupport.ttlSeconds(dedupTtlMinutes))
             );
-            // 读该文待增量（含本次）；与计数分两次 RTT，极端并发下展示值可能相差 1，
-            // 属 D35「重复/丢失计数为计数场景可接受取舍」口径
-            Object pending = client.getMap(ViewCountSupport.pendingKey()).get(String.valueOf(articleId));
             return ViewCountSupport.mergeViewCount(dbViewCount, toLong(pending));
         } catch (Exception e) {
             log.warn("阅读量计数 Redis 链路异常，降级直写 DB, articleId={}", articleId, e);
@@ -97,7 +107,7 @@ public class ViewCountServiceImpl implements ViewCountService {
         List<Object> drained;
         try {
             RedissonClient client = RedisUtils.getClient();
-            drained = client.getScript().eval(
+            drained = client.getScript(StringCodec.INSTANCE).eval(
                 RScript.Mode.READ_WRITE,
                 LUA_FLUSH_DRAIN,
                 RScript.ReturnType.LIST,
@@ -134,7 +144,7 @@ public class ViewCountServiceImpl implements ViewCountService {
     }
 
     /**
-     * Redis hash 值 → Long（Redisson 解码可能为 Integer/Long/String/byte[]）。
+     * 脚本返回值 → Long（StringCodec 下为 String；nil/畸形按 null 由 mergeViewCount 兜底）。
      */
     private static Long toLong(Object value) {
         if (value == null) {

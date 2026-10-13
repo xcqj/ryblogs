@@ -15,7 +15,8 @@ public interface ViewCountService {
     /**
      * 计数并返回本次展示阅读量。
      * <p>
-     * 分支：① 可识别访客且 Redis 正常 → Lua 原子「窗口去重 + 待增量 +1」，返回 {@code dbViewCount + 待增量}；
+     * 分支：① 可识别访客且 Redis 正常 → Lua 原子「窗口去重 + 待增量 +1」并返回该文当前待增量
+     * （单次 RTT），展示值 = {@code dbViewCount + 待增量}；
      * ② Redis 异常 → 降级直写 DB +1（S8 行为，无窗口去重），返回 {@code dbViewCount + 1}；
      * ③ 无访客标识（未登录且无 visitorId）→ 直写 DB +1（无去重，与 S8 一致）。
      *
