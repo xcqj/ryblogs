@@ -1,6 +1,6 @@
 # 系统架构（architecture）
 
-> 状态：v0.2 · 2026-10-03
+> 状态：v0.3 · 2026-10-14（S16：新增 ES 搜索组件与索引同步链路）
 > 定位：一张图 + 一条请求链 + 一套部署拓扑。只讲"系统长什么样"，不讲"业务是什么"。
 > 业务规则见 PRD，接口见 blog-api.md，表结构见 database-design/schema，红线见 AGENTS.md——本文一律不重复。
 
@@ -18,9 +18,9 @@
 │  ├── sd-blog（博客业务模块，包 org.dromara.blog）                                              │
 │  ├── ruoyi-modules/*（system、gen、workflow、job、ai、demo）                                   │
 │  └── ruoyi-common/*（mybatis、satoken、redis、oss、excel、log、web… 横切能力）                  │
-└──────────┬──────────────────────────┬──────────────────────────┬──────────────────────────────┘
-           ▼                          ▼                          ▼
-      MySQL 8.4（主存储）        Redis 8.x（缓存/会话/限流）   OSS/MinIO（对象存储）
+└──────────┬──────────────────┬─────────────────────┬────────────────────┬────────────────┘
+           ▼                  ▼                     ▼                    ▼
+      MySQL 8.4（主存储）  Redis 8.x（缓存/会话/限流） OSS/MinIO（对象存储）  Elasticsearch 7.17（全文检索，仅公共文章）
 ```
 
 - 架构形态：**单体多模块 Maven 工程**，唯一部署单元 `ruoyi-admin`；模块间通过 Service 接口调用，无 RPC。
@@ -40,7 +40,9 @@ org.dromara.blog
 ├── domain          Entity（继承 BaseEntity，@TableLogic String delFlag）
 │   ├── bo / vo     入参 / 出参（@AutoMapper，mapstruct-plus 编译期生成转换器）
 ├── mapper          BaseMapperPlus<Entity, Vo>
-└── service / impl  业务规则、状态机、事务边界
+├── es              ES 索引生命周期（IndexManager/Bootstrap：mapping/alias/reindex，S16）
+├── event           文章变更事件 → ES 增量同步（AFTER_COMMIT 监听，S16）
+└── service / impl  业务规则、状态机、事务边界；search/ 下搜索抽象（Mysql/Es 双实现，S16）
 resources/mapper/blog/  自定义 SQL（仅在 wrapper 不够用时）
 ```
 
@@ -57,6 +59,16 @@ HTTP → Jetty → Sa-Token 拦截器
       → BaseMapperPlus / QueryWrapper（PlusDataPermissionInterceptor 可注入数据权限 SQL）
       → MySQL；Redis 用于缓存、验证码、分布式锁；审计写 sys_oper_log
 响应：R<T> 统一包装，分页 PageResult{rows,total}；VO 字段可经 @Translation 翻译、脱敏注解处理
+
+搜索链路（S16）：/blog/public/search → ArticleSearchService（engine=es|mysql 切换）
+  ├─ ES 实现：multi_match（IK 分词，title^3）→ 命中 id 打分序 → 回表 MySQL（selectPublicPage 三条件内建）
+  │          → 按 ES 序重排 + 合并服务端高亮（<em>，D36）+ ArticleTagFiller 填 tags
+  │          └─ ES 异常 → 降级 MySQL LIKE（响应无 highlight/nextAfter）
+  └─ MySQL 实现：三字段 OR LIKE（兜底 + 对比基线）
+
+索引同步链路（S16）：文章 8 个写方法成功后发 ArticleChangedEvent（事务 AFTER_COMMIT）
+  → ArticleIndexService.indexOrRemove：按 DB 现状重推导（公共可见三条件内建于索引生命周期）
+  → upsert / 删除 ES 文档；失败仅记日志，由定时对账（MySQL 公共文章集合 vs ES 文档集合 diff）兜底
 ```
 
 ## 4. 博客域模型（简图）
@@ -78,6 +90,8 @@ docker-compose.dev.yml（script/docker/）
 ├── blog-mysql   mysql:8.4.9    :3306   库 ry-vue（utf8mb4_general_ci, lower_case_table_names=1）
 ├── blog-redis   redis:8.6.3    :6379   requirepass 见 compose
 ├── blog-minio   minio          :9000/:9001  OSS 兼容存储（RuoYi oss 配置指向它）
+├── blog-es      自建镜像 blog-es:7.17.28-ik :9200  ES 7.17.28 单节点 + IK 7.17.28（经 ghproxy 安装）
+│                + tech.dic 自定义技术词典；512m 堆；构建上下文 = script/docker/es（S16）
 └── blog-web     自建镜像（profile=web 才启动）:3000
                  Nuxt 4 SSR node-server 产物；构建上下文 = 同级仓库 blog-web/Dockerfile
                  NUXT_API_BASE 指向 host.docker.internal:8081；密钥经 env 注入不入库
@@ -96,8 +110,8 @@ plus-ui 为纯静态前端，日常 `pnpm dev`、生产产物由 Web 服务器�
 
 | 未来能力 | 预留方式 |
 |---|---|
-| 搜索换 Elasticsearch | `ArticleSearchService` 抽象隔离（契约 §6） |
-| 阅读量去重/异步 | 计数点收敛在详情接口一处（ROADMAP D8） |
+| 搜索换 Elasticsearch | ✅ 已落地（S16）：`ArticleSearchService` 双实现 + `blog.search.engine` 切换 |
+| 阅读量去重/异步 | ✅ 已落地（S15）：计数点收敛在详情接口一处（D35） |
 | 版本恢复/差异 | Version append-only 模型天然支持（PRD §8.5） |
 | 旧 URL 301 | 后端只负责 alias→canonical 解析，301 归前台/边缘层（契约 §7.3） |
 | Markdown 编辑器 | 正文只约定为"净化后的 HTML 快照"，来源不限 |

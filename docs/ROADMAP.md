@@ -37,7 +37,7 @@
 | S13 | 线上部署与生产化 | — | — | 后端+前端 | ⏳ 待启动（D0 采购/备案先行，等待期并行 S14/S15） | 1~2d+备案 |
 | S14 | GitHub/Gitee 社交登录 | §2.8（登录，复用） | — | 后端+前端(blog-web) | ✅ 已验收（2026-10-14；后端 4 commit + blog-web 5 commit，详 §3 S14；Apifox 用例补录留人工） | 2d |
 | S15 | 阅读量 Redis 异步计数 | §5.2 | — | 后端(+blog-web 小改) | ✅ 已验收（2026-10-14 人工实测通过；后端 4 commit + blog-web 3 commit，联调期三联坑详见 §3 S15；JMeter 压测与 Apifox 语义回归留作面试演示/人工） | 1d |
-| S16 | ES 搜索替换 MySQL LIKE | §6 | — | 后端(+blog-web 高亮 UI) | ⏳ 待启动（D36 已关闭：服务端高亮，含契约变更） | 3~5d |
+| S16 | ES 搜索替换 MySQL LIKE | §6 | — | 后端(+blog-web 高亮 UI) | 🔄 代码完成（2026-10-14 两半场 8 commit；ES 容器搭建/演示数据执行/Apifox/浏览器验收留人工，详 §3 S16） | 3~5d |
 | S17 | PWA + SEO 三件套 | — | — | 前端(blog-web) | ⏳ 待启动 | 1~1.5d |
 | S18 | 接口限流 | — | — | 后端 | ⏳ 待启动 | 0.5d |
 | S19 | plus-ui 登录页/后台首页改版 | — | — | 前端(plus-ui) | ⏳ 待启动（核心完成后） | 0.5~1d |
@@ -414,7 +414,7 @@ S2 遗留接入（已落地）：
 - **联调期第二/三坑（2026-10-14，blog-web 侧，均已修复验证）**：② SSR 取数用全局 `$fetch`，内部请求不转发浏览器 Cookie（S14 useAuth 同款坑第二现场）→ 详情代理读不到 visitorId/token，刷新页面去重永不命中；修：`/post/[slug].vue` 文章 useAsyncData 改 `useRequestFetch()`；③ **Nitro 内部请求响应里种的 Set-Cookie 不冒泡到外层 HTML 响应**（实测 SSR 文档响应无 set-cookie、直连 API 有）→ 在详情代理里种 cookie 浏览器永远收不到（Edge 未登录正常只因曾 SPA 导航时被 API 响应种下 cookie，Chrome 未登录从未 SPA 导航故全中）；修：visitor cookie 改由 `server/middleware/visitor-cookie.ts` 在最外层种植（`server/utils/visitor.ts` 种/读单点），代理只读。**三坑共性（面试叙事）：每层单元都正常、curl 直打都正常，坏的全是层间链路（codec 序列化方向、内部请求 cookie 方向、Set-Cookie 冒泡方向）——联调期查 Redis 键形态与响应头比任何单测都直接**
 - 备案边界（S15-D1）：① 列表页 viewCount 仍只读 DB（滞后 ≤10s，与掘金等站行为一致）；② 无访客标识（未登录且无 visitorId，如裸调 API）→ 每请求 +1 无去重（与 S8 一致）；③ 单条 flush DB 失败丢该 delta（已 drain 无法回退，D35 接受取舍，记 error 日志）；④ 宿主 `/docker/redis/conf/redis.conf` **未开 AOF**（仓库外文件，用户手动开 `appendonly yes`+`appendfsync everysec` 并重启容器，会丢内存中未 flush 待增量，dev 可接受）；⑤ 生产 redis AOF 属 S13 部署清单
 
-### S16 ES 搜索替换 MySQL LIKE ⏳（2026-10-13 规划；3~5d；D36 已关闭：服务端高亮）
+### S16 ES 搜索替换 MySQL LIKE 🔄（2026-10-13 规划；3~5d；D36 已关闭：服务端高亮；2026-10-14 两半场代码完成，验收留人工）
 
 背景（D19 预留）：`ArticleSearchService` 接口注释已写明"引入 ES 时替换实现即可，不改变契约"。本切片兑现该预留。
 
@@ -438,6 +438,18 @@ S2 遗留接入（已落地）：
 - [ ] alias 切换零停机；对账任务能发现并修复不同步；
 - [ ] LIKE vs ES 对比数据留档（面试材料）；
 - [ ] **契约先行**：实现前完成 `blog-api.md` §6 修订（响应新增可选 `highlight` 字段，D36）；Apifox 五类用例全过（含高亮片段抽查：命中词 `<em>` 包裹、其余内容转义）；
+
+实施结果（2026-10-14，后端仓 7 commit + blog-web 仓 1 commit，均标 S16；两半场同会话经用户确认，S14/S15 先例）：
+
+- **契约先行（先于全部代码）**：`blog-api.md` §6 重写——响应新增可选 `highlight`（title/summary/content 片段数组，`<em>` 包裹，ES 默认编码器转义其余 HTML）与顶层可选 `nextAfter` 深翻页游标、请求新增可选 `after`；ES 同步语义/排序口径/降级行为一并登记（2 commit：b977daf6/9cbbf970）。
+- **ES 基建**：`script/docker/es/`（ES 7.17.28 + IK 7.17.28 经 ghproxy 镜像安装——直连 GitHub release 实测 404；IKAnalyzer.cfg.xml ext_dict + tech.dic 79 条技术词典）+ dev compose `es` 服务（512m 堆/单节点/9200）；`blog.search.engine`（默认 es）/`blog.es.address`/`blog.index.reconcile-cron` 等配置段。
+- **索引管理**：`BlogEsConfig` 裸 `elasticsearch-java:7.17.28` 客户端 bean（S16-D2）+ `ArticleIndexManager`（mapping：articleId keyword / title ik_max_word / summary、content ik_smart / tags keyword / publishedAt date；settings：1 shard / max_result_window=50000；alias `blog_article`；建 v2 → `_reindex` → 单请求原子切 alias 的零停机三步）。
+- **同步链路**：`SdBlogArticleServiceImpl` 8 个写方法成功后发 `ArticleChangedEvent` → `ArticleIndexListener`（AFTER_COMMIT + `fallbackExecution=true` 兼容 5 个无事务注解方法）→ `ArticleIndexService.indexOrRemove` 按 DB 现状重推导（公共可见三条件内建于索引生命周期；`@TableLogic` 使软删文章 selectById 为 null → 直接删文档）；keyset 分页 `initialFullSync` + `@Scheduled` 对账（MySQL 公共文章 id 集合 vs ES 文档 id 集合 diff，search_after 全量拉 id）。
+- **查询**：`EsArticleSearchService`（@Primary + @ConditionalOnProperty(engine=es)）——multi_match（title^3，查询侧 ik_smart）+ `_score desc, publishedAt desc, articleId desc` 排序 + 服务端高亮（title/summary 整字段、content 3 片段×200 字符）→ 命中 id 回表 `selectPublicPage`（**三条件内建，堵 ES→DB 竞态窗口**）→ `EsSearchSupport` 纯逻辑按 ES 序重排（防御性丢弃命中序外行）+ 合并高亮 + ArticleTagFiller 填 tags；深翻页 = from+size ≤ 5 万窗口，越窗用 `after` 游标（`nextAfter` 透传，编码 score|publishedAt(epochMilli)|articleId）；ES 异常降级 MySQL LIKE（限频告警，响应无 highlight）。
+- **演示数据**：`blog_s16_demo_data.sql`（24 篇中文技术文 + 2 万压测，recursive CTE 生成，ID 全落 9e18 标记段、slug 带 s16- 前缀防撞键）+ `blog_s16_cleanup.sql`（含 ES 清理两法）+ `blog_s16_benchmark.md`（LIKE vs ES 对比方法与命令，结果表留人工实测填写）。
+- **blog-web 半场**：`types/blog.ts` 增 `ArticleHighlight`/`ArticleSummary.highlight?`；`ArticleCard` 标题/摘要位渲染命中片段（摘要未中降级渲染正文片段；`v-html` 安全依据 = 契约"ES 已转义"，样式走 `--accent-fg` token + scoped `:deep(em)`）；`npm run build` 绿。
+- **自测协议已跑**：`mvn compile -pl ruoyi-admin -am` 绿；sd-blog 单测 55/55 全绿（新增 EsSearchSupportTest 7 条 / IndexReconcileSupportTest 5 条 / ArticleIndexDocBuilderTest 4 条）；静态断言（8 写方法 publishEvent 齐全、三条件三处同源、5 个 ES bean 条件注入）；git diff 自审无越界改动。
+- ⏸ **人工待办**（不在本切片代码内，按序）：① `cd script/docker && docker compose -f docker-compose.dev.yml up -d blog-es`（首次构建 ES 镜像含 IK 下载，需几分钟）；② 启动应用确认启动日志 `[ES] alias blog_article 不存在，已新建索引` + 初始全量同步（存量 16 篇公共文章）；③ IK 中文分词实测：`curl 'localhost:8081/blog/public/search?keyword=Python爬虫'` 应命中「Python 爬虫入门」；技术词整词匹配抽 tech.dic 词条；④ 执行 `blog_s16_demo_data.sql` + 等/调对账周期验证「对账发现并修复不同步」；⑤ LIKE vs ES 对比：按 `blog_s16_benchmark.md` 跑数填结果表（engine 切 mysql 需重启）；⑥ 零停机重建演示：`_reindex` 到 v2 + 原子切 alias（命令即 ArticleIndexManager 语义的 ES API 直写，或口头演示设计）；⑦ Apifox 五类用例（含高亮片段抽查、越权类：草稿/隐藏/下线/软删不出现在搜索）；⑧ blog-web 浏览器验收（搜索页高亮渲染 + 移动视口）；⑨ 演示收尾跑 `blog_s16_cleanup.sql` 并在 ROADMAP §3 SQL 状态表登记已执行。
 
 ### S17 PWA + SEO 三件套 ⏳（blog-web；1~1.5d）
 
@@ -498,6 +510,8 @@ S2 遗留接入（已落地）：
 | `blog_s6_menu.sql` | S6 标签治理按钮 + Tag 裸 CRUD 菜单清理 | ✅ 已执行（2026-10-03） |
 | `blog_s7_menu.sql` | S7 评论治理按钮 + Comment/UserProfile 菜单清理 | ✅ 已执行（2026-10-03） |
 | `blog_s10_menu.sql` | S10 治理页 C 型菜单入口（文章/标签/评论，parent=博客目录） | ✅ 已执行（2026-10-05） |
+| `blog_s16_demo_data.sql` | S16 演示数据（24 篇中文文 + 2 万压测，标记 ID 段 9e18 量级/s16- 前缀） | ⏳ 待人工执行（S16 联调时，可重跑：先 cleanup 再 demo） |
+| `blog_s16_cleanup.sql` | S16 演示数据清理（含 ES 文档清理两法：对账自动 / curl _delete_by_query） | ⏳ 待人工执行（用完必清，人工确认后执行） |
 | `blog_s9_web_client.sql` | S9 开工准备：sys_client 新增 `web` 客户端记录（D28，幂等含验证段） | ✅ 已执行（2026-10-06，验证段 1 行：client_id `f38076e6bb30a1170b9ea3fbebac0815`、grant_type 仅 password、status/del_flag 均 0） |
 
 > S14 的 `web` 客户端 grant_types 追加 `social` 经 plus-ui 后台「客户端管理」执行，**不落 SQL 脚本**；若后续改由脚本执行，在此登记。
@@ -592,6 +606,11 @@ S0 → S1 → S2 → S3 → S4 → S5 → S6 → S7 → S8   （后端关键路�
 | 2026-10-14 | S14-D2（社交登录邮箱与账号归并口径，联调期用户提问触发、零代码改动）：① 社交自动注册**不写 `sys_user.email`**（平台邮箱未验证，GitHub 默认 scope 还不返回非公开邮箱）；② **不按邮箱归并账号**——未验证邮箱隐式归并 = 账号接管漏洞（A 在平台资料填 B 邮箱即可登入 B 账号）；同一人授权多平台视为多个独立账号，代价仅是作者中心多一组文章，博客场景可接受；③ 身份模型维持框架既定语义（`authId=source+uuid` 平台维度唯一，框架绑定流程本就是「已登录用户主动绑更多平台到同一账号」）；④ 将来如需归并，做成「登录后 `/auth/social/callback` 主动绑定」显式功能（独立切片，需定契约 + plus-ui 入口），**不做登录时隐式合并**；⑤ 本条为备忘录性质，防止未来把「社交用户无邮箱/同人多账号」误当 bug 去"修"而引入接管风险 | 本文件 / SysLoginService / AuthController |
 | 2026-10-14 | S15-D1（阅读量异步计数实现口径，实施期沉淀，含联调期修正）：① 计数与读值合并为**单脚本单 RTT**（`SETNX NX EX`+`HINCRBY` 后 `HGET` 收尾返回当前待增量），不套 MULTI、不第二次 RTT——初版分两次 RTT + RMap 读取，联调期发现 Redisson 全局 `CompositeCodec` 的 JSON 值编码会把 Lua 参数污染成垃圾值（`SET EX` 报 not an integer，全量走降级），合并脚本 + 显式 `getScript(StringCodec.INSTANCE)` 后修复，详见 §3 S15 联调期修复条；② flush 逐条独立提交不套整批事务——单条 DB 失败仅丢该 delta 并续跑，与 D35 取舍一致（套事务会一损俱损）；③ 库内 view_count 由详情路径已读文章行传入，服务层不回查（省一次 SELECT）；④ 无访客标识退化直写（裸调 API 场景，与 S8 一致）；⑤ 列表页不合成待增量（滞后 ≤10s 可接受，避免列表查询打 Redis）；⑥ 宿主 redis AOF 为仓库外手动步骤，生产 AOF 归 S13 部署清单；⑦ **纪律：今后任何 Redisson Lua 调用必须显式指定 StringCodec**（全局 codec 只保证 key 正常、value 必被 JSON 编码，陷阱极隐蔽） | 本文件 / ViewCountService / ViewCountSupport / RedisConfig |
 | 2026-10-13 | S14-D1（社交登录自动注册实现口径，依据框架源码与库表实证）：① 锁与事务同方法——lock4j-core 2.2.7 的 `LockAnnotationAdvisor` 为 `Ordered.HIGHEST_PRECEDENCE`，锁包裹事务，锁内双查绑定关系保证并发首登只建一号（与 workflow 模块 `@Lock4j + @Transactional` 既有用法一致）；② "禁账密登录"= 随机 UUID 的 BCrypt 哈希密码（`sys_user` 无专用禁用列，明文不可获知即不可登录，密码永不下发）；③ 不分配任何角色/部门，与框架 `/auth/register` 的 `registerUser` 口径一致（博客红线：所有注册用户天然可发文、不授予管理权限）；④ 账号派生：平台用户名清洗（仅保留 `[a-z0-9_-]` 并小写）→ 冲突 `base_1~base_9` → `source_uuid` 确定性兜底（`user_name` 无唯一约束，必须应用层消歧）；昵称空值回退账号名、截断 30、冲突追加 4 位随机后缀（仅展示用途、无唯一约束）；⑤ 社交头像 URL **不落** `sys_user.avatar`（bigint OSS id，类型不匹配），仅存 `sys_social.avatar`——社交注册用户的博客公共资料头像为空，属已备案边界（S1-D1 头像机制不变，不新建头像链路）；⑥ justauth 只配 dev（`github` 新增 + `gitee` 假凭据清除，均 env 占位），**prod 配置留 S13**（生产域名未定，避免空 redirect-uri 破坏授权链接） | 本文件 / SysLoginService / SocialAccountNamer / AuthController |
+| 2026-10-14 | S16-D1（ES 服务端版本选 7.17.28，修订 S16 原文"ES 8"）：项目依赖栈实际锁定 easy-es 3.0.2 → `co.elastic.clients:elasticsearch-java:7.17.28`（本地 ~/.m2 pom 实证），ES 8 服务端与 7.17 客户端存在兼容风险；7.17.28 与客户端精确匹配，IK 7.17.28 同版本配套（直连 GitHub release 404，经 ghproxy.com 镜像安装已实证可达）；`vm.max_map_count` 环境已 1048576 达标 | 本文件 / script/docker/es/Dockerfile |
+| 2026-10-14 | S16-D2（ES 客户端走裸 elasticsearch-java，不用 easy-es BaseEsMapper）：IK mapping/boost/alias/零停机 reindex/highlight/search_after 需要精确 DSL 控制，easy-es 启动期自动建索引与 alias 方案冲突；`BlogEsConfig` 手工建 `ElasticsearchClient` bean（约 40 行），`easy-es.enable` 保持 false 与其并存互不激活（依赖经 ruoyi-common-elasticsearch 传递已锁定，零新增依赖） | 本文件 / BlogEsConfig |
+| 2026-10-14 | S16-D3（深翻页 = from+size 窗口 + after 游标双轨，兑现 ROADMAP 原文 search_after）：无状态 pageNum 契约无法携带上一页 sort 值，纯 search_after 需状态；定案 = `max_result_window=50000`（覆盖 5 万演示数据）+ 契约新增可选 `after` 请求参数 / `nextAfter` 响应字段（opaque 游标编码 score|publishedAt(epochMilli)|articleId，URL-safe Base64 去 padding）；越窗且无游标返回空页；pageSize 兜底默认 10、上限 100 | 本文件 / blog-api.md §6 / EsArticleSearchService |
+| 2026-10-14 | S16-D4（索引同步最终一致 + 降级哲学，与 S15 同脉）：① 事件只作触发信号不携带状态，监听方事务提交后按 DB 现状重推导（重复/乱序消费幂等），索引失败仅记 error 由对账定时任务兜底（不阻断主业务，接受最终一致的秒级窗口）；② 回表查询复用 `selectPublicPage` 三条件底座——堵住"ES 查询后、DB 回表前文章被隐藏"的竞态泄露窗口（红线核验点：三条件在 indexOrRemove / initialFullSync / reconcile 的 MySQL 侧三处同源）；③ ES 运行期异常降级 MySQL LIKE（响应无 highlight/nextAfter），保证搜索可用性；④ 已备案边界：标签 rename/merge 不即时同步索引（tags 字段靠对账任务兜底刷新） | 本文件 / ArticleIndexServiceImpl / EsArticleSearchService |
+| 2026-10-14 | S16-D5（演示数据与对比留档登记）：`blog_s16_demo_data.sql`（24 篇中文文 + 2 万压测，recursive CTE；ID 全落 9e18 标记段、tag slug 一律 s16- 前缀防既有标签唯一键冲突；SQL 直插绕过应用事件，ES 侧由对账任务补齐——顺带完成"对账发现并修复不同步"验收）；`blog_s16_cleanup.sql`（按段 DELETE + ES 清理两法）；`blog_s16_benchmark.md`（对比方法/命令留档，结果表人工实测后填写，清理方式随切片登记于此与 §3 SQL 状态表） | 本文件 / docs/blog_s16_*.sql / docs/blog_s16_benchmark.md |
 
 ### 待决策
 
