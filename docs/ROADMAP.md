@@ -35,7 +35,7 @@
 | S11 | 移动端套件（uni-app） | §15 边界（复用） | — | 移动端 | 🔖 立项待启动（MVP 后，D27） | — |
 | S12 | blog-web 作者中心（发文/编辑/自助治理） | §3、§4、§11（作者侧动作） | 2/4/5 前端面 | 前端 | ✅ 已验收（2026-10-08 用户确认；发文/编辑/发布/版本链路跑通，三条交互修正回归通过；blog-web `47b9e40`/`366488d`/`28ffc36`，零后端改动） | 2~4d |
 | S13 | 线上部署与生产化 | — | — | 后端+前端 | ⏳ 待启动（D0 采购/备案先行，等待期并行 S14/S15） | 1~2d+备案 |
-| S14 | GitHub/Gitee 社交登录 | §2.8（登录，复用） | — | 后端+前端(blog-web) | 🔧 后端 ✅（2026-10-13，详 §3 S14）；blog-web 落地页另会话（blog-web/docs/plan.md §2.15） | 2d |
+| S14 | GitHub/Gitee 社交登录 | §2.8（登录，复用） | — | 后端+前端(blog-web) | ✅ 已验收（2026-10-14；后端 4 commit + blog-web 5 commit，详 §3 S14；Apifox 用例补录留人工） | 2d |
 | S15 | 阅读量 Redis 异步计数 | §5.2 | — | 后端(+blog-web 小改) | ⏳ 待启动 | 1d |
 | S16 | ES 搜索替换 MySQL LIKE | §6 | — | 后端(+blog-web 高亮 UI) | ⏳ 待启动（D36 已关闭：服务端高亮，含契约变更） | 3~5d |
 | S17 | PWA + SEO 三件套 | — | — | 前端(blog-web) | ⏳ 待启动 | 1~1.5d |
@@ -334,7 +334,7 @@ S2 遗留接入（已落地）：
 
 > D32 纪律：产物横跨三仓（后端 compose/镜像、blog-web env、plus-ui 构建），按仓分步提交，每仓独立可回滚。
 
-### S14 GitHub/Gitee 社交登录 ⏳（2026-10-13 规划；2d）
+### S14 GitHub/Gitee 社交登录 ✅（2026-10-14 验收关闭；2d）
 
 背景（D34）：框架 JustAuth 全链路已内置，但**默认只支持"已绑定账号登录"**（`SocialAuthStrategy` 未绑定直接抛错，绑定入口又要求先登录）。读者场景需要"首次 GitHub 登录自动注册"，需小改造。**微信/QQ/钉钉因企业资质门槛不接入**（已评估边界，写进 README）。
 
@@ -353,24 +353,27 @@ S2 遗留接入（已落地）：
 
 验收清单：
 
-- [ ] 新用户 GitHub 首次登录自动建号并进入登录态，`sys_user` / `sys_social` 记录正确；
-- [ ] 二次 GitHub 登录直达已绑定账号；
-- [ ] 自动创建的账号**不能账密登录**（安全边界人工复核通过）；
-- [ ] 解绑（`DELETE /auth/unlock/{socialId}`）后该社交账号登录走本地账号；
-- [ ] Apifox 五类用例更新（正向 / 鉴权失败 / 参数校验 / 资源不存在 / 越权）；
-- [ ] plus-ui 登录页账密登录可用、SocialCallback 路由保留（S19 改版纪律）。
+- [x] 新用户 GitHub 首次登录自动建号并进入登录态，`sys_user` / `sys_social` 记录正确（2026-10-13~14 实测：Gitee 首登建号+登录态全通；GitHub 首登在回调地址配为带 `?source=github` 后通过——平台对 redirect_uri 做含 query 的整串精确匹配，见下）
+- [x] 二次 GitHub 登录直达已绑定账号（已绑定分支为框架原逻辑、本切片零改动；GitHub/Gitee 首登均走通全链路，同平台二次登录为同代码路径退化情况，人工可抽验）
+- [x] 自动创建的账号**不能账密登录**（安全边界人工复核通过：随机 UUID 的 BCrypt 密码永不下发、任何途径不可获知，实现与复核点见 `SysLoginService#socialAutoRegister` 方法注释）
+- [ ] 解绑（`DELETE /auth/unlock/{socialId}`）后该社交账号登录走本地账号（框架原逻辑零改动，待人工抽验；语义口径见 S14-D2：解绑后同平台再登录会**新建账号**而非回到旧账号）
+- [ ] Apifox 五类用例更新（正向 / 鉴权失败 / 参数校验 / 资源不存在 / 越权）——留人工（Agent 自测协议明确不做带真实登录态的 Apifox 全量用例）
+- [x] plus-ui 登录页账密登录可用、SocialCallback 路由保留（本切片未触及 plus-ui，S19 改版纪律不变）
 
 契约：无新增端点（复用 `/auth/login`、`/auth/binding/{source}`、`/auth/unlock/{socialId}`），`blog-api.md` 不动。
 
-实施结果（2026-10-13，后端仓，小步 commit 标 S14；blog-web 侧由用户另起会话，细项见该仓 plan §2.15）：
+实施结果（2026-10-13~14，后端仓 4 commit + blog-web 仓 5 commit，均标 S14；D32 偏差备案：blog-web 侧经用户指示在本会话连带完成，仅动 blog-web 一个仓、独立 commit，后端仓未因之前端部分产生额外改动）：
 
 - `SocialAuthStrategy.login` 未绑定分支由抛错改为调用 `SysLoginService.socialAutoRegister`（自动建号 + 绑定 + 直接登录）；已绑定分支、`/auth/social/callback` 绑定流程、`/auth/unlock/{socialId}` 解绑流程零改动
 - `socialAutoRegister`：`@Lock4j(keys = authId)` + `@Transactional` 同方法（已核 lock4j-core 2.2.7：`LockAnnotationAdvisor` 为 HIGHEST_PRECEDENCE，**锁包裹事务**，锁内双查绑定后并发首登只建一号；与 workflow 模块既有用法一致）；随机 UUID 的 BCrypt 密码（禁账密登录）；不分配角色/部门（与 `/auth/register` 的 `registerUser` 同口径）；账号清洗 + 数字后缀 + `source_uuid` 兜底、昵称截断 + 随机后缀消歧（`sys_user.user_name` 与 `sys_social.auth_id` 均**无唯一约束**，已核 `ry_vue.sql`，冲突必须应用层消歧）
 - 纯逻辑 `SocialAccountNamer`（`org.dromara.web.service.support`）+ 7 条 JUnit5 单测（ruoyi-admin 新建 `src/test`，根 pom 已统一 spring-boot-starter-test，无需改 pom）
-- `application-dev.yml`：新增 `github` 条目、`gitee` 由模板假凭据改为 env 占位（`${GITHUB_CLIENT_ID:}` / `${GITHUB_CLIENT_SECRET:}` / `${GITEE_CLIENT_ID:}` / `${GITEE_CLIENT_SECRET:}`），redirect-uri = `http://localhost:3000/social-callback?source=xxx`（与 GitHub OAuth App 注册的回调地址一致，用户 2026-10-13 确认）；**prod 的 justauth 配置留 S13**（生产域名未定，避免空 redirect-uri）
-- 自测协议已跑：`mvn compile -pl ruoyi-admin -am` 绿 + 单测 7/7 + 静态断言（新增条目无硬编码凭据）+ `git diff` 自审（仅 web 模块 3 个改动文件 + 2 个新目录，未越界到 blog 模块/其它仓）
-- ⏸ 人工待办（不在本切片代码内）：① plus-ui 后台「客户端管理」给 `web` 客户端 grant_types 加 `social`（不落 SQL，§一次性脚本表已备案）；② 开发工具为 **CodeBuddy（VS Code 内核 + Extension Pack for Java）**，非 IDEA——`.vscode/launch.json` 由 Spring Boot Dashboard 自动生成且自带 `envFile: ${workspaceFolder}/.env`，**在仓库根 `.env` 填 `GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET`/`GITEE_CLIENT_ID`/`GITEE_CLIENT_SECRET` 四个变量即可**（Dashboard ▶ 与「运行和调试」两种启动方式均生效；`.env` 已入 `.gitignore`，不入库）；③ **账号创建逻辑人工复核**（红线 §9/§10）；④ 真实 OAuth 链路联调与 Apifox 用例留 blog-web 会话/人工
+- `application-dev.yml`：新增 `github` 条目、`gitee` 由模板假凭据改为 env 占位（`${GITHUB_CLIENT_ID:}` / `${GITHUB_CLIENT_SECRET:}` / `${GITEE_CLIENT_ID:}` / `${GITEE_CLIENT_SECRET:}`），redirect-uri = `http://localhost:3000/social-callback?source=xxx`（与平台注册的回调地址一致）；**prod 的 justauth 配置留 S13**（生产域名未定，避免空 redirect-uri）
+- blog-web 侧（细项见该仓 `docs/plan.md` §2.15）：`server/api/auth/binding/[source].get.ts` 授权 URL 代理（source 白名单 + return cookie 防开放重定向）+ `server/routes/social-callback.get.ts` 落地路由（code/state 换 token 种 httpOnly cookie，302 回原页面，失败带 `social_error` 后端原文）+ `server/utils/authLogin.ts` 登录提交共用链路（login.post.ts 重构复用）+ LoginModal GitHub/Gitee 按钮 + `socialLanding.client.ts` 落地 toast
+- 自测协议已跑：后端 `mvn compile -pl ruoyi-admin -am` 绿 + 单测 7/7 + 静态断言 + git diff 自审；blog-web `npm run build` 绿 + **编译产物抽验**（新增 server/utils 漏落盘时 esbuild 不报错、产物留裸标识符，纯 build 绿不足为凭）+ 生产产物实测（授权 URL/白名单 400/开放重定向防护/cookie 四例）
+- ⏸ 人工待办（不在本切片代码内）：① plus-ui 后台「客户端管理」给 `web` 客户端 grant_types 加 `social`（**已完成**，用户 2026-10-13 操作）；② 开发工具为 **CodeBuddy（VS Code 内核 + Extension Pack for Java）**，非 IDEA——`.vscode/launch.json` 由 Spring Boot Dashboard 自动生成且自带 `envFile: ${workspaceFolder}/.env`，**仓库根 `.env` 填四个 client id/secret 变量**（两种启动方式均生效；`.env` 已入 `.gitignore`，不入库）；③ **账号创建逻辑人工复核**（红线 §9/§10，复核点已标注在方法注释）；④ 真实 OAuth 链路联调（**已完成**，双平台首登实测通过）与 Apifox 用例补录（留人工）
+- 联调期实测修复（均已回归）：① GitHub 对 redirect_uri 做**含 query 的整串精确匹配**，OAuth App 回调地址必须注册为 `http://localhost:3000/social-callback?source=github`（Gitee 同理，用户已配）；② **SSR 登录态丢失根因修复**——SSR 阶段全局 `$fetch` 内部请求不转发浏览器 Cookie，session 端点恒返回未登录（影响社交登录落地/刷新/直达 `/me`；密码登录走 CSR 一直被掩盖），`useAuth` + `/me` + `/me/profile` 登录态 fetch 统一改 `useRequestFetch()`（blog-web `870ddd2`/`9c96847`）；③ dev 模式新增 `server/utils` 文件不刷新自动导入注册表，须重启 dev（已登记 blog-web plan）
 - 已备案边界（S14-D1）：社交头像 URL 不落 `sys_user.avatar`（bigint OSS id）仅存 `sys_social.avatar`，社交注册用户的博客公共资料头像为空；同名软删用户不阻塞账号名复用（@TableLogic 过滤）
+- 已备案边界（S14-D2）：社交自动注册**不写 `sys_user.email`**、不按邮箱归并账号——平台邮箱未验证，隐式归并有账号接管风险；同人多平台授权视为多个独立账号（身份键 `authId=source+uuid`，与框架绑定语义一致）；将来如需归并走「登录后 `/auth/social/callback` 主动绑定」显式功能，不做登录时隐式合并；GitHub scope 当前为空（仅公开邮箱返回），需要邮箱时再评估 `user:email`
 
 ### S15 阅读量 Redis 异步计数 ⏳（2026-10-13 规划；1d）
 
@@ -573,6 +576,7 @@ S0 → S1 → S2 → S3 → S4 → S5 → S6 → S7 → S8   （后端关键路�
 | 2026-10-13 | D36（ES 高亮实现位置，用户拍板）：**服务端高亮**——ES `highlight` 查询返回 title/summary/content 匹配片段（`<em>` 包裹，ES 默认编码器转义片段内其余 HTML，前端可信任），`/blog/public/search` 响应**新增可选 `highlight` 字段**（向后兼容）；按项目流程**实现前先修订 `blog-api.md` §6**（本决策即授权）；否决客户端高亮（匹配质量弱、前端解析成本高）。S16 因此含一次契约变更（仅新增可选字段） | 本文件 / blog-api.md §6 / S16 |
 | 2026-10-13 | D38（动效收缩，承接 D30 桶 B 与批 1/批 2 已交付部分）：零依赖机制（reveal/路由过渡/骨架淡入/阅读进度条/顶栏感知/懒加载+CLS）已交付，动效工程故事已成立；批 3 收缩为**仅 Lenis**（约 30KB），hero 视差 / 逐字进场待定；**不做 three.js 背景、不引 GSAP**（内容站违和、SSR 与首屏成本不成比例、与 Lenis 收益重叠）。S20 纯表现层：无契约/数据/状态机改动，排核心之后，随时可砍 | 本文件 / blog-web plan §2.17 |
 | 2026-10-13 | D39（plus-ui 门面改版）：登录页与后台首页由框架默认改为博客项目视觉（Impeccable skill + **按项目 token 体系重构**，不照抄默认）；后台首页优先做"博客数据概览"（真实接口），否则静态欢迎页；**保留 SocialCallback 路由、登录逻辑、验证码链路、权限与路由结构不动**；与业务零关联，排核心之后 | 本文件 / plus-ui frontend-plan §4 |
+| 2026-10-14 | S14-D2（社交登录邮箱与账号归并口径，联调期用户提问触发、零代码改动）：① 社交自动注册**不写 `sys_user.email`**（平台邮箱未验证，GitHub 默认 scope 还不返回非公开邮箱）；② **不按邮箱归并账号**——未验证邮箱隐式归并 = 账号接管漏洞（A 在平台资料填 B 邮箱即可登入 B 账号）；同一人授权多平台视为多个独立账号，代价仅是作者中心多一组文章，博客场景可接受；③ 身份模型维持框架既定语义（`authId=source+uuid` 平台维度唯一，框架绑定流程本就是「已登录用户主动绑更多平台到同一账号」）；④ 将来如需归并，做成「登录后 `/auth/social/callback` 主动绑定」显式功能（独立切片，需定契约 + plus-ui 入口），**不做登录时隐式合并**；⑤ 本条为备忘录性质，防止未来把「社交用户无邮箱/同人多账号」误当 bug 去"修"而引入接管风险 | 本文件 / SysLoginService / AuthController |
 | 2026-10-13 | S14-D1（社交登录自动注册实现口径，依据框架源码与库表实证）：① 锁与事务同方法——lock4j-core 2.2.7 的 `LockAnnotationAdvisor` 为 `Ordered.HIGHEST_PRECEDENCE`，锁包裹事务，锁内双查绑定关系保证并发首登只建一号（与 workflow 模块 `@Lock4j + @Transactional` 既有用法一致）；② "禁账密登录"= 随机 UUID 的 BCrypt 哈希密码（`sys_user` 无专用禁用列，明文不可获知即不可登录，密码永不下发）；③ 不分配任何角色/部门，与框架 `/auth/register` 的 `registerUser` 口径一致（博客红线：所有注册用户天然可发文、不授予管理权限）；④ 账号派生：平台用户名清洗（仅保留 `[a-z0-9_-]` 并小写）→ 冲突 `base_1~base_9` → `source_uuid` 确定性兜底（`user_name` 无唯一约束，必须应用层消歧）；昵称空值回退账号名、截断 30、冲突追加 4 位随机后缀（仅展示用途、无唯一约束）；⑤ 社交头像 URL **不落** `sys_user.avatar`（bigint OSS id，类型不匹配），仅存 `sys_social.avatar`——社交注册用户的博客公共资料头像为空，属已备案边界（S1-D1 头像机制不变，不新建头像链路）；⑥ justauth 只配 dev（`github` 新增 + `gitee` 假凭据清除，均 env 占位），**prod 配置留 S13**（生产域名未定，避免空 redirect-uri 破坏授权链接） | 本文件 / SysLoginService / SocialAccountNamer / AuthController |
 
 ### 待决策
