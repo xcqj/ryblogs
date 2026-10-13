@@ -607,8 +607,9 @@ after      可选，深翻页游标（opaque，由上一页响应返回；见下
 **响应结构：**
 
 ```text
-rows     文章列表，行结构与 §5.1 完全同构
-total    命中总数
+rows      文章列表，行结构与 §5.1 完全同构
+total     命中总数
+nextAfter 可选字符串：深翻页游标（见下文「深翻页」）；缺失时忽略
 ```
 
 行结构在 §5.1 基础上**新增一个可选字段**（向后兼容，旧客户端忽略即可）：
@@ -626,9 +627,10 @@ highlight   可选对象，仅当该行在对应字段命中时出现：
 
 **深翻页（after）：**
 
-- 不传 `after` 时按 `pageNum/pageSize` 常规分页（内部 from+size）
-- 需要越过深页窗口时，客户端把上一页响应返回的 `after` 原样传入，与 `pageNum` 互斥（传 `after` 时忽略 `pageNum`）
-- `after` 为 opaque 游标（编码上一页最后一条的排序值），格式不保证稳定，不得解析依赖
+- 不传 `after` 时按 `pageNum/pageSize` 常规分页（内部 from+size，受深页窗口限制）
+- 需要越过深页窗口时，客户端把上一页响应返回的 `nextAfter` 原样作为 `after` 传入，与 `pageNum` 互斥（传 `after` 时忽略 `pageNum`）
+- `after` / `nextAfter` 为 opaque 游标（编码上一页最后一条的排序值），格式不保证稳定，不得解析依赖
+- 深页窗口之外且未传 `after` 时返回空结果（此时应改用 `nextAfter` 翻页）
 
 **底层实现与语义（S16 / D36，2026-10-14 登记）：**
 
