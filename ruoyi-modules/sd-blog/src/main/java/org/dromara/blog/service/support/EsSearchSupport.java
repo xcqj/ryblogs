@@ -39,11 +39,12 @@ public final class EsSearchSupport {
     }
 
     /**
-     * 编码深翻页游标（URL-safe Base64，可安全进 query 参数）
+     * 编码深翻页游标（URL-safe Base64 去 padding，可安全进 query 参数）
      */
     public static String encodeCursor(double score, long publishedAtEpochMilli, long articleId) {
         String raw = score + "|" + publishedAtEpochMilli + "|" + articleId;
-        return Base64.getUrlEncoder().encodeToString(raw.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return Base64.getUrlEncoder().withoutPadding()
+            .encodeToString(raw.getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     /**
