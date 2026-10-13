@@ -369,7 +369,7 @@ S2 遗留接入（已落地）：
 - 纯逻辑 `SocialAccountNamer`（`org.dromara.web.service.support`）+ 7 条 JUnit5 单测（ruoyi-admin 新建 `src/test`，根 pom 已统一 spring-boot-starter-test，无需改 pom）
 - `application-dev.yml`：新增 `github` 条目、`gitee` 由模板假凭据改为 env 占位（`${GITHUB_CLIENT_ID:}` / `${GITHUB_CLIENT_SECRET:}` / `${GITEE_CLIENT_ID:}` / `${GITEE_CLIENT_SECRET:}`），redirect-uri = `http://localhost:3000/social-callback?source=xxx`（与 GitHub OAuth App 注册的回调地址一致，用户 2026-10-13 确认）；**prod 的 justauth 配置留 S13**（生产域名未定，避免空 redirect-uri）
 - 自测协议已跑：`mvn compile -pl ruoyi-admin -am` 绿 + 单测 7/7 + 静态断言（新增条目无硬编码凭据）+ `git diff` 自审（仅 web 模块 3 个改动文件 + 2 个新目录，未越界到 blog 模块/其它仓）
-- ⏸ 人工待办（不在本切片代码内）：① plus-ui 后台「客户端管理」给 `web` 客户端 grant_types 加 `social`（不落 SQL，§一次性脚本表已备案）；② IDEA `DromaraApplication` 运行配置填上述 4 个 env；③ **账号创建逻辑人工复核**（红线 §9/§10）；④ 真实 OAuth 链路联调与 Apifox 用例留 blog-web 会话/人工
+- ⏸ 人工待办（不在本切片代码内）：① plus-ui 后台「客户端管理」给 `web` 客户端 grant_types 加 `social`（不落 SQL，§一次性脚本表已备案）；② 开发工具为 **CodeBuddy（VS Code 内核 + Extension Pack for Java）**，非 IDEA——`.vscode/launch.json` 由 Spring Boot Dashboard 自动生成且自带 `envFile: ${workspaceFolder}/.env`，**在仓库根 `.env` 填 `GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET`/`GITEE_CLIENT_ID`/`GITEE_CLIENT_SECRET` 四个变量即可**（Dashboard ▶ 与「运行和调试」两种启动方式均生效；`.env` 已入 `.gitignore`，不入库）；③ **账号创建逻辑人工复核**（红线 §9/§10）；④ 真实 OAuth 链路联调与 Apifox 用例留 blog-web 会话/人工
 - 已备案边界（S14-D1）：社交头像 URL 不落 `sys_user.avatar`（bigint OSS id）仅存 `sys_social.avatar`，社交注册用户的博客公共资料头像为空；同名软删用户不阻塞账号名复用（@TableLogic 过滤）
 
 ### S15 阅读量 Redis 异步计数 ⏳（2026-10-13 规划；1d）
