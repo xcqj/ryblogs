@@ -87,4 +87,17 @@ public interface SdBlogArticleMapper extends BaseMapperPlus<SdBlogArticle, SdBlo
     @Update("update sd_blog_article set view_count = view_count + 1 where article_id = #{articleId} and del_flag = '0'")
     int increaseViewCount(@Param("articleId") Long articleId);
 
+    /**
+     * 阅读量待增量回写（S15 / D35）：增量合并而非覆盖，保证并发 flush 不回退；
+     * del_flag='0' 守卫防止软删文章被回写（此时返回 0 行，调用方跳过即可）。
+     * <p>
+     * 人工复核点（AGENTS.md §9）：增量语义 + 逻辑删除守卫。
+     *
+     * @param articleId 文章ID
+     * @param delta     待增量（>0）
+     * @return 更新行数
+     */
+    @Update("update sd_blog_article set view_count = view_count + #{delta} where article_id = #{articleId} and del_flag = '0'")
+    int addViewCount(@Param("articleId") Long articleId, @Param("delta") long delta);
+
 }

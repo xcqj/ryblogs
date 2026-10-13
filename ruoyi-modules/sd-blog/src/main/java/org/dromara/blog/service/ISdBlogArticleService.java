@@ -168,10 +168,12 @@ public interface ISdBlogArticleService {
     PageResult<BlogPublicArticleListItemVo> queryPublicTagArticles(String slug, PageQuery pageQuery);
 
     /**
-     * 公共文章详情（契约 §5.2）：非公共可见报“文章不存在”；成功打开时 view_count 原子 +1（D8）
+     * 公共文章详情（契约 §5.2）：非公共可见报“文章不存在”；阅读量走异步计数
+     * （S15 / D35：Redis 同人窗口去重 + 待增量，读路径零 DB 写；降级时内部直写 DB）
      *
      * @param articleId 文章ID
+     * @param visitorId 匿名访客标识（blog-web 代理转发的 httpOnly cookie 值，可空；已登录按 userId 优先）
      * @return 公共详情（含当前版本与标签，不含内部状态字段）
      */
-    BlogPublicArticleDetailVo queryPublicDetail(Long articleId);
+    BlogPublicArticleDetailVo queryPublicDetail(Long articleId, String visitorId);
 }

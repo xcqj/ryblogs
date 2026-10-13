@@ -4,6 +4,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.ObjectUtil;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
+import org.dromara.common.satoken.utils.LoginHelper;
 import org.dromara.common.core.domain.PageResult;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -37,6 +38,7 @@ import org.dromara.blog.mapper.SdBlogTagMapper;
 import org.dromara.blog.service.ISdBlogArticleService;
 import org.dromara.blog.service.ISdBlogArticleTagService;
 import org.dromara.blog.service.ISdBlogTagService;
+import org.dromara.blog.service.ViewCountService;
 import org.dromara.blog.service.support.ArticleGuards;
 import org.dromara.blog.service.support.ArticleTagFiller;
 import org.dromara.blog.service.support.VersionPolicy;
@@ -68,6 +70,7 @@ public class SdBlogArticleServiceImpl implements ISdBlogArticleService {
     private final ISdBlogTagService sdBlogTagService;
     private final ISdBlogArticleTagService sdBlogArticleTagService;
     private final ArticleTagFiller articleTagFiller;
+    private final ViewCountService viewCountService;
 
     /**
      * 创建文章：DRAFT + Version 1 + 回写 currentVersionId + 标签同步，同一事务（契约 §3.1）
@@ -434,20 +437,24 @@ public class SdBlogArticleServiceImpl implements ISdBlogArticleService {
     }
 
     /**
-     * 公共文章详情（契约 §5.2）：验证可见后原子 +1，返回库内原值 +1（不二次查询）
+     * 公共文章详情（契约 §5.2）：验证可见后走阅读量异步计数，返回库内值 + 待增量（D35）
+     * <p>
+     * S15 / D35：读路径不再写 DB 行锁——Redis 可用时 Lua 去重 + 待增量 +1（登录 userId 优先、
+     * 匿名 visitorId，30min 窗口）；Redis 异常或无访客标识时 ViewCountService 内部降级直写 DB（S8 行为）。
      */
     @Override
-    public BlogPublicArticleDetailVo queryPublicDetail(Long articleId) {
+    public BlogPublicArticleDetailVo queryPublicDetail(Long articleId, String visitorId) {
         SdBlogArticle article = sdBlogArticleMapper.selectById(articleId);
         if (Objects.isNull(article) || !ArticleGuards.isPublicVisible(article)) {
             throw new ServiceException("文章不存在");
         }
-        sdBlogArticleMapper.increaseViewCount(articleId);
+        Long userId = LoginHelper.isLogin() ? LoginHelper.getUserId() : null;
+        long viewCount = viewCountService.countAndGetViewCount(articleId, userId, visitorId, article.getViewCount());
         BlogPublicArticleDetailVo vo = new BlogPublicArticleDetailVo();
         vo.setArticleId(article.getArticleId());
         vo.setAuthorId(article.getAuthorId());
         vo.setPublishedAt(article.getPublishedAt());
-        vo.setViewCount(Objects.isNull(article.getViewCount()) ? 1L : article.getViewCount() + 1);
+        vo.setViewCount(viewCount);
         if (Objects.nonNull(article.getCurrentVersionId())) {
             vo.setCurrentVersion(toVersionVo(sdBlogArticleVersionMapper.selectById(article.getCurrentVersionId())));
         }

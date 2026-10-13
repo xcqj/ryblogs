@@ -41,6 +41,14 @@ user:
     # 密码锁定时间（默认10分钟）
     lockTime: 10
 
+# 博客模块配置（sd-blog）
+blog:
+  view:
+    # 阅读量同人去重窗口（分钟）：登录 userId / 匿名 visitorId 在此窗口内重复打开只计一次（S15 / D35）
+    dedup-ttl-minutes: 30
+    # 阅读量待增量回写周期（毫秒）：Redis 待增量 hash 批量增量 UPDATE 合回 DB 的定时间隔
+    flush-interval-ms: 10000
+
 # Spring配置
 spring:
   application:

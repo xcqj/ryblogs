@@ -14,6 +14,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -46,16 +47,18 @@ public class BlogPublicArticleController extends BaseController {
     }
 
     /**
-     * 公共文章详情（§5.2）：成功打开时 view_count +1（D8 同步原子 UPDATE）；
-     * 草稿/隐藏/下线/已删一律“文章不存在”
+     * 公共文章详情（§5.2）：阅读量走异步计数（S15 / D35：Redis 同人窗口去重 + 待增量，
+     * 降级直写 DB）；草稿/隐藏/下线/已删一律“文章不存在”
      *
      * @param articleId 文章ID
+     * @param visitorId 匿名访客标识（blog-web 代理转发的 httpOnly cookie 值，可选；已登录按 userId 优先）
      * @return 公共详情（含正文、标签、最新阅读量）
      */
     @GetMapping("/{articleId}")
     public R<BlogPublicArticleDetailVo> detail(@NotNull(message = "文章ID不能为空")
-                                               @PathVariable("articleId") Long articleId) {
-        return R.ok(sdBlogArticleService.queryPublicDetail(articleId));
+                                               @PathVariable("articleId") Long articleId,
+                                               @RequestParam(value = "visitorId", required = false) String visitorId) {
+        return R.ok(sdBlogArticleService.queryPublicDetail(articleId, visitorId));
     }
 
 }
