@@ -36,7 +36,7 @@
 | S12 | blog-web 作者中心（发文/编辑/自助治理） | §3、§4、§11（作者侧动作） | 2/4/5 前端面 | 前端 | ✅ 已验收（2026-10-08 用户确认；发文/编辑/发布/版本链路跑通，三条交互修正回归通过；blog-web `47b9e40`/`366488d`/`28ffc36`，零后端改动） | 2~4d |
 | S13 | 线上部署与生产化 | — | — | 后端+前端 | ⏳ 待启动（D0 采购/备案先行，等待期并行 S14/S15） | 1~2d+备案 |
 | S14 | GitHub/Gitee 社交登录 | §2.8（登录，复用） | — | 后端+前端(blog-web) | ✅ 已验收（2026-10-14；后端 4 commit + blog-web 5 commit，详 §3 S14；Apifox 用例补录留人工） | 2d |
-| S15 | 阅读量 Redis 异步计数 | §5.2 | — | 后端(+blog-web 小改) | 🔧 代码完成（2026-10-14，后端 2 commit + blog-web 1 commit，详 §3 S15）；联调验收待人工（重启 8081 + dev 后） | 1d |
+| S15 | 阅读量 Redis 异步计数 | §5.2 | — | 后端(+blog-web 小改) | ✅ 已验收（2026-10-14 人工实测通过；后端 4 commit + blog-web 3 commit，联调期三联坑详见 §3 S15；JMeter 压测与 Apifox 语义回归留作面试演示/人工） | 1d |
 | S16 | ES 搜索替换 MySQL LIKE | §6 | — | 后端(+blog-web 高亮 UI) | ⏳ 待启动（D36 已关闭：服务端高亮，含契约变更） | 3~5d |
 | S17 | PWA + SEO 三件套 | — | — | 前端(blog-web) | ⏳ 待启动 | 1~1.5d |
 | S18 | 接口限流 | — | — | 后端 | ⏳ 待启动 | 0.5d |
@@ -394,14 +394,14 @@ S2 遗留接入（已落地）：
 
 验收清单：
 
-- [ ] 连续刷新：同一访客 30min 内只 +1；换访客 / 过期后 +1（待重启 8081 后人工联调；Agent 已用 redis-cli EVAL 实证两段 Lua 语义）；
-- [ ] flush 后 DB 值与预期一致（`docker exec blog-mysql` 只读核验；人工）；
-- [ ] 杀进程重启：阅读量不回退、不跳变（依赖 redis AOF，人工）；
-- [ ] 停 Redis：详情仍 200，降级直写 DB（人工演练）；
-- [ ] 并发刷新无负值（脚本或 JMeter 压测；人工）；
-- [ ] Apifox 详情用例语义更新并回归（人工）。
+- [x] 连续刷新：同一访客 30min 内只 +1；换访客 / 过期后 +1（2026-10-14 人工实测通过：Chrome 未登录首访 +1、之后不加；换浏览器 +1；登录态走 userId 去重正常）；
+- [x] flush 后 DB 值与预期一致（人工实测：页面显示 12 / DB 11 → flush 后 DB 追平；`docker exec blog-mysql` 只读核验）；
+- [ ] 杀进程重启：阅读量不回退、不跳变（DB 为唯一真相源、增量 UPDATE 语义上不回退；依赖 redis AOF 的极致场景留 S13 生产环境验证）；
+- [x] 停 Redis：详情仍 200，降级直写 DB（codec 故障期间全量请求实际走过降级路径、详情持续 200，等效验证）；
+- [ ] 并发刷新无负值（HINCRBY/HGETALL+DEL/`view_count + delta` 均为原子增量语义，无减法路径；JMeter 压测留作面试演示素材）；
+- [ ] Apifox 详情用例语义更新并回归（留人工：viewCount 现 = DB + 待增量，可能滞后展示）。
 
-实施结果（2026-10-14，后端仓 + blog-web 仓各一提交周期，均标 S15；D32 偏差备案：经用户指示两半场同会话完成，blog-web 仅动详情代理与 blogGet，独立 commit）：
+实施结果（2026-10-14，后端仓 + blog-web 仓各一提交周期，均标 S15；D32 偏差备案：经用户指示两半场同会话完成，blog-web 仅动详情代理、middleware 与 utils，独立 commit）：
 
 - 后端新增 `ViewCountService`/`Impl`（sd-blog）：两段 Lua——计数「`SETNX NX EX` + `HINCRBY`」同 RTT 原子完成去重与计数；flush「`HGETALL`+`DEL`」同脚本原子 drain，避免先读后删丢增量；10s 定时逐条 `view_count = view_count + delta`（`del_flag='0'` 守卫，**人工复核点**）；Redis 异常 catch 降级直写 DB +1（S8 行为）；无访客标识同样直写
 - 读路径零 DB 写：`queryPublicDetail` 改调 `countAndGetViewCount(articleId, userId, visitorId, dbViewCount)`——库内值由调用方已读文章行传入，**不新增 SELECT**；返回 `DB + 待增量`；登录态经 `LoginHelper.isLogin()` 取 userId 优先（公开端点转发 token 时可用）
@@ -411,6 +411,7 @@ S2 遗留接入（已落地）：
 - 契约 `blog-api.md` §5.2 已按 D35 修订（**先报告冲突再修订**：原「每次打开 view_count +1」及「MVP 不做 Redis 热点计数/异步刷盘」与新语义冲突）：新增可选 `visitorId` 参数表、重写「阅读量」条款（窗口去重/异步回写/降级/滞后说明）、收窄「不做」清单为 IP 去重与设备指纹；响应结构不变，头部版本说明补记
 - 自测协议：`mvn compile -pl ruoyi-admin -am` 绿 + 单测 7/7 + 静态断言 + git diff 自审 + **redis-cli EVAL 实证两段 Lua 语义**；blog-web `npm run build` 绿
 - **联调期修复（2026-10-14，Redisson Lua codec 陷阱，必修）**：首轮联调「每次刷新都 +1」——后端日志 `ERR value is not an integer or out of range` 全部走降级。根因：本仓 Redisson 全局配置为 `CompositeCodec(StringCodec, TypedJsonJackson3Codec, ...)`（`RedisConfig`），而 `RedissonClient#getScript()` 默认继承全局 codec，**脚本 VALUE 参数按 JSON 编码**（"1800" → 带引号的 6 字节垃圾值），Lua 的 `SET ... EX ARGV[2]` 直接报错；**key 走 CompositeCodec 首位 StringCodec 看似正常，极具迷惑性**（生产日志里键名完全正确）。修法：所有 Lua eval 显式 `getScript(StringCodec.INSTANCE)`；并把 pending 读取合并进计数脚本（`HGET` 收尾，单次 RTT），顺带消除 RMap 读取的同源 codec 隐患。已用「Redisson 直连真实 Redis 的临时复现测试」四变体对比实证（String/Long/Integer 参数均失败、StringCodec 全过），复现测试已删；**全仓仅本功能使用 Lua，无其他历史中招点**。今后任何 Redisson Lua 调用必须先显式指定 StringCodec
+- **联调期第二/三坑（2026-10-14，blog-web 侧，均已修复验证）**：② SSR 取数用全局 `$fetch`，内部请求不转发浏览器 Cookie（S14 useAuth 同款坑第二现场）→ 详情代理读不到 visitorId/token，刷新页面去重永不命中；修：`/post/[slug].vue` 文章 useAsyncData 改 `useRequestFetch()`；③ **Nitro 内部请求响应里种的 Set-Cookie 不冒泡到外层 HTML 响应**（实测 SSR 文档响应无 set-cookie、直连 API 有）→ 在详情代理里种 cookie 浏览器永远收不到（Edge 未登录正常只因曾 SPA 导航时被 API 响应种下 cookie，Chrome 未登录从未 SPA 导航故全中）；修：visitor cookie 改由 `server/middleware/visitor-cookie.ts` 在最外层种植（`server/utils/visitor.ts` 种/读单点），代理只读。**三坑共性（面试叙事）：每层单元都正常、curl 直打都正常，坏的全是层间链路（codec 序列化方向、内部请求 cookie 方向、Set-Cookie 冒泡方向）——联调期查 Redis 键形态与响应头比任何单测都直接**
 - 备案边界（S15-D1）：① 列表页 viewCount 仍只读 DB（滞后 ≤10s，与掘金等站行为一致）；② 无访客标识（未登录且无 visitorId，如裸调 API）→ 每请求 +1 无去重（与 S8 一致）；③ 单条 flush DB 失败丢该 delta（已 drain 无法回退，D35 接受取舍，记 error 日志）；④ 宿主 `/docker/redis/conf/redis.conf` **未开 AOF**（仓库外文件，用户手动开 `appendonly yes`+`appendfsync everysec` 并重启容器，会丢内存中未 flush 待增量，dev 可接受）；⑤ 生产 redis AOF 属 S13 部署清单
 
 ### S16 ES 搜索替换 MySQL LIKE ⏳（2026-10-13 规划；3~5d；D36 已关闭：服务端高亮）
