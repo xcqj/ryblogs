@@ -288,10 +288,17 @@ justauth:
       client-id: 10**********6
       client-secret: 1f7d08**********5b7**********29e
       redirect-uri: ${justauth.address}/social-callback?source=weibo
+    github:
+      # S14 博客社交登录：client id/secret 走 env（IDEA 运行配置环境变量注入，不落库）
+      # GitHub OAuth App 的 Authorization callback URL = http://localhost:3000/social-callback（blog-web 落地页）
+      client-id: ${GITHUB_CLIENT_ID:}
+      client-secret: ${GITHUB_CLIENT_SECRET:}
+      redirect-uri: ${GITHUB_REDIRECT_URI:http://localhost:3000/social-callback?source=github}
     gitee:
-      client-id: 91436b7940090d09c72c7daf85b959cfd5f215d67eea73acbf61b6b590751a98
-      client-secret: 02c6fcfd70342980cd8dd2f2c06c1a350645d76c754d7a264c4e125f9ba915ac
-      redirect-uri: ${justauth.address}/social-callback?source=gitee
+      # S14 博客社交登录：凭据同样走 env；redirect-uri 需与 Gitee 应用配置的回调地址严格一致
+      client-id: ${GITEE_CLIENT_ID:}
+      client-secret: ${GITEE_CLIENT_SECRET:}
+      redirect-uri: ${GITEE_REDIRECT_URI:http://localhost:3000/social-callback?source=gitee}
     dingtalk:
       client-id: 10**********6
       client-secret: 1f7d08**********5b7**********29e
