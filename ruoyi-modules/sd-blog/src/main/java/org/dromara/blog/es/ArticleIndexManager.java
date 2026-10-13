@@ -11,6 +11,7 @@ import co.elastic.clients.util.ObjectBuilder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.blog.config.BlogEsConfig;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -35,6 +36,7 @@ import java.util.Set;
 @Slf4j
 @RequiredArgsConstructor
 @Component
+@ConditionalOnProperty(prefix = "blog.search", name = "engine", havingValue = "es")
 public class ArticleIndexManager {
 
     /** 字段名常量：mapping / 排序 / highlight / 回表共用同一份定义 */

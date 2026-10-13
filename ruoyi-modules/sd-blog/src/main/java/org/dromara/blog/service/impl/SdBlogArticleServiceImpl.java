@@ -31,6 +31,7 @@ import org.dromara.blog.domain.vo.SdBlogArticleVersionVo;
 import org.dromara.blog.domain.vo.SdBlogTagVo;
 import org.dromara.blog.enums.BlogArticleStatus;
 import org.dromara.blog.enums.BlogVisibility;
+import org.dromara.blog.event.ArticleChangedEvent;
 import org.dromara.blog.mapper.SdBlogArticleMapper;
 import org.dromara.blog.mapper.SdBlogArticleTagMapper;
 import org.dromara.blog.mapper.SdBlogArticleVersionMapper;
@@ -43,6 +44,7 @@ import org.dromara.blog.service.support.ArticleGuards;
 import org.dromara.blog.service.support.ArticleTagFiller;
 import org.dromara.blog.service.support.VersionPolicy;
 import org.dromara.blog.util.HtmlSanitizer;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -71,6 +73,7 @@ public class SdBlogArticleServiceImpl implements ISdBlogArticleService {
     private final ISdBlogArticleTagService sdBlogArticleTagService;
     private final ArticleTagFiller articleTagFiller;
     private final ViewCountService viewCountService;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 创建文章：DRAFT + Version 1 + 回写 currentVersionId + 标签同步，同一事务（契约 §3.1）
@@ -98,6 +101,7 @@ public class SdBlogArticleServiceImpl implements ISdBlogArticleService {
         update.setCurrentVersionId(version.getVersionId());
         sdBlogArticleMapper.updateById(update);
         sdBlogArticleTagService.syncArticleTags(article.getArticleId(), toTagIds(tags));
+        publishEvent(article.getArticleId(), ArticleChangedEvent.Action.CREATE);
         return article.getArticleId();
     }
 
@@ -137,6 +141,8 @@ public class SdBlogArticleServiceImpl implements ISdBlogArticleService {
             flag = sdBlogArticleMapper.updateById(update) > 0;
         }
         sdBlogArticleTagService.syncArticleTags(articleId, toTagIds(tags));
+        // 标签同步同样改变索引文档（tags 字段），无论内容是否变化都发事件（S16）
+        publishEvent(articleId, ArticleChangedEvent.Action.UPDATE);
         return flag;
     }
 
@@ -165,7 +171,11 @@ public class SdBlogArticleServiceImpl implements ISdBlogArticleService {
         if (Objects.isNull(article.getPublishedAt())) {
             update.setPublishedAt(LocalDateTime.now());
         }
-        return sdBlogArticleMapper.updateById(update) > 0;
+        boolean published = sdBlogArticleMapper.updateById(update) > 0;
+        if (published) {
+            publishEvent(articleId, ArticleChangedEvent.Action.PUBLISH);
+        }
+        return published;
     }
 
     /**
@@ -290,13 +300,16 @@ public class SdBlogArticleServiceImpl implements ISdBlogArticleService {
     public Boolean hideArticle(Long articleId, Long userId) {
         SdBlogArticle article = sdBlogArticleMapper.selectById(articleId);
         ArticleGuards.requireUserToggleVisible(article, userId);
-        if (BlogVisibility.USER_HIDDEN.getCode().equals(article.getVisibility())) {
-            return true;
+        boolean result = true;
+        if (!BlogVisibility.USER_HIDDEN.getCode().equals(article.getVisibility())) {
+            SdBlogArticle update = new SdBlogArticle();
+            update.setArticleId(articleId);
+            update.setVisibility(BlogVisibility.USER_HIDDEN.getCode());
+            result = sdBlogArticleMapper.updateById(update) > 0;
         }
-        SdBlogArticle update = new SdBlogArticle();
-        update.setArticleId(articleId);
-        update.setVisibility(BlogVisibility.USER_HIDDEN.getCode());
-        return sdBlogArticleMapper.updateById(update) > 0;
+        // 隐藏即移出索引（S16：索引只收公共可见文章，三条件内建于生命周期）
+        publishEvent(articleId, ArticleChangedEvent.Action.HIDE);
+        return result;
     }
 
     /**
@@ -306,13 +319,16 @@ public class SdBlogArticleServiceImpl implements ISdBlogArticleService {
     public Boolean showArticle(Long articleId, Long userId) {
         SdBlogArticle article = sdBlogArticleMapper.selectById(articleId);
         ArticleGuards.requireUserToggleVisible(article, userId);
-        if (BlogVisibility.PUBLIC.getCode().equals(article.getVisibility())) {
-            return true;
+        boolean result = true;
+        if (!BlogVisibility.PUBLIC.getCode().equals(article.getVisibility())) {
+            SdBlogArticle update = new SdBlogArticle();
+            update.setArticleId(articleId);
+            update.setVisibility(BlogVisibility.PUBLIC.getCode());
+            result = sdBlogArticleMapper.updateById(update) > 0;
         }
-        SdBlogArticle update = new SdBlogArticle();
-        update.setArticleId(articleId);
-        update.setVisibility(BlogVisibility.PUBLIC.getCode());
-        return sdBlogArticleMapper.updateById(update) > 0;
+        // 重新公开：已发布则回索引（草稿保持不入，indexOrRemove 按 DB 现状重推导）
+        publishEvent(articleId, ArticleChangedEvent.Action.SHOW);
+        return result;
     }
 
     /**
@@ -322,7 +338,10 @@ public class SdBlogArticleServiceImpl implements ISdBlogArticleService {
     public Boolean deleteByAuthor(Long articleId, Long userId) {
         SdBlogArticle article = sdBlogArticleMapper.selectById(articleId);
         ArticleGuards.requireDeletable(article, userId);
-        return sdBlogArticleMapper.deleteById(articleId) > 0;
+        boolean deleted = sdBlogArticleMapper.deleteById(articleId) > 0;
+        // 逻辑删除即移出索引（selectById 被 @TableLogic 过滤，indexOrRemove 直接删文档）
+        publishEvent(articleId, ArticleChangedEvent.Action.DELETE);
+        return deleted;
     }
 
     /**
@@ -368,22 +387,27 @@ public class SdBlogArticleServiceImpl implements ISdBlogArticleService {
     public Boolean adminHide(Long articleId, String reason, Long adminId) {
         SdBlogArticle article = sdBlogArticleMapper.selectById(articleId);
         ArticleGuards.requireExists(article);
+        boolean result;
         if (BlogVisibility.ADMIN_HIDDEN.getCode().equals(article.getVisibility())) {
             SdBlogArticle refresh = new SdBlogArticle();
             refresh.setArticleId(articleId);
             refresh.setAdminHiddenReason(reason);
             refresh.setAdminHiddenBy(adminId);
             refresh.setAdminHiddenTime(LocalDateTime.now());
-            return sdBlogArticleMapper.updateById(refresh) > 0;
+            result = sdBlogArticleMapper.updateById(refresh) > 0;
+        } else {
+            ArticleGuards.requireAdminHidable(article);
+            SdBlogArticle update = new SdBlogArticle();
+            update.setArticleId(articleId);
+            update.setVisibility(BlogVisibility.ADMIN_HIDDEN.getCode());
+            update.setAdminHiddenReason(reason);
+            update.setAdminHiddenBy(adminId);
+            update.setAdminHiddenTime(LocalDateTime.now());
+            result = sdBlogArticleMapper.updateById(update) > 0;
         }
-        ArticleGuards.requireAdminHidable(article);
-        SdBlogArticle update = new SdBlogArticle();
-        update.setArticleId(articleId);
-        update.setVisibility(BlogVisibility.ADMIN_HIDDEN.getCode());
-        update.setAdminHiddenReason(reason);
-        update.setAdminHiddenBy(adminId);
-        update.setAdminHiddenTime(LocalDateTime.now());
-        return sdBlogArticleMapper.updateById(update) > 0;
+        // 下线即移出索引（S16：USER_HIDDEN/ADMIN_HIDDEN 均非公共可见）
+        publishEvent(articleId, ArticleChangedEvent.Action.ADMIN_HIDE);
+        return result;
     }
 
     /**
@@ -394,17 +418,31 @@ public class SdBlogArticleServiceImpl implements ISdBlogArticleService {
     public Boolean adminRestore(Long articleId) {
         SdBlogArticle article = sdBlogArticleMapper.selectById(articleId);
         ArticleGuards.requireExists(article);
-        if (BlogVisibility.PUBLIC.getCode().equals(article.getVisibility())) {
-            return true;
+        boolean result = true;
+        if (!BlogVisibility.PUBLIC.getCode().equals(article.getVisibility())) {
+            ArticleGuards.requireAdminRestorable(article);
+            result = sdBlogArticleMapper.lambdaUpdate()
+                .set(SdBlogArticle::getVisibility, BlogVisibility.PUBLIC.getCode())
+                .set(SdBlogArticle::getAdminHiddenReason, null)
+                .set(SdBlogArticle::getAdminHiddenBy, null)
+                .set(SdBlogArticle::getAdminHiddenTime, null)
+                .eq(SdBlogArticle::getArticleId, articleId)
+                .update();
         }
-        ArticleGuards.requireAdminRestorable(article);
-        return sdBlogArticleMapper.lambdaUpdate()
-            .set(SdBlogArticle::getVisibility, BlogVisibility.PUBLIC.getCode())
-            .set(SdBlogArticle::getAdminHiddenReason, null)
-            .set(SdBlogArticle::getAdminHiddenBy, null)
-            .set(SdBlogArticle::getAdminHiddenTime, null)
-            .eq(SdBlogArticle::getArticleId, articleId)
-            .update();
+        // 恢复即重新可见：已发布则回索引（indexOrRemove 按 DB 现状重推导）
+        publishEvent(articleId, ArticleChangedEvent.Action.ADMIN_RESTORE);
+        return result;
+    }
+
+    /**
+     * 发布文章变更事件（S16）：驱动 ES 索引增量同步。
+     * <p>
+     * 只携带 articleId 与动作类型（动作仅日志用），索引决策由监听方从事务提交后的
+     * DB 现状重新推导——事件重复/乱序消费均安全；本方法在引擎为 mysql 时同样安全
+     * （无监听器注册，Spring 对无监听者事件静默丢弃）。
+     */
+    private void publishEvent(Long articleId, ArticleChangedEvent.Action action) {
+        eventPublisher.publishEvent(new ArticleChangedEvent(this, articleId, action));
     }
 
     /**
