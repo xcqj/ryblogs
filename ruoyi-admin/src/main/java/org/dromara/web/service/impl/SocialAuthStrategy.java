@@ -46,7 +46,7 @@ public class SocialAuthStrategy implements IAuthStrategy {
     private final SysLoginService loginService;
 
     /**
-     * 执行第三方授权登录，并校验授权账号与系统账号的绑定关系。
+     * 执行第三方授权登录：已绑定账号直接登录，未绑定账号自动创建系统账号并绑定后登录（S14 / D34）。
      *
      * @param body   登录信息
      * @param client 客户端信息
@@ -65,10 +65,13 @@ public class SocialAuthStrategy implements IAuthStrategy {
         AuthUser authUserData = response.getData();
 
         List<SysSocialVo> list = sysSocialService.selectByAuthId(authUserData.getSource() + authUserData.getUuid());
+        SysUserVo user;
         if (CollUtil.isEmpty(list)) {
-            throw new ServiceException("你还没有绑定第三方账号，绑定后才可以登录！");
+            // 未绑定：首次社交登录自动创建账号并写入绑定关系（S14 / D34，安全边界见 SysLoginService#socialAutoRegister）
+            user = loginService.socialAutoRegister(authUserData);
+        } else {
+            user = loadUser(list.getFirst().getUserId());
         }
-        SysUserVo user = loadUser(list.getFirst().getUserId());
         // 此处可根据登录用户的数据不同 自行创建 loginUser 属性不够用继承扩展就行了
         LoginUser loginUser = loginService.buildLoginUser(user);
         loginUser.setClientKey(client.getClientKey());
