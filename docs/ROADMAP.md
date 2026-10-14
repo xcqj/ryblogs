@@ -39,7 +39,7 @@
 | S15 | 阅读量 Redis 异步计数 | §5.2 | — | 后端(+blog-web 小改) | ✅ 已验收（2026-10-14 人工实测通过；后端 4 commit + blog-web 3 commit，联调期三联坑详见 §3 S15；JMeter 压测与 Apifox 语义回归留作面试演示/人工） | 1d |
 | S16 | ES 搜索替换 MySQL LIKE | §6 | — | 后端(+blog-web 高亮 UI) | ✅ 验收关闭（2026-10-14：分词/越权红线/编辑同步/对账双向/零停机/LIKE vs ES 对比/深翻页游标全部实测通过；演示数据清理留作面试前收尾，详 §3 S16） | 3~5d |
 | S17 | PWA + SEO 三件套 | — | — | 前端(blog-web) | ✅ 已验收（2026-10-15 人工实测通过：Lighthouse SEO/Perf/A11y 100、SW 安装/预缓存/断网可读/回落/`/me` 红线全过；blog-web 6 commit 零后端改动，详 §3 S17） | 1~1.5d |
-| S18 | 接口限流 | — | — | 后端 | ⏳ 待启动 | 0.5d |
+| S18 | 接口限流 | — | — | 后端 | ✅ 已验收（2026-10-15；键与阈值备案 §6 S18-D1；Apifox 用例与超限实感留人工，详 §3 S18） | 0.5d |
 | S19 | plus-ui 登录页/后台首页改版 | — | — | 前端(plus-ui) | ⏳ 待启动（核心完成后） | 0.5~1d |
 | S20 | Lenis 平滑滚动（动效收缩，D38） | — | — | 前端(blog-web) | ⏸ 待定（核心完成后，可砍） | 0.5d |
 | S21 | CI/CD 补全（可选） | — | — | 后端+前端 | ⏸ 可选 | 1d |
@@ -471,17 +471,34 @@ S2 遗留接入（已落地）：
 - **验收结果（2026-10-15 人工实测）**：Lighthouse（Windows Chrome）**SEO 100 / Performance 100 / Accessibility 100 / Best Practices 96**——**PWA 类别自 Lighthouse 12.0（2024-05）起已移除**，可安装性改由 Chrome 安装图标 + DevTools Application 核验；SW activated and is running、49 条预缓存（workbox-precache/sd-pages/sd-public-api 三缓存）；断网刷新已读文章 200 完整渲染、未读回落 offline.html、直开 offline.html 200；`/me` 与 `/me/new` 停留后缓存仅 3 条公共匿名端点（红线人工复核通过）；view-source JSON-LD 抽验通过；SEO 端点（sitemap 索引/分块/rss/robots）人工复核通过。Agent 侧另以无头 Chrome 全链路复验（安装→激活→断网三场景→`/me` 零泄漏）。
 - ⏸ **人工待办**（不在切片代码内）：① Chrome 地址栏安装图标按钮级安装验收；② iOS Safari 限制描述人工确认（无设备时以 README 措辞为准）；③ S13 部署时配 `NUXT_PUBLIC_SITE_URL` 真实域名；④ 面试前执行 `blog_s16_cleanup.sql` 后 sitemap 从 41 块自然收缩的验证（可选）。iOS 无 SW 限制已写入 `blog-web/README.md` S17 章节。
 
-### S18 接口限流 ⏳（后端；0.5d）
+### S18 接口限流 ✅（后端切片，2026-10-15 代码侧验收）
 
-依赖：无（复用框架 `@RateLimiter`，Redis 已在位）。
+依赖：无（Redis 已在位；框架 `@RateLimiter` / `RedisUtils.rateLimiter` 零 setup 开箱可用）。
 
-范围与步骤：
+范围与步骤（照单完成）：
 
 1. 限流点：`/auth/login`（IP+username 键，防暴力破解，与 S14 成对）、发表评论（用户键）、`/blog/public/search`（IP 键）；
 2. 规则配置化（application.yml 或 sys_config，不硬编码）；
 3. 超限行为确认（框架默认拒绝码与文案）并在 Apifox 登记用例。
 
 验收：超限返回符合预期且正常用户无感；限流键与阈值文档化（§6 备案）。
+
+实施结果（S18-D1，形态决策与键阈值备案见 §6）：
+
+- **形态**：开工前拍板放弃 `@RateLimiter` 注解（`count/time` 编译期字面量读不到 application.yml，违背本切片要求 2），选「`blog.rate-limit.*` 配置化阈值 + `RateLimitChecker` 薄封装直调框架 `RedisUtils.rateLimiter`（Redisson `RRateLimiter`）+ 复用框架 i18n `rate.limiter.message`」；超限行为与注解路径**完全一致**：`ServiceException` → `GlobalExceptionHandler` → `R.fail`，即 **HTTP 200 + envelope code 500 + msg「访问过于频繁，请稍候再试」（不是 429）**；Redis 异常同口径包装 `RuntimeException("服务器限流异常，请稍候再试")`（与 `RateLimiterAspect` 逐行对齐）。
+- **接入点**（均在方法体首行/校验后，三个调用点各一行 + 注释）：
+  - `AuthController.login`：`ValidatorUtils.validate` 之后、client 校验之前（错误 clientId 的探测请求也计入配额）；username 从加密内层 `PasswordLoginBody` 二次解析取得（小 JSON 成本可忽略），非密码 grant 无用户名字段时退化为同 IP 共享键；
+  - `BlogArticleController.comment`：按 `LoginHelper.getUserId()`；与 `@RepeatSubmit` 互补（防重挡同内容短周期重复、限流挡高频不同内容）；
+  - `BlogPublicSearchController.search`：按客户端 IP；加在 Controller 层不影响引擎选择（mysql/es 均覆盖），`@NotBlank` 校验先行、空关键字不计配额。
+- **新增**（`org.dromara.blog.ratelimit`）：`RateLimitKeys`（纯静态键组装，键前缀复用框架 `global:rate_limit:`）+ `RateLimitChecker`（`@Value` 绑定 `blog.rate-limit.*`，内联默认值与 yml 同源，遵循本模块 S15/S16 约定）；单测 9 条（`RateLimitKeysTest` 4 条键形态 + `RateLimitCheckerTest` 5 条契约：三点位键/阈值/timeout 绑定、超限文案、Redis 异常包装，mock Redisson 范式同 `RedisAspectContractTest`）。
+- **零前端改动**：blog-web 对 `R.fail` 已有处理路径（超限提示直接可见）；契约 `blog-api.md` 无变更（不改出入参，仅新增服务端防护行为）。
+
+人工待办（不在切片代码内）：
+
+1. Apifox 补录超限用例（正向连续请求打满阈值 → 第 N+1 次返回 HTTP 200 + code 500 + 「访问过于频繁，请稍候再试」）；登录链路注意带验证码参数；
+2. 登录/评论/搜索三场景超限实感 + 正常用户无感回归（1 次登录/评论/搜索不受影响）；
+3. Redis 键核验：`global:rate_limit:auth/login:*` / `global:rate_limit:blog/article/comments:*` / `global:rate_limit:blog/public/search:*`（实测后按需清理，策略 86400s 自然过期）；
+4. 重启 8081 加载新代码（重启前确认 IDE 未持有旧增量产物；mapstruct-plus 编译期生成类如报 ConvertException 先 `mvn clean` 全量重编）。
 
 ### S19 plus-ui 登录页 / 后台首页改版 ⏳（plus-ui；0.5~1d，核心完成后）
 
@@ -621,6 +638,7 @@ S0 → S1 → S2 → S3 → S4 → S5 → S6 → S7 → S8   （后端关键路�
 | 2026-10-14 | S16-D3（深翻页 = from+size 窗口 + after 游标双轨，兑现 ROADMAP 原文 search_after）：无状态 pageNum 契约无法携带上一页 sort 值，纯 search_after 需状态；定案 = `max_result_window=50000`（覆盖 5 万演示数据）+ 契约新增可选 `after` 请求参数 / `nextAfter` 响应字段（opaque 游标编码 score|publishedAt(epochMilli)|articleId，URL-safe Base64 去 padding）；越窗且无游标返回空页；pageSize 兜底默认 10、上限 100 | 本文件 / blog-api.md §6 / EsArticleSearchService |
 | 2026-10-14 | S16-D4（索引同步最终一致 + 降级哲学，与 S15 同脉）：① 事件只作触发信号不携带状态，监听方事务提交后按 DB 现状重推导（重复/乱序消费幂等），索引失败仅记 error 由对账定时任务兜底（不阻断主业务，接受最终一致的秒级窗口）；② 回表查询复用 `selectPublicPage` 三条件底座——堵住"ES 查询后、DB 回表前文章被隐藏"的竞态泄露窗口（红线核验点：三条件在 indexOrRemove / initialFullSync / reconcile 的 MySQL 侧三处同源）；③ ES 运行期异常降级 MySQL LIKE（响应无 highlight/nextAfter），保证搜索可用性；④ 已备案边界：标签 rename/merge 不即时同步索引（tags 字段靠对账任务兜底刷新） | 本文件 / ArticleIndexServiceImpl / EsArticleSearchService |
 | 2026-10-14 | S16-D5（演示数据与对比留档登记）：`blog_s16_demo_data.sql`（24 篇中文文 + 2 万压测，recursive CTE；ID 全落 9e18 标记段、tag slug 一律 s16- 前缀防既有标签唯一键冲突；SQL 直插绕过应用事件，ES 侧由对账任务补齐——顺带完成"对账发现并修复不同步"验收）；`blog_s16_cleanup.sql`（按段 DELETE + ES 清理两法）；`blog_s16_benchmark.md`（对比方法/命令留档，结果表人工实测后填写，清理方式随切片登记于此与 §3 SQL 状态表） | 本文件 / docs/blog_s16_*.sql / docs/blog_s16_benchmark.md |
+| 2026-10-15 | S18-D1（限流实现形态与键阈值备案，开工前拍板）：① **放弃框架 `@RateLimiter` 注解、选「配置化阈值 + 薄封装直调 `RedisUtils.rateLimiter`」**——注解 `count/time` 为编译期字面量读不到配置，违背 S18 要求 2「不硬编码」；仍复用框架 Redisson `RRateLimiter` 与 i18n `rate.limiter.message`，超限行为与注解路径一致（`ServiceException` → `R.fail`，HTTP 200 + envelope code 500 + msg「访问过于频繁，请稍候再试」，**非 429**），Redis 异常同口径包装 `RuntimeException("服务器限流异常，请稍候再试")`；② 三点位键与阈值：`/auth/login` = `global:rate_limit:auth/login:{ip}:{username}` 5 次/60s（username 取加密内层 `PasswordLoginBody`，置于 client 校验前；非密码 grant 无用户名字段时退化为同 IP 共享键）；发表评论 = `global:rate_limit:blog/article/comments:{userId}` 10 次/60s（全站每用户配额、不区分文章；与 `@RepeatSubmit` 互补）；`/blog/public/search` = `global:rate_limit:blog/public/search:{ip}` 30 次/60s；策略存活 86400s（与框架 timeout 默认一致）；③ 键前缀复用框架 `global:rate_limit:`（`GlobalConstants.RATE_LIMIT_KEY`）便于运维统一观测；实现为 `org.dromara.blog.ratelimit`（`RateLimitKeys` 纯静态键组装 + `RateLimitChecker` `@Value` 绑定，内联默认值与 yml 同源）；单测 9 条；④ 阈值取「正常用户无感」口径：登录 5 次/分（忘记密码重试 2~3 次有余量，与账号密码错误锁定互补）、评论 10 次/分、搜索 30 次/分（防输入联想连打又留 NAT 共享 IP 余量），如实测偏紧改 yml 即可、无需改代码 | 本文件 §3 S18 / RateLimitChecker / RateLimitKeys / application.yml |
 
 ### 待决策
 

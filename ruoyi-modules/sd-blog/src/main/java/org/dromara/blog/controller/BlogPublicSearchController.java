@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.dromara.blog.domain.vo.BlogPublicArticleListItemVo;
 import org.dromara.blog.domain.vo.BlogSearchPageResult;
+import org.dromara.blog.ratelimit.RateLimitChecker;
 import org.dromara.blog.service.search.ArticleSearchService;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.mybatis.core.page.PageQuery;
@@ -31,6 +32,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class BlogPublicSearchController extends BaseController {
 
     private final ArticleSearchService articleSearchService;
+    private final RateLimitChecker rateLimitChecker;
 
     /**
      * 搜索公开文章（§6.1）：keyword 必填，命中当前版本 title/summary/content 任一；
@@ -47,6 +49,9 @@ public class BlogPublicSearchController extends BaseController {
         @RequestParam(value = "keyword", required = false) String keyword,
         PageQuery pageQuery,
         @RequestParam(value = "after", required = false) String after) {
+        // S18 公共搜索限流：按客户端 IP 维度（阈值 blog.rate-limit.search，备案 ROADMAP §6 S18-D1），
+        // 加在 Controller 层不影响底层引擎选择（mysql/es）；@NotBlank 校验先行，空关键字不计配额
+        rateLimitChecker.checkSearch();
         // required=false 使"参数缺失"与"空串"统一落入 @NotBlank 校验（否则 Spring 先抛
         // MissingServletRequestParameterException，框架无对应 handler 会返回 500 未知异常）
         return R.ok(articleSearchService.search(keyword.trim(), pageQuery, after));

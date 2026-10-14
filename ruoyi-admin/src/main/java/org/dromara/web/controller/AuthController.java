@@ -9,6 +9,7 @@ import me.zhyd.oauth.model.AuthResponse;
 import me.zhyd.oauth.model.AuthUser;
 import me.zhyd.oauth.request.AuthRequest;
 import me.zhyd.oauth.utils.AuthStateUtils;
+import org.dromara.blog.ratelimit.RateLimitChecker;
 import org.dromara.common.core.constant.SystemConstants;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.core.domain.model.LoginBody;
@@ -26,6 +27,7 @@ import org.dromara.common.social.config.properties.SocialProperties;
 import org.dromara.common.social.utils.SocialUtils;
 import org.dromara.system.api.MessageService;
 import org.dromara.system.api.domain.PushPayloadDTO;
+import org.dromara.system.api.model.PasswordLoginBody;
 import org.dromara.system.api.model.RegisterBody;
 import org.dromara.system.api.model.SocialLoginBody;
 import org.dromara.system.domain.vo.SysClientVo;
@@ -64,6 +66,7 @@ public class AuthController {
     private final ISysClientService clientService;
     private final ScheduledExecutorService scheduledExecutorService;
     private final MessageService messageService;
+    private final RateLimitChecker rateLimitChecker;
 
 
     /**
@@ -77,6 +80,9 @@ public class AuthController {
     public R<LoginVo> login(@RequestBody String body) {
         LoginBody loginBody = JsonUtils.parseObject(body, LoginBody.class);
         ValidatorUtils.validate(loginBody);
+        // S18 登录限流：IP+username 键防暴力破解（阈值 blog.rate-limit.login，键与阈值备案 ROADMAP §6 S18-D1）。
+        // 置于客户端校验之前：错误 clientId 的探测请求同样计入配额
+        rateLimitChecker.checkLogin(extractLoginUsername(body));
         // 授权类型和客户端id
         String clientId = loginBody.getClientId();
         String grantType = loginBody.getGrantType();
@@ -104,6 +110,21 @@ public class AuthController {
             );
         }, 5, TimeUnit.SECONDS);
         return R.ok(loginVo);
+    }
+
+    /**
+     * 提取登录用户名用于限流键（S18）。
+     * <p>
+     * 凭证在加密内层（本方法 body 已由 @ApiEncrypt 解密）：密码登录载体为
+     * {@link PasswordLoginBody}，此处按同一载体二次解析取 username（小 JSON，成本可忽略）；
+     * 非密码 grant（email/sms/xcx）无 username 字段，返回 null，限流键退化为同 IP 共享段。
+     *
+     * @param body 已解密的登录请求体
+     * @return 登录用户名；非密码 grant 时返回 null
+     */
+    private String extractLoginUsername(String body) {
+        PasswordLoginBody credential = JsonUtils.parseObject(body, PasswordLoginBody.class);
+        return credential == null ? null : credential.getUsername();
     }
 
     /**

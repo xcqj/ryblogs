@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.dromara.blog.domain.bo.BlogArticleMyQueryBo;
 import org.dromara.blog.domain.bo.BlogArticleSaveBo;
 import org.dromara.blog.domain.bo.BlogCommentAddBo;
+import org.dromara.blog.ratelimit.RateLimitChecker;
 import org.dromara.blog.service.ISdBlogCommentService;
 import org.dromara.blog.domain.vo.BlogArticleDetailVo;
 import org.dromara.blog.domain.vo.BlogArticleListItemVo;
@@ -48,6 +49,7 @@ public class BlogArticleController extends BaseController {
 
     private final ISdBlogArticleService sdBlogArticleService;
     private final ISdBlogCommentService sdBlogCommentService;
+    private final RateLimitChecker rateLimitChecker;
 
     /**
      * 创建文章（草稿）
@@ -186,6 +188,9 @@ public class BlogArticleController extends BaseController {
     @PostMapping("/{articleId}/comments")
     public R<Long> comment(@NotNull(message = "文章ID不能为空") @PathVariable("articleId") Long articleId,
                            @Validated @RequestBody BlogCommentAddBo bo) {
+        // S18 评论限流：按登录用户维度（阈值 blog.rate-limit.comment，备案 ROADMAP §6 S18-D1）；
+        // 与 @RepeatSubmit 互补——防重挡同内容短周期重复，限流挡高频不同内容
+        rateLimitChecker.checkComment(LoginHelper.getUserId());
         return R.ok(sdBlogCommentService.addComment(articleId, bo.getContent(), LoginHelper.getUserId()));
     }
 

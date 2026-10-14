@@ -63,6 +63,22 @@ blog:
     reconcile-cron: "0 0/30 * * * ?"
     # 对账全量拉取 ES 文档 id 的每批条数（search_after 分页，防深翻页成本）
     reconcile-batch-size: 1000
+  rate-limit:
+    # 接口限流（S18）：超限返回 R.fail「访问过于频繁，请稍候再试」（框架 i18n rate.limiter.message，
+    # HTTP 200 + envelope code 500，非 429）；策略存活 86400s（与框架 @RateLimiter 默认 timeout 一致）；
+    # 限流键与阈值备案见 ROADMAP §6 S18-D1，实现在 org.dromara.blog.ratelimit.RateLimitChecker
+    login:
+      # 登录（/auth/login）：同一 IP+username 在 time 秒内最多 count 次，防暴力破解（与账号密码错误锁定互补）
+      count: 5
+      time: 60
+    comment:
+      # 发表评论（/blog/article/{articleId}/comments）：同一登录用户在 time 秒内最多 count 次
+      count: 10
+      time: 60
+    search:
+      # 公共搜索（/blog/public/search）：同一 IP 在 time 秒内最多 count 次，保护 ES/MySQL 搜索链路
+      count: 30
+      time: 60
 
 # Spring配置
 spring:
