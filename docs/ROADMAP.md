@@ -38,7 +38,7 @@
 | S14 | GitHub/Gitee 社交登录 | §2.8（登录，复用） | — | 后端+前端(blog-web) | ✅ 已验收（2026-10-14；后端 4 commit + blog-web 5 commit，详 §3 S14；Apifox 用例补录留人工） | 2d |
 | S15 | 阅读量 Redis 异步计数 | §5.2 | — | 后端(+blog-web 小改) | ✅ 已验收（2026-10-14 人工实测通过；后端 4 commit + blog-web 3 commit，联调期三联坑详见 §3 S15；JMeter 压测与 Apifox 语义回归留作面试演示/人工） | 1d |
 | S16 | ES 搜索替换 MySQL LIKE | §6 | — | 后端(+blog-web 高亮 UI) | ✅ 验收关闭（2026-10-14：分词/越权红线/编辑同步/对账双向/零停机/LIKE vs ES 对比/深翻页游标全部实测通过；演示数据清理留作面试前收尾，详 §3 S16） | 3~5d |
-| S17 | PWA + SEO 三件套 | — | — | 前端(blog-web) | ⏳ 待启动 | 1~1.5d |
+| S17 | PWA + SEO 三件套 | — | — | 前端(blog-web) | ✅ 已验收（2026-10-15 人工实测通过：Lighthouse SEO/Perf/A11y 100、SW 安装/预缓存/断网可读/回落/`/me` 红线全过；blog-web 6 commit 零后端改动，详 §3 S17） | 1~1.5d |
 | S18 | 接口限流 | — | — | 后端 | ⏳ 待启动 | 0.5d |
 | S19 | plus-ui 登录页/后台首页改版 | — | — | 前端(plus-ui) | ⏳ 待启动（核心完成后） | 0.5~1d |
 | S20 | Lenis 平滑滚动（动效收缩，D38） | — | — | 前端(blog-web) | ⏸ 待定（核心完成后，可砍） | 0.5d |
@@ -452,7 +452,7 @@ S2 遗留接入（已落地）：
 - **联调期实测修复（2026-10-14，均必修）**：① **refresh-immediate 默认值反转**（true→false）——单文档写 + `refresh=true` 同步等 refresh（最长 ~1s/篇），2 万篇初始同步被拖到 20 分钟级（表象="一直循环打印 SQL"，实为慢速推进非死循环）；修 = 批量走 `_bulk` 单请求一批 + 批间不 refresh，`indexBatch`/对账补索引改造后 2 万篇秒级，事件路径靠 ≤1s 自然刷新（顺带消除 AFTER_COMMIT 同步监听对写接口的 +1s 延迟）；② **AGENTS.md §8 陷阱再现（CodeBuddy 变体，凶器=JDT 非 IDEA）**——`EsArticleSearchService` 回表段把 MyBatis-Plus `Page`（getRecords）误写成 RuoYi `PageResult`（getRows），JDT 把带错 class 写进 target/classes 且时间戳新于源码 → **mvn 增量编译跳过该文件、坏产物混入 jar**，运行期 `java.lang.Error: Unresolved compilation problems`（500 的真因）；`mvn compile` 多次"全绿"均因跳过而失真，**clean 全量重编后才暴露**；修 = 源码类型改正 + clean package，jar 内 `Unresolved compilation` 抽验归零（教训：IDE 开着时 mvn"全绿"不足为凭，排查以 clean 产物为准；另注意编辑器旧缓冲区回写会静默回退外部编辑，提交前先核对 git diff）；③ **tag_id 段越界**：9.5e18 超 BIGINT 上限（9.22e18）致 SQL 1264，降 9.2e18 段（a346fb22）；④ 高亮 VO 类级 `@JsonInclude(NON_NULL)` 在 Jackson 3（tools.jackson）下未按预期省略未命中字段（字段级生效、类级不生效，未深挖）——契约 §6 措辞放宽为"null 或不出现"，前端 `?.[0]` 空安全；⑤ **total=10000 系 ES 默认 `track_total_hits` 计数上限**（relation=gte 下界，非真实命中数），查询已显式 `track_total_hits=true` 修为精确总数（同词实测 20001，eaf9dcaa4）。修复后实测：搜索 200 + 打分序 + `<em>` 高亮 + tags 回填全链路通；「Python爬虫」命中「Python 爬虫入门」、tech.dic 词条（K8s）整词命中，两项分词验收提前通过。
 - ⏸ **人工待办**（不在本切片代码内，按序）：① ~~ES 容器搭建~~（已完成：blog-es 运行中，20040 篇已入索引）；② ~~IK 中文分词实测~~（已完成：Python爬虫/K8s 两用例 Agent 实测通过，人工浏览器复验可选）；③ ~~演示数据灌入~~（已完成：blog_s16_demo_data.sql 执行成功，验证段 20024/20024/30 符合预期）；④ ~~对账兜底验证~~（已完成：用户直改 DB visibility——隐藏后被对账删文档、恢复后等下个 :00/:30 周期自动补回，MySQL 20040 vs ES 20039 恰差 1 即待补项，最终一致 S16-D4 活体演示；需重启后端使 track_total_hits 修复生效后再看恢复结果）；⑤ LIKE vs ES 对比：ES 侧 Agent 已实测并填入 `blog_s16_benchmark.md`（高频词 ~21ms/2 万篇命中、低频 17.6ms、空结果 5.7ms，total 已精确计数）；**MySQL 侧待人工**：切 `blog.search.engine=mysql` 重启后用该文档 §3 的一键循环跑数填表；⑥ ~~深翻页 after 游标实测~~（已完成 2026-10-14：越窗守卫生效 + 游标时区偏差修复后，游标第 2/3 页与 pageNum 第 2/3 页完全一致、无重叠、可续翻）；⑦ ~~零停机重建演示~~（已完成：建 v2 → reindex 20040 篇 2.3s → _aliases 原子切 v1→v2，全程并发 55/55 请求全 200，实证留档 benchmark.md §4；旧 v1 可择机 `DELETE /blog_article_v1`）；⑧ ~~Apifox 五类用例~~（2026-10-14 用户验收通过）；⑨ ~~blog-web 浏览器验收~~（2026-10-14 用户验收通过：高亮渲染 + 视口）；⑩ 演示收尾跑 `blog_s16_cleanup.sql`（**时机由用户定**——演示数据可留作面试现场演示，含 cleanup 内 ES 对账自动清理说明）并在 ROADMAP §3 SQL 状态表登记已执行。
 
-### S17 PWA + SEO 三件套 ⏳（blog-web；1~1.5d）
+### S17 PWA + SEO 三件套 ✅（blog-web；1~1.5d，2026-10-15 验收关闭）
 
 依赖：S13（HTTPS 下完整体验）；无后端改动。细项见 `blog-web/docs/plan.md` §2.16。
 
@@ -461,6 +461,15 @@ S2 遗留接入（已落地）：
 1. `@vite-pwa/nuxt`：manifest + Workbox 策略——app shell precache / 文章页 stale-while-revalidate / API network-first；离线回退页；**`/me/**` 与需登录 API 不进 SW 缓存**（红线）；
 2. SEO 三件套（不引整模块，Nitro route 手写更轻）：`sitemap.xml`（查公共列表生成，含 lastmod）、`rss.xml`（RSS 2.0 最新 N 篇）、JSON-LD `Article`（`/post`，在现有 `useSeoMeta` 基线上扩展）；`robots.txt` 声明 sitemap；
 3. 验收：Lighthouse（本地 Chrome）PWA + SEO 分数留档；断网刷新已加载文章可读；view-source 抽验结构化数据；移动视口回归；iOS 无 SW 的限制写进 README（实事求是）。
+
+实施结果（2026-10-14 实施 / 2026-10-15 人工验收并修复，blog-web 仓 6 commit 均标 S17：`1437ad2` SEO / `7237ea1` PWA / `d6979ec` 文档 / `9195294`+`0f0a57e` 验收期修复 / `fa065f1` 留档更新；零后端改动）：
+
+- **SEO 三件套**：`/sitemap.xml` 为 sitemapindex + 分块 `/sitemap/{n}.xml`（500/块，2 万演示数据 → 41 块，`blog_s16_cleanup.sql` 执行后自然收缩；服务端 `defineCachedEventHandler` 10min + `Cache-Control`）；`/rss.xml`（RSS 2.0 最新 20 篇，RFC822 pubDate + XML 转义）；`/post` 页 JSON-LD `Article` + canonical + ogUrl/ogImage（useSeoMeta 基线只增不改）；`robots.txt` 静态文件改 Nitro 动态 route（注入运行时 `siteUrl` 的 Sitemap 绝对行 + `Disallow: /me/`）；`runtimeConfig.public` 新增 `siteUrl`（`NUXT_PUBLIC_SITE_URL`，S13 部署配真实域名）。
+- **PWA 架构决策**：`@vite-pwa/nuxt@1.1.1`（→ vite-plugin-pwa 1.3.0，兼容本仓 vite 8）+ **injectManifest 手写 `app/sw/sw.ts`**——generateSW 的 navigateFallback 是 SPA app-shell 语义，与 SSR 站「文章页 SWR + 离线回退」互相遮蔽，手写 SW 才能逐条审计红线。SW 规则：① precache 清单（app shell + offline.html + 图标 + `_nuxt/builds`）；② 文档导航**白名单** SWR（`/`、`/page/`、`/post/`、`/tag/`、`/tags/`、`/user/`、`/offline.html`——白名单构造天然排除 `/me/**`、`/register`、`/social-callback`）；③ `/api/blog/public/**` NetworkFirst；④ 认证 API 不注册规则直通（cookie 不落缓存）。
+- **验收期两处模块生态坑（人工首测发现 SW 全部不生效：DevTools redundant、零缓存、断网全失败；无头 Chrome 复现 + 打桩 dump + 二分定位，均修复并全链路复验）**：① **`@vite-pwa/nuxt` 生产默认 `manifestTransforms` 面向预渲染路由页把 `.html` 条目按 clean-URL 改写**——`offline.html` → `offline` 致预缓存 404、SW 安装被 Chrome 静默丢弃；修法=自定义 `manifestTransforms`（保留 `.html` 原 URL，复刻模块对 `_nuxt/builds` 的 UUID-json 去 revision 处理）。② **顶层 `self.skipWaiting()/clientsClaim()` 致 Chrome「script evaluation failed」、注册同样被静默丢弃**（Node 桩求值却正常，极具迷惑性）；修法=移入 `activate` 事件。③ 离线回退 `caches.match` 匹配不到带 `?__WB_REVISION__` 的预缓存键 → 改 `matchPrecache`。
+- **M11 移动视口回归（人工截图发现）**：窄屏顶栏下滑隐藏后 `top-16` 悬浮元素孤悬——阅读进度条经包裹层随顶栏同步上移+淡出（内层 scaleX 与外层位移 transform 分离）；作者中心编辑器吸顶操作条 `top` 收回 0 贴住视顶；桌面媒体查询零回归（1440px 实测）。
+- **验收结果（2026-10-15 人工实测）**：Lighthouse（Windows Chrome）**SEO 100 / Performance 100 / Accessibility 100 / Best Practices 96**——**PWA 类别自 Lighthouse 12.0（2024-05）起已移除**，可安装性改由 Chrome 安装图标 + DevTools Application 核验；SW activated and is running、49 条预缓存（workbox-precache/sd-pages/sd-public-api 三缓存）；断网刷新已读文章 200 完整渲染、未读回落 offline.html、直开 offline.html 200；`/me` 与 `/me/new` 停留后缓存仅 3 条公共匿名端点（红线人工复核通过）；view-source JSON-LD 抽验通过；SEO 端点（sitemap 索引/分块/rss/robots）人工复核通过。Agent 侧另以无头 Chrome 全链路复验（安装→激活→断网三场景→`/me` 零泄漏）。
+- ⏸ **人工待办**（不在切片代码内）：① Chrome 地址栏安装图标按钮级安装验收；② iOS Safari 限制描述人工确认（无设备时以 README 措辞为准）；③ S13 部署时配 `NUXT_PUBLIC_SITE_URL` 真实域名；④ 面试前执行 `blog_s16_cleanup.sql` 后 sitemap 从 41 块自然收缩的验证（可选）。iOS 无 SW 限制已写入 `blog-web/README.md` S17 章节。
 
 ### S18 接口限流 ⏳（后端；0.5d）
 
