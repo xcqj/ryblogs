@@ -46,7 +46,13 @@ public class BlogEsConfig {
 
     @Bean(destroyMethod = "close")
     public ElasticsearchClient blogElasticsearchClient() {
-        RestClient restClient = RestClient.builder(HttpHost.create(address)).build();
+        RestClient restClient = RestClient.builder(HttpHost.create(address))
+            // 显式超时防挂死：低层 RestClient 默认 socketTimeout=30s——ES 抖动时搜索请求会
+            // 挂满 30s 才进降级，体验极差；收敛到 10s（批量写大包走同一配置，5 万级仍绰绰有余）
+            .setRequestConfigCallback(rc -> rc
+                .setConnectTimeout(5_000)
+                .setSocketTimeout(10_000))
+            .build();
         RestClientTransport transport = new RestClientTransport(restClient, new JacksonJsonpMapper());
         return new ElasticsearchClient(transport);
     }

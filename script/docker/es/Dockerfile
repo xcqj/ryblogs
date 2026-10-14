@@ -9,8 +9,11 @@ FROM elasticsearch:7.17.28
 
 ARG IK_VERSION=7.17.28
 ARG IK_MIRROR=https://ghproxy.com
-RUN elasticsearch-plugin install --batch \
-    "${IK_MIRROR}/https://github.com/medcl/elasticsearch-analysis-ik/releases/download/v${IK_VERSION}/elasticsearch-analysis-ik-${IK_VERSION}.zip"
+#RUN elasticsearch-plugin install --batch \
+    #"${IK_MIRROR}/https://github.com/medcl/elasticsearch-analysis-ik/releases/download/v${IK_VERSION}/elasticsearch-analysis-ik-${IK_VERSION}.zip"
+# ghproxy.com下载超时，替换为本地安装
+COPY elasticsearch-analysis-ik-7.17.28.zip /tmp/ik.zip
+RUN elasticsearch-plugin install --batch file:///tmp/ik.zip && rm -rf /tmp/ik.zip    
 
 # IK 扩展配置 + 自定义技术词典：技术词整词匹配（ext_dict 声明见 IKAnalyzer.cfg.xml）
 COPY IKAnalyzer.cfg.xml /usr/share/elasticsearch/config/analysis-ik/IKAnalyzer.cfg.xml

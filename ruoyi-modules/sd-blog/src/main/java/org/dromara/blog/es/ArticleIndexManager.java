@@ -3,6 +3,9 @@ package org.dromara.blog.es;
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.Refresh;
 import co.elastic.clients.elasticsearch._types.mapping.Property;
+import co.elastic.clients.elasticsearch.core.BulkRequest;
+import co.elastic.clients.elasticsearch.core.BulkResponse;
+import co.elastic.clients.elasticsearch.core.bulk.BulkResponseItem;
 import co.elastic.clients.elasticsearch._types.mapping.TypeMapping;
 import co.elastic.clients.elasticsearch.indices.CreateIndexResponse;
 import co.elastic.clients.elasticsearch.indices.GetIndexResponse;
@@ -106,6 +109,36 @@ public class ArticleIndexManager {
             .id(String.valueOf(doc.getArticleId()))
             .document(doc)
             .refresh(refreshImmediate ? Refresh.True : Refresh.False));
+    }
+
+    /**
+     * 批量写入（_bulk，单请求多文档）：初始全量与对账补索引专用。
+     * <p>
+     * 单文档逐条 index + refresh=true 会同步等 refresh（最长 ~1s/篇），2 万篇被拖到
+     * 20 分钟级（S16 联调实测）；bulk 一次 RTT 写一批、批间不 refresh，整轮结束才
+     * 统一刷新，2 万篇秒级完成。逐条失败不抛整体异常，记 error 由对账兜底重试。
+     */
+    public void bulkIndexDocs(List<BlogArticleDoc> docs, boolean refreshImmediate) throws IOException {
+        if (docs == null || docs.isEmpty()) {
+            return;
+        }
+        BulkRequest.Builder br = new BulkRequest.Builder()
+            .refresh(refreshImmediate ? Refresh.True : Refresh.False);
+        for (BlogArticleDoc doc : docs) {
+            br.operations(op -> op.index(idx -> idx
+                .index(BlogEsConfig.INDEX_ALIAS)
+                .id(String.valueOf(doc.getArticleId()))
+                .document(doc)));
+        }
+        BulkResponse resp = blogElasticsearchClient.bulk(br.build());
+        if (resp.errors()) {
+            for (BulkResponseItem item : resp.items()) {
+                if (item.error() != null) {
+                    log.error("[ES] 批量写入单条失败（对账将兜底重试）, docId={}, reason={}",
+                        item.id(), item.error().reason());
+                }
+            }
+        }
     }
 
     /**

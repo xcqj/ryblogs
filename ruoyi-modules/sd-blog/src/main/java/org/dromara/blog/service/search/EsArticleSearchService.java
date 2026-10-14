@@ -19,6 +19,7 @@ import org.dromara.blog.es.BlogArticleDoc;
 import org.dromara.blog.mapper.SdBlogArticleMapper;
 import org.dromara.blog.service.support.ArticleTagFiller;
 import org.dromara.blog.service.support.EsSearchSupport;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.dromara.common.core.domain.PageResult;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -154,8 +155,9 @@ public class EsArticleSearchService implements ArticleSearchService {
         }
         String nextAfter = buildNextCursor(hits.getLast());
 
-        // 回表：selectPublicPage 三条件内建（ES→DB 竞态窗口内刚隐藏/删除的文章不会出现）
-        PageResult<BlogPublicArticleListItemVo> page = sdBlogArticleMapper.selectPublicPage(
+        // 回表：selectPublicPage 三条件内建（ES→DB 竞态窗口内刚隐藏/删除的文章不会出现）；
+        // 注意返回类型是 MyBatis-Plus Page（getRecords），不是 RuoYi PageResult（getRows）
+        Page<BlogPublicArticleListItemVo> page = sdBlogArticleMapper.selectPublicPage(
             new PageQuery(hitOrderIds.size(), 1).build(), hitOrderIds, null);
         List<BlogPublicArticleListItemVo> rows = EsSearchSupport.reorderByHitOrder(
             page.getRecords(), hitOrderIds, BlogPublicArticleListItemVo::getArticleId);

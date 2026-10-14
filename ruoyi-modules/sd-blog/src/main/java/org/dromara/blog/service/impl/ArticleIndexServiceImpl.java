@@ -5,6 +5,7 @@ import co.elastic.clients.elasticsearch._types.FieldValue;
 import co.elastic.clients.elasticsearch._types.SortOrder;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.core.search.Hit;
+import cn.hutool.core.collection.CollUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.blog.config.BlogEsConfig;
@@ -28,6 +29,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -65,9 +67,10 @@ public class ArticleIndexServiceImpl implements ArticleIndexService {
     private final ElasticsearchClient blogElasticsearchClient;
 
     /**
-     * 写入后立即刷新（开发/演示即时可见；生产可关，靠自然刷新周期）
+     * 写入后立即刷新（默认 false：≤1s 自然刷新足够演示；true 会同步等 refresh 拖慢批量同步
+     * 与事件监听所在线程，联调实测 20040 篇被拖到 20 分钟级）
      */
-    @Value("${blog.es.refresh-immediate:true}")
+    @Value("${blog.es.refresh-immediate:false}")
     private boolean refreshImmediate;
 
     /**
@@ -140,8 +143,15 @@ public class ArticleIndexServiceImpl implements ArticleIndexService {
             return;
         }
         log.warn("[ES] 对账发现差异：待补索引 {} 篇，待删文档 {} 个", diff.toIndex().size(), diff.toRemove().size());
-        for (Long articleId : diff.toIndex()) {
-            indexOrRemove(articleId);
+        // 补索引走批量（2 万级差异 bulk 秒级完成；逐条 indexOrRemove 会被单文档 RTT 拖到分钟级）
+        List<Long> toIndex = diff.toIndex();
+        for (int from = 0; from < toIndex.size(); from += SYNC_BATCH_SIZE) {
+            List<Long> chunk = toIndex.subList(from, Math.min(from + SYNC_BATCH_SIZE, toIndex.size()));
+            try {
+                indexBatch(sdBlogArticleMapper.selectByIds(chunk));
+            } catch (Exception e) {
+                log.error("[ES] 对账补索引批次失败（下周期重试）, articleIds={}", chunk, e);
+            }
         }
         for (String docId : diff.toRemove()) {
             try {
@@ -192,9 +202,13 @@ public class ArticleIndexServiceImpl implements ArticleIndexService {
     }
 
     /**
-     * 批量入索引（版本、标签都两段式批量查，杜绝 N+1）
+     * 批量入索引（版本、标签两段式批量查杜绝 N+1；写 ES 走 _bulk 单请求一批，
+     * 批间不 refresh——2 万篇从 20 分钟级降到秒级，联调实测教训）
      */
     private void indexBatch(List<SdBlogArticle> articles) {
+        if (CollUtil.isEmpty(articles)) {
+            return;
+        }
         List<Long> versionIds = articles.stream()
             .map(SdBlogArticle::getCurrentVersionId).filter(Objects::nonNull).distinct().toList();
         Map<Long, SdBlogArticleVersion> versionMap = new HashMap<>();
@@ -206,6 +220,7 @@ public class ArticleIndexServiceImpl implements ArticleIndexService {
         }
         List<Long> articleIds = articles.stream().map(SdBlogArticle::getArticleId).toList();
         Map<Long, List<SdBlogTagVo>> tagMap = articleTagFiller.queryTagsByArticleIds(articleIds);
+        List<BlogArticleDoc> docs = new ArrayList<>(articles.size());
         for (SdBlogArticle article : articles) {
             SdBlogArticleVersion version = versionMap.get(article.getCurrentVersionId());
             if (Objects.isNull(version)) {
@@ -213,12 +228,12 @@ public class ArticleIndexServiceImpl implements ArticleIndexService {
             }
             List<String> tagNames = tagMap.getOrDefault(article.getArticleId(), List.of()).stream()
                 .map(SdBlogTagVo::getName).toList();
-            try {
-                articleIndexManager.indexDoc(
-                    ArticleIndexDocBuilder.from(article, version, tagNames), refreshImmediate);
-            } catch (Exception e) {
-                log.error("[ES] 批量同步单篇失败, articleId={}", article.getArticleId(), e);
-            }
+            docs.add(ArticleIndexDocBuilder.from(article, version, tagNames));
+        }
+        try {
+            articleIndexManager.bulkIndexDocs(docs, refreshImmediate);
+        } catch (Exception e) {
+            log.error("[ES] 批量同步失败（对账任务将兜底重试）, batchSize={}", docs.size(), e);
         }
     }
 
