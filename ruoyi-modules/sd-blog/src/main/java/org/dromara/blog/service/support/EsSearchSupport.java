@@ -48,6 +48,19 @@ public final class EsSearchSupport {
     }
 
     /**
+     * 文档 publishedAt（ISO 本地时间串）→ epoch 毫秒，**按 UTC 解释**。
+     * <p>
+     * ⚠ 时区陷阱（S16 联调实测）：ES 对无时区日期串按 <b>UTC</b> 解析（date 字段默认格式
+     * strict_date_optional_time），date sort 值 = 该串按 UTC 的毫秒数；编码游标时若按
+     * 系统本地时区（东八区 +08:00）换算，游标边界会整体偏移 8 小时——search_after 的
+     * publishedAt 边界错位，深翻页结果与 pageNum 翻页不一致。两端必须同一解释。
+     */
+    public static long publishedAtToEpochMilli(String publishedAtIso) {
+        return java.time.LocalDateTime.parse(publishedAtIso)
+            .toEpochSecond(java.time.ZoneOffset.UTC) * 1000;
+    }
+
+    /**
      * 解码深翻页游标；非法格式（截断/污染/手工构造）返回 null——调用方按「无游标」退化到 pageNum
      */
     public static CursorValues decodeCursor(String cursor) {

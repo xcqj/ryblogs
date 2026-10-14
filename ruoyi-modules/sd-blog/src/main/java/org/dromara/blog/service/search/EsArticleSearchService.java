@@ -26,8 +26,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -175,7 +173,8 @@ public class EsArticleSearchService implements ArticleSearchService {
     }
 
     /**
-     * 由最后一条命中构造下一页游标：score（hit.score）+ publishedAt（doc ISO → epochMilli）
+     * 由最后一条命中构造下一页游标：score（hit.score）+ publishedAt（doc ISO → epochMilli，
+     * <b>按 UTC 解释</b>——与 ES 解析无时区日期串的口径一致，见 {@link EsSearchSupport#publishedAtToEpochMilli}）
      * + articleId——与排序 [_score desc, publishedAt desc, articleId desc] 的 sort 值一一对应。
      */
     private String buildNextCursor(Hit<BlogArticleDoc> lastHit) {
@@ -184,8 +183,7 @@ public class EsArticleSearchService implements ArticleSearchService {
             || doc.getPublishedAt() == null || doc.getPublishedAt().isBlank()) {
             return null;
         }
-        long epochMilli = LocalDateTime.parse(doc.getPublishedAt())
-            .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+        long epochMilli = EsSearchSupport.publishedAtToEpochMilli(doc.getPublishedAt());
         return EsSearchSupport.encodeCursor(lastHit.score(), epochMilli, doc.getArticleId());
     }
 

@@ -44,6 +44,16 @@ class EsSearchSupportTest {
     }
 
     @Test
+    @DisplayName("publishedAt 毫秒换算：按 UTC 解释（与 ES 解析无时区日期串同口径），非本地时区")
+    void publishedAtUtcInterpretation() {
+        // 1970-01-01T00:00:01 按 UTC = 1000ms——若误用东八区本地解释会得到 -28799000
+        assertEquals(1000L, EsSearchSupport.publishedAtToEpochMilli("1970-01-01T00:00:01"));
+        // 与 ES 原生 sort 值对齐（联调实测：同一文档 ES sort=1791973218000，
+        // 误按 +08:00 编码会得 1791944418000，恰差 8 小时，游标边界错位）
+        assertEquals(1791973218000L, EsSearchSupport.publishedAtToEpochMilli("2026-10-14T10:20:18"));
+    }
+
+    @Test
     @DisplayName("游标解码：null/空串/非法 Base64/段数不足/数字畸形全部退化 null")
     void cursorDecodeInvalid() {
         assertNull(EsSearchSupport.decodeCursor(null));

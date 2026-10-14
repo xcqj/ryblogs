@@ -56,10 +56,8 @@ blog:
     # ES 连接地址（S16）：裸 elasticsearch-java 客户端，不启用 easy-es 自动索引生命周期
     # （IK mapping/boost/alias/reindex 需精确 DSL 控制，ROADMAP §6 S16-D2 登记）
     address: localhost:9200
-    # 写入后是否立即刷新索引。默认 false：ES refresh_interval 默认 1s，文档 ≤1s 自然可见，
-    # 足够演示；true 会让每次单文档写同步等 refresh（最长 ~1s）——事件监听在请求线程上
-    # 同步执行，会拖慢发布/隐藏等写接口（S16 联调实测：全量同步 20040 篇被拖到 20 分钟级）
-    refresh-immediate: false
+    # 写入后立即刷新索引（开发/演示即时可见；生产可改 false 靠自然刷新周期，写入吞吐更高）
+    refresh-immediate: true
   index:
     # 索引同步对账周期（S16，Spring cron）：MySQL 公共文章集合 vs ES 文档集合，修复事件同步遗漏/漂移
     reconcile-cron: "0 0/30 * * * ?"
