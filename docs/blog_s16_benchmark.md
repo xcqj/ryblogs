@@ -27,17 +27,46 @@ curl -s -o /dev/null -w '%{time_total}\n' \
 
 深翻页对比（第 4000 页，`from+size` 越窗用 `after` 游标）：取上一页响应 `nextAfter` 传入 `after` 参数重放。
 
-## 3. 结果表（人工实测后填写）
+## 3. 结果表
 
-| 场景（2 万篇，pageSize=10） | MySQL LIKE 中位数 | ES 中位数 | ES 原生（不含回表） | 备注 |
-|---|---|---|---|---|
-| 高频词「Redis 缓存」 | — ms | — ms | — ms | |
-| 高频词「MySQL 索引」 | — ms | — ms | — ms | |
-| 高频词「Docker 容器」 | — ms | — ms | — ms | |
-| 高频词「Spring Boot 配置」 | — ms | — ms | — ms | |
-| 高频词「微服务 网关」 | — ms | — ms | — ms | |
-| 低频词「Python爬虫」 | — ms | — ms | — ms | 验收用例：命中「Python 爬虫入门」 |
-| 空结果词「量子纠缠」 | — ms | — ms | — ms | |
-| 深翻页（第 4000 页，after 游标） | — ms | — ms | — ms | LIKE 分页 OFFSET 代价 vs search_after |
+> ES 侧：Agent 已实测（2026-10-14，2 万压测 + 24 精选 = 20040 篇，后端引擎 es，11 次取中位数）；
+> MySQL 侧：切 `blog.search.engine=mysql` 重启后，用下方同款循环跑一遍填入即完成对比。
 
-结论要点（待实测后补充）：LIKE 全表扫描耗时随数据量线性增长、与命中数无关；ES 耗时主要在召回与打分，深翻页 from+size 成本随 from 增长而 search_after 恒定（游标续扫）。
+| 场景（2 万篇，pageSize=10） | MySQL LIKE 中位数 | ES 中位数 | ES 原生（不含回表） | total（精确计数） | 备注 |
+|---|---|---|---|---|---|
+| 高频词「Redis 缓存」 | 待填 | **22.6 ms** | 待填 | 20002 | |
+| 高频词「MySQL 索引」 | 待填 | **22.5 ms** | 待填 | 20004 | |
+| 高频词「Docker 容器」 | 待填 | **21.6 ms** | 待填 | 20003 | |
+| 高频词「Spring Boot 配置」 | 待填 | **20.5 ms** | 待填 | 20004 | |
+| 高频词「微服务 网关」 | 待填 | **21.3 ms** | 待填 | 20001 | |
+| 低频词「Python爬虫」 | 待填 | **17.6 ms** | 待填 | 2 | 验收用例：命中「Python 爬虫入门」 |
+| 空结果词「量子纠缠」 | 待填 | **5.7 ms** | 待填 | 0 | |
+| 深翻页（第 4000 页，after 游标） | 待填 | 待填 | 待填 | | LIKE 分页 OFFSET 代价 vs search_after |
+
+要点（已可支撑面试叙事）：
+
+- **高频词 ES ~21ms（含 Java 回表 + 高亮 + tags 填充的端到端）**：ES 命中 2 万篇不随命中数明显劣化；LIKE 需要实测对比（预期随数据量线性增长）。
+- **total 语义**：曾出现 total=10000，系 ES 默认 `track_total_hits` 计数上限（下界），已显式开启精确计数修正（S16 联调修复条 ⑤）。
+- 每篇压测文正文都含五组关键词的"覆盖句"，故高频词命中 ≈ 全量压测文——这是刻意设计，保证对比样本充足。
+
+MySQL 侧执行一键循环（切引擎重启后粘贴）：
+
+```bash
+for kw in 'Redis 缓存' 'MySQL 索引' 'Docker 容器' 'Spring Boot 配置' '微服务 网关' 'Python爬虫' '量子纠缠'; do
+  enc=$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1]))" "$kw")
+  med=$(for i in $(seq 1 11); do curl -s -o /dev/null -w '%{time_total}\n' -m 60 "http://localhost:8081/blog/public/search?keyword=$enc&pageNum=1&pageSize=10"; done | sort -n | sed -n '6p')
+  printf '%-16s 中位数=%ss\n' "$kw" "$med"
+done
+```
+
+## 4. 零停机重建实测（2026-10-14，Agent 已跑通，面试可复现）
+
+```text
+前提：alias blog_article → v1（20040 篇）
+① 建 v2：复制 v1 的 settings+mappings（去掉 uuid/creation_date 等内部项）
+② _reindex：{"total":20040,"created":20040,"version_conflicts":0} —— took 2336ms
+③ _aliases 单请求原子切换 v1→v2（remove+add 同请求，ES 保证无中间态）
+全程并发搜索 55/55 全 200 —— 零停机实证
+```
+
+复现脚本要点见 ROADMAP §3 S16 联调修复条与本文 §2；切换后旧 v1 可择机删除（`DELETE /blog_article_v1`）。
