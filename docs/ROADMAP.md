@@ -39,7 +39,7 @@
 | S15 | 阅读量 Redis 异步计数 | §5.2 | — | 后端(+blog-web 小改) | ✅ 已验收（2026-10-14 人工实测通过；后端 4 commit + blog-web 3 commit，联调期三联坑详见 §3 S15；JMeter 压测与 Apifox 语义回归留作面试演示/人工） | 1d |
 | S16 | ES 搜索替换 MySQL LIKE | §6 | — | 后端(+blog-web 高亮 UI) | ✅ 验收关闭（2026-10-14：分词/越权红线/编辑同步/对账双向/零停机/LIKE vs ES 对比/深翻页游标全部实测通过；演示数据清理留作面试前收尾，详 §3 S16） | 3~5d |
 | S17 | PWA + SEO 三件套 | — | — | 前端(blog-web) | ✅ 已验收（2026-10-15 人工实测通过：Lighthouse SEO/Perf/A11y 100、SW 安装/预缓存/断网可读/回落/`/me` 红线全过；blog-web 6 commit 零后端改动，详 §3 S17） | 1~1.5d |
-| S18 | 接口限流 | — | — | 后端 | ✅ 已验收（2026-10-15；键与阈值备案 §6 S18-D1；Apifox 用例与超限实感留人工，详 §3 S18） | 0.5d |
+| S18 | 接口限流 | — | — | 后端 | ✅ 已验收（2026-10-15；三点位超限实感/无感回归/Redis 键核验人工实测通过；Apifox 用例补录留人工，详 §3 S18） | 0.5d |
 | S19 | plus-ui 登录页/后台首页改版 | — | — | 前端(plus-ui) | ⏳ 待启动（核心完成后） | 0.5~1d |
 | S20 | Lenis 平滑滚动（动效收缩，D38） | — | — | 前端(blog-web) | ⏸ 待定（核心完成后，可砍） | 0.5d |
 | S21 | CI/CD 补全（可选） | — | — | 后端+前端 | ⏸ 可选 | 1d |
@@ -471,7 +471,7 @@ S2 遗留接入（已落地）：
 - **验收结果（2026-10-15 人工实测）**：Lighthouse（Windows Chrome）**SEO 100 / Performance 100 / Accessibility 100 / Best Practices 96**——**PWA 类别自 Lighthouse 12.0（2024-05）起已移除**，可安装性改由 Chrome 安装图标 + DevTools Application 核验；SW activated and is running、49 条预缓存（workbox-precache/sd-pages/sd-public-api 三缓存）；断网刷新已读文章 200 完整渲染、未读回落 offline.html、直开 offline.html 200；`/me` 与 `/me/new` 停留后缓存仅 3 条公共匿名端点（红线人工复核通过）；view-source JSON-LD 抽验通过；SEO 端点（sitemap 索引/分块/rss/robots）人工复核通过。Agent 侧另以无头 Chrome 全链路复验（安装→激活→断网三场景→`/me` 零泄漏）。
 - ⏸ **人工待办**（不在切片代码内）：① Chrome 地址栏安装图标按钮级安装验收；② iOS Safari 限制描述人工确认（无设备时以 README 措辞为准）；③ S13 部署时配 `NUXT_PUBLIC_SITE_URL` 真实域名；④ 面试前执行 `blog_s16_cleanup.sql` 后 sitemap 从 41 块自然收缩的验证（可选）。iOS 无 SW 限制已写入 `blog-web/README.md` S17 章节。
 
-### S18 接口限流 ✅（后端切片，2026-10-15 代码侧验收）
+### S18 接口限流 ✅（后端切片，2026-10-15 已验收）
 
 依赖：无（Redis 已在位；框架 `@RateLimiter` / `RedisUtils.rateLimiter` 零 setup 开箱可用）。
 
@@ -493,12 +493,13 @@ S2 遗留接入（已落地）：
 - **新增**（`org.dromara.blog.ratelimit`）：`RateLimitKeys`（纯静态键组装，键前缀复用框架 `global:rate_limit:`）+ `RateLimitChecker`（`@Value` 绑定 `blog.rate-limit.*`，内联默认值与 yml 同源，遵循本模块 S15/S16 约定）；单测 9 条（`RateLimitKeysTest` 4 条键形态 + `RateLimitCheckerTest` 5 条契约：三点位键/阈值/timeout 绑定、超限文案、Redis 异常包装，mock Redisson 范式同 `RedisAspectContractTest`）。
 - **零前端改动**：blog-web 对 `R.fail` 已有处理路径（超限提示直接可见）；契约 `blog-api.md` 无变更（不改出入参，仅新增服务端防护行为）。
 
-人工待办（不在切片代码内）：
+验收结果（2026-10-15 人工实测通过；前置：重启 8081 加载新码，无 mapstruct ConvertException）：
 
-1. Apifox 补录超限用例（正向连续请求打满阈值 → 第 N+1 次返回 HTTP 200 + code 500 + 「访问过于频繁，请稍候再试」）；登录链路注意带验证码参数；
-2. 登录/评论/搜索三场景超限实感 + 正常用户无感回归（1 次登录/评论/搜索不受影响）；
-3. Redis 键核验：`global:rate_limit:auth/login:*` / `global:rate_limit:blog/article/comments:*` / `global:rate_limit:blog/public/search:*`（实测后按需清理，策略 86400s 自然过期）；
-4. 重启 8081 加载新代码（重启前确认 IDE 未持有旧增量产物；mapstruct-plus 编译期生成类如报 ConvertException 先 `mvn clean` 全量重编）。
+1. **三点位超限实感**：搜索第 31 发、评论第 11 发、登录第 6 发均返回 HTTP 200 + code 500 + 「访问过于频繁，请稍候再试」；前 N 发均穿过限流器到达业务层——评论打不存在文章 ID（`999999999`）返回「文章不存在或不可评论」零脏数据；登录用不存在用户名 `s18_probe`（规避 5 次错误锁账号），第 1~5 发返回「用户不存在」；
+2. **正常用户无感**：窗口过后单次登录/评论/搜索全部恢复；真实账号 `admin` 登录成功且独立成键；换用户名 `s18_probe2` 连打同样第 6 发被限——键的 username 维度实证；
+3. **Redis 键核验**（实测键与 §6 S18-D1 备案逐一吻合）：`global:rate_limit:auth/login:127.0.0.1:s18_probe`（IP+username）、`global:rate_limit:blog/article/comments:1761100000000000001`（userId）、`global:rate_limit:blog/public/search:0:0:0:0:0:0:0:1`（IPv6 回环 `::1`——客户端地址族由框架 `getClientIP` 如实提取，非异常）、`global:rate_limit:auth/login:127.0.0.1:admin`（无感验证的真实登录）；另观测到框架既有键 `global:rate_limit:/auth/code:127.0.0.1:`（CaptchaController 的 `@RateLimiter`，requestURI 形态），与 S18 三点位共存于同一前缀——"一个前缀统一观测"的运维口径实证。
+
+遗留人工事项（不在切片代码内）：Apifox 补录三组超限用例（断言 HTTP 200 + code 500 + 指定文案；登录用例需复刻 plus-ui 加密链路 `encrypt-key` 头，验证码答案可从 Redis `global:captcha_codes:{uuid}` 读取，或标注浏览器手工验证通过）。
 
 ### S19 plus-ui 登录页 / 后台首页改版 ⏳（plus-ui；0.5~1d，核心完成后）
 
