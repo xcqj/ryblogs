@@ -109,6 +109,9 @@ public class EsArticleSearchService implements ArticleSearchService {
         SearchResponse<BlogArticleDoc> resp = blogElasticsearchClient.search(s -> {
             s.index(BlogEsConfig.INDEX_ALIAS)
                 .size(pageSize)
+                // 精确总数：ES 默认 track_total_hits=10000，超出返回下界（relation=gte）——
+                // 契约 §6 "total=命中总数" + 前端分页展示都要求精确值；演示量级（≤5 万）计数开销可忽略
+                .trackTotalHits(t -> t.enabled(true))
                 .query(q -> q.multiMatch(mm -> mm
                     .query(keyword)
                     .fields(ArticleIndexManager.FIELD_TITLE + "^" + TITLE_BOOST,
