@@ -46,6 +46,7 @@ agent 只向用户要求三样：
 - 涉及接口：`RuoYi-Vue-Plus/docs/blog-api.md`（契约权威；实现与契约冲突时先报告再修订，不得默默偏离）
 - 排期/切片类：`RuoYi-Vue-Plus/docs/ROADMAP.md`（切片状态与完成标准权威；决策记录看 §6）
 - blog-web 页面/组件粒度：`blog-web/docs/plan.md` 对应小节
+- plus-ui 页面/组件粒度：`plus-ui/docs/frontend-plan.md` 对应小节（派生自 ROADMAP S10，状态以 ROADMAP 为准）
 - 部署类：`RuoYi-Vue-Plus/docs/cloud-deployment.md`
 - 目标目录**最近似的真实代码**（同模块/同目录优先；信息源优先级：仓内真实代码 → 权威文档 → skill 资产 → 通用框架知识，禁止照搬通用模板）
 
@@ -84,6 +85,6 @@ agent 只向用户要求三样：
 
 - [ ] 构建/自测通过（命令与结果写进交付说明）
 - [ ] 冒烟通过（涉及页面：加载 / 控制台 / 5xx / 深浅主题 / 移动视口，按任务范围裁剪）
-- [ ] 文档同步：涉及切片状态的更新 ROADMAP；blog-web 页面粒度更新 `docs/plan.md`；跨仓更新列人工事项
+- [ ] 文档同步：涉及切片状态的更新 ROADMAP；blog-web 页面粒度更新 `docs/plan.md`；plus-ui 页面粒度更新 `docs/frontend-plan.md`；跨仓更新列人工事项
 - [ ] commit 信息含切片号/性质，工作区干净
 - [ ] 人工事项清单交付给用户（含验收方式）
