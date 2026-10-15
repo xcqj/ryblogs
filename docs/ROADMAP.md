@@ -36,14 +36,14 @@
 | S12 | blog-web 作者中心（发文/编辑/自助治理） | §3、§4、§11（作者侧动作） | 2/4/5 前端面 | 前端 | ✅ 已验收（2026-10-08 用户确认；发文/编辑/发布/版本链路跑通，三条交互修正回归通过；blog-web `47b9e40`/`366488d`/`28ffc36`，零后端改动） | 2~4d |
 | S13 | 线上部署与生产化 | — | — | 后端+前端 | ⏳ 待启动（D0 采购/备案先行，等待期并行 S14/S15） | 1~2d+备案 |
 | S14 | GitHub/Gitee 社交登录 | §2.8（登录，复用） | — | 后端+前端(blog-web) | ✅ 已验收（2026-10-14；后端 4 commit + blog-web 5 commit，详 §3 S14；Apifox 用例补录留人工） | 2d |
-| S15 | 阅读量 Redis 异步计数 | §5.2 | — | 后端(+blog-web 小改) | ✅ 已验收（2026-10-14 人工实测通过；后端 4 commit + blog-web 3 commit，联调期三联坑详见 §3 S15；JMeter 压测与 Apifox 语义回归留作面试演示/人工） | 1d |
-| S16 | ES 搜索替换 MySQL LIKE | §6 | — | 后端(+blog-web 高亮 UI) | ✅ 验收关闭（2026-10-14：分词/越权红线/编辑同步/对账双向/零停机/LIKE vs ES 对比/深翻页游标全部实测通过；演示数据清理留作面试前收尾，详 §3 S16） | 3~5d |
+| S15 | 阅读量 Redis 异步计数 | §5.2 | — | 后端(+blog-web 小改) | ✅ 已验收（2026-10-14 人工实测通过；后端 4 commit + blog-web 3 commit，联调期三联坑详见 §3 S15；Apifox 语义回归 2026-10-16 人工补录通过；JMeter 压测留作面试演示素材） | 1d |
+| S16 | ES 搜索替换 MySQL LIKE | §6 | — | 后端(+blog-web 高亮 UI) | ✅ 验收关闭（2026-10-14 实测 + 2026-10-16 收尾：分词/越权红线/编辑同步/对账双向/零停机/LIKE vs ES 对比/深翻页游标全部实测通过；演示数据灌入实测后已执行清理，详 §3 S16） | 3~5d |
 | S17 | PWA + SEO 三件套 | — | — | 前端(blog-web) | ✅ 已验收（2026-10-15 人工实测通过：Lighthouse SEO/Perf/A11y 100、SW 安装/预缓存/断网可读/回落/`/me` 红线全过；blog-web 6 commit 零后端改动，详 §3 S17） | 1~1.5d |
-| S18 | 接口限流 | — | — | 后端 | ✅ 已验收（2026-10-15；三点位超限实感/无感回归/Redis 键核验人工实测通过；Apifox 用例补录留人工，详 §3 S18） | 0.5d |
-| S19 | plus-ui 登录页/后台首页改版 | — | — | 前端(plus-ui) | ✅ 已完成（2026-10-15；plus-ui 5 commit 零后端改动，详 §3 S19；人工视觉验收留用户 Windows 浏览器） | 0.5~1d |
+| S18 | 接口限流 | — | — | 后端 | ✅ 已验收（2026-10-15；三点位超限实感/无感回归/Redis 键核验人工实测通过；Apifox 三组超限用例 2026-10-16 补录通过，详 §3 S18） | 0.5d |
+| S19 | plus-ui 登录页/后台首页改版 | — | — | 前端(plus-ui) | ✅ 已完成（2026-10-15；plus-ui 5 commit 零后端改动，详 §3 S19；2026-10-16 人工视觉验收与菜单隐藏均已完成） | 0.5~1d |
 | S20 | Lenis 平滑滚动（动效收缩，D38） | — | — | 前端(blog-web) | ✅ 已验收（2026-10-15 人工确认：桌面手感/移动端跟手/reduced-motion 切换/PWA 安装态叠加全过；blog-web `bde6043` 零后端改动，详 §3 S20） | 0.5d |
 | S21 | CI/CD 补全（可选） | — | — | 后端+前端 | ⏸ 可选 | 1d |
-| S22 | 注册即登录（去掉注册后手动登录中间态） | §2.8（登录，复用） | — | 后端+前端(blog-web) | ✅ 已验收（2026-10-16；Agent E2E 六用例实测通过：注册种 token / session / 登录态 API / 401 对照 / 错误验证码 / 重复用户名；后端 1 commit + blog-web 1 commit，详 §3 S22） | 0.5d |
+| S22 | 注册即登录（去掉注册后手动登录中间态） | §2.8（登录，复用） | — | 后端+前端(blog-web) | ✅ 已验收（2026-10-16；Agent E2E 六用例 + 人工浏览器验收均通过；后端 1 commit + blog-web 1 commit，详 §3 S22） | 0.5d |
 
 > 与 PRD §12.1 的顺序差异：评论提前到前台站之前，保证后端 API 闭环先行；
 > S9 前台可在 S5 完成后于前端仓库并行启动（首页/列表/详情依赖 S2+S6+S8 的接口）。
@@ -357,7 +357,7 @@ S2 遗留接入（已落地）：
 - [x] 新用户 GitHub 首次登录自动建号并进入登录态，`sys_user` / `sys_social` 记录正确（2026-10-13~14 实测：Gitee 首登建号+登录态全通；GitHub 首登在回调地址配为带 `?source=github` 后通过——平台对 redirect_uri 做含 query 的整串精确匹配，见下）
 - [x] 二次 GitHub 登录直达已绑定账号（已绑定分支为框架原逻辑、本切片零改动；GitHub/Gitee 首登均走通全链路，同平台二次登录为同代码路径退化情况，人工可抽验）
 - [x] 自动创建的账号**不能账密登录**（安全边界人工复核通过：随机 UUID 的 BCrypt 密码永不下发、任何途径不可获知，实现与复核点见 `SysLoginService#socialAutoRegister` 方法注释）
-- [ ] 解绑（`DELETE /auth/unlock/{socialId}`）后该社交账号登录走本地账号（框架原逻辑零改动，待人工抽验；语义口径见 S14-D2：解绑后同平台再登录会**新建账号**而非回到旧账号）
+- [ ] 解绑（`DELETE /auth/unlock/{socialId}`）后该社交账号登录走本地账号（框架原逻辑零改动，待人工抽验；语义口径见 S14-D2：解绑后同平台再登录会**新建账号**而非回到旧账号。注：解绑入口仅 plus-ui「个人资料 → 第三方账号」，blog-web 无 UI、社交自动建号账号也无法登录 plus-ui——非用户可达路径，2026-10-16 备案为已知边界 D40；本项测的是框架原逻辑本身）
 - [ ] Apifox 五类用例更新（正向 / 鉴权失败 / 参数校验 / 资源不存在 / 越权）——留人工（Agent 自测协议明确不做带真实登录态的 Apifox 全量用例）
 - [x] plus-ui 登录页账密登录可用、SocialCallback 路由保留（本切片未触及 plus-ui，S19 改版纪律不变）
 
@@ -400,7 +400,7 @@ S2 遗留接入（已落地）：
 - [ ] 杀进程重启：阅读量不回退、不跳变（DB 为唯一真相源、增量 UPDATE 语义上不回退；依赖 redis AOF 的极致场景留 S13 生产环境验证）；
 - [x] 停 Redis：详情仍 200，降级直写 DB（codec 故障期间全量请求实际走过降级路径、详情持续 200，等效验证）；
 - [ ] 并发刷新无负值（HINCRBY/HGETALL+DEL/`view_count + delta` 均为原子增量语义，无减法路径；JMeter 压测留作面试演示素材）；
-- [ ] Apifox 详情用例语义更新并回归（留人工：viewCount 现 = DB + 待增量，可能滞后展示）。
+- [x] Apifox 详情用例语义更新并回归（2026-10-16 人工完成：viewCount = DB + 待增量，列表页仍只读 DB、展示可能 ≤10s 滞后，语义已按契约登记）。
 
 实施结果（2026-10-14，后端仓 + blog-web 仓各一提交周期，均标 S15；D32 偏差备案：经用户指示两半场同会话完成，blog-web 仅动详情代理、middleware 与 utils，独立 commit）：
 
@@ -415,7 +415,7 @@ S2 遗留接入（已落地）：
 - **联调期第二/三坑（2026-10-14，blog-web 侧，均已修复验证）**：② SSR 取数用全局 `$fetch`，内部请求不转发浏览器 Cookie（S14 useAuth 同款坑第二现场）→ 详情代理读不到 visitorId/token，刷新页面去重永不命中；修：`/post/[slug].vue` 文章 useAsyncData 改 `useRequestFetch()`；③ **Nitro 内部请求响应里种的 Set-Cookie 不冒泡到外层 HTML 响应**（实测 SSR 文档响应无 set-cookie、直连 API 有）→ 在详情代理里种 cookie 浏览器永远收不到（Edge 未登录正常只因曾 SPA 导航时被 API 响应种下 cookie，Chrome 未登录从未 SPA 导航故全中）；修：visitor cookie 改由 `server/middleware/visitor-cookie.ts` 在最外层种植（`server/utils/visitor.ts` 种/读单点），代理只读。**三坑共性（面试叙事）：每层单元都正常、curl 直打都正常，坏的全是层间链路（codec 序列化方向、内部请求 cookie 方向、Set-Cookie 冒泡方向）——联调期查 Redis 键形态与响应头比任何单测都直接**
 - 备案边界（S15-D1）：① 列表页 viewCount 仍只读 DB（滞后 ≤10s，与掘金等站行为一致）；② 无访客标识（未登录且无 visitorId，如裸调 API）→ 每请求 +1 无去重（与 S8 一致）；③ 单条 flush DB 失败丢该 delta（已 drain 无法回退，D35 接受取舍，记 error 日志）；④ 宿主 `/docker/redis/conf/redis.conf` **未开 AOF**（仓库外文件，用户手动开 `appendonly yes`+`appendfsync everysec` 并重启容器，会丢内存中未 flush 待增量，dev 可接受）；⑤ 生产 redis AOF 属 S13 部署清单
 
-### S16 ES 搜索替换 MySQL LIKE 🔄（2026-10-13 规划；3~5d；D36 已关闭：服务端高亮；2026-10-14 两半场代码完成，验收留人工）
+### S16 ES 搜索替换 MySQL LIKE ✅（2026-10-13 规划；3~5d；D36 已关闭：服务端高亮；2026-10-14 两半场代码完成，2026-10-16 验收关闭）
 
 背景（D19 预留）：`ArticleSearchService` 接口注释已写明"引入 ES 时替换实现即可，不改变契约"。本切片兑现该预留。
 
@@ -433,12 +433,12 @@ S2 遗留接入（已落地）：
 
 验收清单：
 
-- [ ] 中文分词实测："Python爬虫"命中"Python 爬虫"；自定义词典技术词整词匹配；
-- [ ] 草稿 / 用户隐藏 / 管理员下线 / 逻辑删除文章**不出现在搜索**（红线核验，Apifox 越权类用例）；
-- [ ] 编辑内容后索引同步更新（title/summary/content 变化均触发）；
-- [ ] alias 切换零停机；对账任务能发现并修复不同步；
-- [ ] LIKE vs ES 对比数据留档（面试材料）；
-- [ ] **契约先行**：实现前完成 `blog-api.md` §6 修订（响应新增可选 `highlight` 字段，D36）；Apifox 五类用例全过（含高亮片段抽查：命中词 `<em>` 包裹、其余内容转义）；
+- [x] 中文分词实测："Python爬虫"命中"Python 爬虫"；自定义词典技术词整词匹配（2026-10-14 Agent 实测：Python爬虫→「Python 爬虫入门」、tech.dic 词条 K8s 整词命中）；
+- [x] 草稿 / 用户隐藏 / 管理员下线 / 逻辑删除文章**不出现在搜索**（红线核验：三条件内建于索引生命周期 + 回表三条件同源；Apifox 越权类用例 2026-10-14 用户验收通过）；
+- [x] 编辑内容后索引同步更新（title/summary/content 变化均触发）（8 写方法事件全覆盖 + 对账兜底；2026-10-14 实测：直改 DB visibility 被对账自动修正，活体演示见人工待办 ④）；
+- [x] alias 切换零停机；对账任务能发现并修复不同步（2026-10-14 实测：建 v2 → reindex 20040 篇 2.3s → 原子切 alias，全程并发 55/55 请求全 200）；
+- [x] LIKE vs ES 对比数据留档（2026-10-16 用户确认 MySQL 侧跑数完成；ES 侧数据 2026-10-14 已填入 `blog_s16_benchmark.md`：高频词 ~21ms/2 万篇、低频 17.6ms、空结果 5.7ms）；
+- [x] **契约先行**：实现前完成 `blog-api.md` §6 修订（响应新增可选 `highlight` 字段，D36）；Apifox 五类用例全过（含高亮片段抽查：命中词 `<em>` 包裹、其余内容转义）（2026-10-14 用户验收通过）；
 
 实施结果（2026-10-14，后端仓 7 commit + blog-web 仓 1 commit，均标 S16；两半场同会话经用户确认，S14/S15 先例）：
 
@@ -451,7 +451,7 @@ S2 遗留接入（已落地）：
 - **blog-web 半场**：`types/blog.ts` 增 `ArticleHighlight`/`ArticleSummary.highlight?`；`ArticleCard` 标题/摘要位渲染命中片段（摘要未中降级渲染正文片段；`v-html` 安全依据 = 契约"ES 已转义"，样式走 `--accent-fg` token + scoped `:deep(em)`）；`npm run build` 绿。
 - **自测协议已跑**：`mvn compile -pl ruoyi-admin -am` 绿；sd-blog 单测 55/55 全绿（新增 EsSearchSupportTest 7 条 / IndexReconcileSupportTest 5 条 / ArticleIndexDocBuilderTest 4 条）；静态断言（8 写方法 publishEvent 齐全、三条件三处同源、5 个 ES bean 条件注入）；git diff 自审无越界改动。
 - **联调期实测修复（2026-10-14，均必修）**：① **refresh-immediate 默认值反转**（true→false）——单文档写 + `refresh=true` 同步等 refresh（最长 ~1s/篇），2 万篇初始同步被拖到 20 分钟级（表象="一直循环打印 SQL"，实为慢速推进非死循环）；修 = 批量走 `_bulk` 单请求一批 + 批间不 refresh，`indexBatch`/对账补索引改造后 2 万篇秒级，事件路径靠 ≤1s 自然刷新（顺带消除 AFTER_COMMIT 同步监听对写接口的 +1s 延迟）；② **AGENTS.md §8 陷阱再现（CodeBuddy 变体，凶器=JDT 非 IDEA）**——`EsArticleSearchService` 回表段把 MyBatis-Plus `Page`（getRecords）误写成 RuoYi `PageResult`（getRows），JDT 把带错 class 写进 target/classes 且时间戳新于源码 → **mvn 增量编译跳过该文件、坏产物混入 jar**，运行期 `java.lang.Error: Unresolved compilation problems`（500 的真因）；`mvn compile` 多次"全绿"均因跳过而失真，**clean 全量重编后才暴露**；修 = 源码类型改正 + clean package，jar 内 `Unresolved compilation` 抽验归零（教训：IDE 开着时 mvn"全绿"不足为凭，排查以 clean 产物为准；另注意编辑器旧缓冲区回写会静默回退外部编辑，提交前先核对 git diff）；③ **tag_id 段越界**：9.5e18 超 BIGINT 上限（9.22e18）致 SQL 1264，降 9.2e18 段（a346fb22）；④ 高亮 VO 类级 `@JsonInclude(NON_NULL)` 在 Jackson 3（tools.jackson）下未按预期省略未命中字段（字段级生效、类级不生效，未深挖）——契约 §6 措辞放宽为"null 或不出现"，前端 `?.[0]` 空安全；⑤ **total=10000 系 ES 默认 `track_total_hits` 计数上限**（relation=gte 下界，非真实命中数），查询已显式 `track_total_hits=true` 修为精确总数（同词实测 20001，eaf9dcaa4）。修复后实测：搜索 200 + 打分序 + `<em>` 高亮 + tags 回填全链路通；「Python爬虫」命中「Python 爬虫入门」、tech.dic 词条（K8s）整词命中，两项分词验收提前通过。
-- ⏸ **人工待办**（不在本切片代码内，按序）：① ~~ES 容器搭建~~（已完成：blog-es 运行中，20040 篇已入索引）；② ~~IK 中文分词实测~~（已完成：Python爬虫/K8s 两用例 Agent 实测通过，人工浏览器复验可选）；③ ~~演示数据灌入~~（已完成：blog_s16_demo_data.sql 执行成功，验证段 20024/20024/30 符合预期）；④ ~~对账兜底验证~~（已完成：用户直改 DB visibility——隐藏后被对账删文档、恢复后等下个 :00/:30 周期自动补回，MySQL 20040 vs ES 20039 恰差 1 即待补项，最终一致 S16-D4 活体演示；需重启后端使 track_total_hits 修复生效后再看恢复结果）；⑤ LIKE vs ES 对比：ES 侧 Agent 已实测并填入 `blog_s16_benchmark.md`（高频词 ~21ms/2 万篇命中、低频 17.6ms、空结果 5.7ms，total 已精确计数）；**MySQL 侧待人工**：切 `blog.search.engine=mysql` 重启后用该文档 §3 的一键循环跑数填表；⑥ ~~深翻页 after 游标实测~~（已完成 2026-10-14：越窗守卫生效 + 游标时区偏差修复后，游标第 2/3 页与 pageNum 第 2/3 页完全一致、无重叠、可续翻）；⑦ ~~零停机重建演示~~（已完成：建 v2 → reindex 20040 篇 2.3s → _aliases 原子切 v1→v2，全程并发 55/55 请求全 200，实证留档 benchmark.md §4；旧 v1 可择机 `DELETE /blog_article_v1`）；⑧ ~~Apifox 五类用例~~（2026-10-14 用户验收通过）；⑨ ~~blog-web 浏览器验收~~（2026-10-14 用户验收通过：高亮渲染 + 视口）；⑩ 演示收尾跑 `blog_s16_cleanup.sql`（**时机由用户定**——演示数据可留作面试现场演示，含 cleanup 内 ES 对账自动清理说明）并在 ROADMAP §3 SQL 状态表登记已执行。
+- ⏸ **人工待办**（不在本切片代码内，按序）：① ~~ES 容器搭建~~（已完成：blog-es 运行中，20040 篇已入索引）；② ~~IK 中文分词实测~~（已完成：Python爬虫/K8s 两用例 Agent 实测通过，人工浏览器复验可选）；③ ~~演示数据灌入~~（已完成：blog_s16_demo_data.sql 执行成功，验证段 20024/20024/30 符合预期）；④ ~~对账兜底验证~~（已完成：用户直改 DB visibility——隐藏后被对账删文档、恢复后等下个 :00/:30 周期自动补回，MySQL 20040 vs ES 20039 恰差 1 即待补项，最终一致 S16-D4 活体演示；需重启后端使 track_total_hits 修复生效后再看恢复结果）；⑤ LIKE vs ES 对比：ES 侧 Agent 已实测并填入 `blog_s16_benchmark.md`（高频词 ~21ms/2 万篇命中、低频 17.6ms、空结果 5.7ms，total 已精确计数）；**MySQL 侧待人工**：切 `blog.search.engine=mysql` 重启后用该文档 §3 的一键循环跑数填表；⑥ ~~深翻页 after 游标实测~~（已完成 2026-10-14：越窗守卫生效 + 游标时区偏差修复后，游标第 2/3 页与 pageNum 第 2/3 页完全一致、无重叠、可续翻）；⑦ ~~零停机重建演示~~（已完成：建 v2 → reindex 20040 篇 2.3s → _aliases 原子切 v1→v2，全程并发 55/55 请求全 200，实证留档 benchmark.md §4；旧 v1 可择机 `DELETE /blog_article_v1`）；⑧ ~~Apifox 五类用例~~（2026-10-14 用户验收通过）；⑨ ~~blog-web 浏览器验收~~（2026-10-14 用户验收通过：高亮渲染 + 视口）；⑩ ~~演示收尾跑 `blog_s16_cleanup.sql`~~（已完成 2026-10-16：用户确认演示数据已执行清理——查库 `sd_blog_article` s16- 前缀 0 条；SQL 状态表已登记）。
 
 ### S17 PWA + SEO 三件套 ✅（blog-web；1~1.5d，2026-10-15 验收关闭）
 
@@ -500,7 +500,7 @@ S2 遗留接入（已落地）：
 2. **正常用户无感**：窗口过后单次登录/评论/搜索全部恢复；真实账号 `admin` 登录成功且独立成键；换用户名 `s18_probe2` 连打同样第 6 发被限——键的 username 维度实证；
 3. **Redis 键核验**（实测键与 §6 S18-D1 备案逐一吻合）：`global:rate_limit:auth/login:127.0.0.1:s18_probe`（IP+username）、`global:rate_limit:blog/article/comments:1761100000000000001`（userId）、`global:rate_limit:blog/public/search:0:0:0:0:0:0:0:1`（IPv6 回环 `::1`——客户端地址族由框架 `getClientIP` 如实提取，非异常）、`global:rate_limit:auth/login:127.0.0.1:admin`（无感验证的真实登录）；另观测到框架既有键 `global:rate_limit:/auth/code:127.0.0.1:`（CaptchaController 的 `@RateLimiter`，requestURI 形态），与 S18 三点位共存于同一前缀——"一个前缀统一观测"的运维口径实证。
 
-遗留人工事项（不在切片代码内）：Apifox 补录三组超限用例（断言 HTTP 200 + code 500 + 指定文案；登录用例需复刻 plus-ui 加密链路 `encrypt-key` 头，验证码答案可从 Redis `global:captcha_codes:{uuid}` 读取，或标注浏览器手工验证通过）。
+遗留人工事项：✅ Apifox 三组超限用例补录（2026-10-16 人工完成，用户确认；断言口径 HTTP 200 + code 500 + 「访问过于频繁，请稍候再试」）。
 
 ### S19 plus-ui 登录页 / 后台首页改版 ✅（plus-ui；0.5~1d，2026-10-15 完成）
 
@@ -522,7 +522,7 @@ S2 遗留接入（已落地）：
 2. 后台首页（`a4aee4b`）：静态欢迎页 → 数据概览。6 统计卡（文章总数/已发布/草稿/隐藏中〔用户隐藏+管理员下线，hint 拆分〕/评论总数/标签总数）全部调已有 `blog:admin/**` 接口，`pageNum=1&pageSize=1` 读 `total` 约 7 发并发（`Promise.allSettled`）；`checkPermi` 预判 `blog:article:list`/`blog:comment:list`/`blog:tag:list`，无权限不发请求并展示降级提示条；单点失败该卡渲染「—」不影响其他卡；另加三层接口边界说明卡（纯文案无深链）。样式全走 `--app-*` token（移除旧页 28px 魔法数字），暗色经 `html.dark` token 覆写。
 3. 品牌统一（`c2d2c60`/`d841848`）：`VITE_APP_LOGO_TITLE` 改「Stack Depth」；侧栏 Logo 由框架 `logo.png` 换为与 blog-web `AppBrand.vue` 同源的内联 SVG 品牌标（错位叠框 + 品牌黄前框，后框描边随侧栏深浅主题切换）；favicon 换 Stack Depth SVG（内置 `prefers-color-scheme` 深浅自适应，ico 保留兜底）。
 4. 框架痕迹清理（`17d270a`）：删除顶栏 Github/文档外链图标块及 `RuoYiGit`/`RuoYiDoc` 组件；登录/注册页页脚版权改为品牌方；注册页品牌文案对齐登录页；头像旁角色标签「Workspace」→「博客后台」。
-5. 遗留人工事项：① 侧栏菜单「PLUS官网/测试菜单/AI会话/系统监控」由用户在后台菜单管理隐藏（可逆，未落 SQL）；② 人工视觉验收（桌面+移动+暗色，Windows 浏览器）待用户确认；③ `navType=TOP` 布局下 Navbar 仍引用框架 `logo.png`（非默认布局，未动）。
+5. 遗留人工事项：① ~~侧栏菜单「PLUS官网/测试菜单/AI会话/系统监控」隐藏~~（2026-10-16 用户已在后台菜单管理操作完成，可逆、未落 SQL）；② ~~人工视觉验收~~（2026-10-16 用户 Windows 浏览器确认通过）；③ `navType=TOP` 布局下 Navbar 仍引用框架 `logo.png`（非默认布局，未动，已知小遗留）。
 
 验收结果（2026-10-15 agent 侧全绿）：`vue-tsc` 0 错 + `pnpm build` 通过；playwright 冒烟——浏览器真实登录成功（验证码答案经 Redis 读取复刻）、首页 6 卡拿到真实数据（文章 20055/已发布 20041/草稿 14/隐藏中 1/评论 3/标签 49）、登录页/首页/作者页/三治理页无控制台错误无 5xx、桌面+移动截图正常、清理项（页脚/favicon/顶栏图标/角色标签）逐项断言通过。注：Impeccable 技能本机不可用，视觉按 D39 token 纪律直接落地，未使用技能默认产物。
 
@@ -555,7 +555,7 @@ S2 遗留接入（已落地）：
    - `app/pages/register.vue`：删除「去登录」成功态，改为 toast「欢迎加入，已为你完成登录」+ `navigateTo(returnPath)`；来源页经 `?return=` 传入（LoginModal 注册链接带上 `route.fullPath`），页面仅接受站内相对路径（拒 `//` 开头）防开放重定向；
    - `useAuth.register`：成功后 `refresh()` 刷新会话（与 login 一致）。
 
-验收（Agent E2E，2026-10-16）：另起 8082 新后端实例 + blog-web 生产实例指向 8082（用户原 8081 实例未动），六用例全过——① 新用户名 + 正确验证码注册 → `{registered:true, logged:true}` + httpOnly token cookie（JWT 含新 userId）；② 注册后 `/api/auth/session` → `logged:true` + profile；③ 带 cookie 调 `/api/blog/user/profile` → 200 返回资料（token 对博客 API 生效）；④ 无 cookie 同接口 → 401；⑤ 错误验证码 → 后端原文「验证码错误」且不种 token；⑥ 重复用户名 →「保存用户…注册账号已存在」且不种 token。测试用户（`e2e_reg_20261016`）与临时实例均已清理。浏览器视觉验收（toast 呈现、跳转落地、移动视口）留人工。
+验收（Agent E2E，2026-10-16）：另起 8082 新后端实例 + blog-web 生产实例指向 8082（用户原 8081 实例未动），六用例全过——① 新用户名 + 正确验证码注册 → `{registered:true, logged:true}` + httpOnly token cookie（JWT 含新 userId）；② 注册后 `/api/auth/session` → `logged:true` + profile；③ 带 cookie 调 `/api/blog/user/profile` → 200 返回资料（token 对博客 API 生效）；④ 无 cookie 同接口 → 401；⑤ 错误验证码 → 后端原文「验证码错误」且不种 token；⑥ 重复用户名 →「保存用户…注册账号已存在」且不种 token。测试用户（`e2e_reg_20261016`）与临时实例均已清理。浏览器视觉验收（toast 呈现、跳回来源页落地、移动视口）2026-10-16 用户确认通过。
 
 ### 一次性 SQL 脚本执行状态（docs/）
 
@@ -570,8 +570,8 @@ S2 遗留接入（已落地）：
 | `blog_s6_menu.sql` | S6 标签治理按钮 + Tag 裸 CRUD 菜单清理 | ✅ 已执行（2026-10-03） |
 | `blog_s7_menu.sql` | S7 评论治理按钮 + Comment/UserProfile 菜单清理 | ✅ 已执行（2026-10-03） |
 | `blog_s10_menu.sql` | S10 治理页 C 型菜单入口（文章/标签/评论，parent=博客目录） | ✅ 已执行（2026-10-05） |
-| `blog_s16_demo_data.sql` | S16 演示数据（24 篇中文文 + 2 万压测，标记 ID 段 9e18 量级/s16- 前缀） | ⏳ 待人工执行（S16 联调时，可重跑：先 cleanup 再 demo） |
-| `blog_s16_cleanup.sql` | S16 演示数据清理（含 ES 文档清理两法：对账自动 / curl _delete_by_query） | ⏳ 待人工执行（用完必清，人工确认后执行） |
+| `blog_s16_demo_data.sql` | S16 演示数据（24 篇中文文 + 2 万压测，标记 ID 段 9e18 量级/s16- 前缀） | ✅ 已执行（2026-10-14 灌入实测，验证段 20024/20024/30 符合预期） |
+| `blog_s16_cleanup.sql` | S16 演示数据清理（含 ES 文档清理两法：对账自动 / curl _delete_by_query） | ✅ 已执行（2026-10-16 用户确认清理完成；查库 s16- 前缀 0 条） |
 | `blog_s9_web_client.sql` | S9 开工准备：sys_client 新增 `web` 客户端记录（D28，幂等含验证段） | ✅ 已执行（2026-10-06，验证段 1 行：client_id `f38076e6bb30a1170b9ea3fbebac0815`、grant_type 仅 password、status/del_flag 均 0） |
 
 > S14 的 `web` 客户端 grant_types 追加 `social` 经 plus-ui 后台「客户端管理」执行，**不落 SQL 脚本**；若后续改由脚本执行，在此登记。
@@ -672,6 +672,8 @@ S0 → S1 → S2 → S3 → S4 → S5 → S6 → S7 → S8   （后端关键路�
 | 2026-10-14 | S16-D4（索引同步最终一致 + 降级哲学，与 S15 同脉）：① 事件只作触发信号不携带状态，监听方事务提交后按 DB 现状重推导（重复/乱序消费幂等），索引失败仅记 error 由对账定时任务兜底（不阻断主业务，接受最终一致的秒级窗口）；② 回表查询复用 `selectPublicPage` 三条件底座——堵住"ES 查询后、DB 回表前文章被隐藏"的竞态泄露窗口（红线核验点：三条件在 indexOrRemove / initialFullSync / reconcile 的 MySQL 侧三处同源）；③ ES 运行期异常降级 MySQL LIKE（响应无 highlight/nextAfter），保证搜索可用性；④ 已备案边界：标签 rename/merge 不即时同步索引（tags 字段靠对账任务兜底刷新） | 本文件 / ArticleIndexServiceImpl / EsArticleSearchService |
 | 2026-10-14 | S16-D5（演示数据与对比留档登记）：`blog_s16_demo_data.sql`（24 篇中文文 + 2 万压测，recursive CTE；ID 全落 9e18 标记段、tag slug 一律 s16- 前缀防既有标签唯一键冲突；SQL 直插绕过应用事件，ES 侧由对账任务补齐——顺带完成"对账发现并修复不同步"验收）；`blog_s16_cleanup.sql`（按段 DELETE + ES 清理两法）；`blog_s16_benchmark.md`（对比方法/命令留档，结果表人工实测后填写，清理方式随切片登记于此与 §3 SQL 状态表） | 本文件 / docs/blog_s16_*.sql / docs/blog_s16_benchmark.md |
 | 2026-10-15 | S18-D1（限流实现形态与键阈值备案，开工前拍板）：① **放弃框架 `@RateLimiter` 注解、选「配置化阈值 + 薄封装直调 `RedisUtils.rateLimiter`」**——注解 `count/time` 为编译期字面量读不到配置，违背 S18 要求 2「不硬编码」；仍复用框架 Redisson `RRateLimiter` 与 i18n `rate.limiter.message`，超限行为与注解路径一致（`ServiceException` → `R.fail`，HTTP 200 + envelope code 500 + msg「访问过于频繁，请稍候再试」，**非 429**），Redis 异常同口径包装 `RuntimeException("服务器限流异常，请稍候再试")`；② 三点位键与阈值：`/auth/login` = `global:rate_limit:auth/login:{ip}:{username}` 5 次/60s（username 取加密内层 `PasswordLoginBody`，置于 client 校验前；非密码 grant 无用户名字段时退化为同 IP 共享键）；发表评论 = `global:rate_limit:blog/article/comments:{userId}` 10 次/60s（全站每用户配额、不区分文章；与 `@RepeatSubmit` 互补）；`/blog/public/search` = `global:rate_limit:blog/public/search:{ip}` 30 次/60s；策略存活 86400s（与框架 timeout 默认一致）；③ 键前缀复用框架 `global:rate_limit:`（`GlobalConstants.RATE_LIMIT_KEY`）便于运维统一观测；实现为 `org.dromara.blog.ratelimit`（`RateLimitKeys` 纯静态键组装 + `RateLimitChecker` `@Value` 绑定，内联默认值与 yml 同源）；单测 9 条；④ 阈值取「正常用户无感」口径：登录 5 次/分（忘记密码重试 2~3 次有余量，与账号密码错误锁定互补）、评论 10 次/分、搜索 30 次/分（防输入联想连打又留 NAT 共享 IP 余量），如实测偏紧改 yml 即可、无需改代码 | 本文件 §3 S18 / RateLimitChecker / RateLimitKeys / application.yml |
+| 2026-10-16 | D39（前台质感精修轮验收关闭）：用户发起的三轮质感精修（非排期切片，先例见 plan.md §2.12）共 13 个 polish commit 全部实施完毕，2026-10-16 用户 Windows 浏览器 + 真机人工验收通过，样式改动暂告一段落；力度口径固化——「精修」= 可动间距节奏/字号字距/组件视觉/局部布局微调，**不动信息架构、页面骨架、交互逻辑与数据流**；设计上下文单一来源固化为 `blog-web/.impeccable.md`（后续设计类会话自动生效） | blog-web/docs/plan.md §2.19 |
+| 2026-10-16 | D40（社交账号绑定/解绑管理不在 blog-web 提供，保持 S14 登录-only 范围，用户拍板）：入口仅 plus-ui「个人资料 → 第三方账号」（框架原带），普通用户不可达，且社交自动建号账号（随机 UUID 密码）无法登录 plus-ui——解绑对 blog-web 社交用户实际不可用；评估三个场景（平台账号丢失致博客账号锁死 / 无法追加第二平台 / 无法解绑）后 MVP 维持现状（PRD 未要求绑定管理，S14-D2 已列为"将来显式功能"），登记为已知边界；若后续补齐，最小方案 = 作者中心「账号与登录」小节复用 `GET /system/social/list` + `DELETE /auth/unlock/{socialId}`（零后端改动，约 0.5d），必须带「若为唯一登录方式，解绑后将无法登录」警示文案 | 本文件 §3 S14 / S14-D2 / blog-web/docs/plan.md §2.15 |
 | 2026-10-16 | D35（注册即登录，S22）：① `/auth/register` 由「只建档」改为注册成功即下发 token（返回类型 `R<Void>` → `R<LoginVo>`），参照 S14 `socialAutoRegister` 建号即登录模式；图形验证码在注册时已校验并消费一次，自动登录不重复校验、不构成绕过；clientId/grantType/status 校验与 `login()` 同口径（前端注册代理早已注入 clientId/grantType）；② blog-web 注册成功后跳转目标为「回来源页」——LoginModal 注册链接带 `?return=route.fullPath`，注册页仅接受站内相对路径（拒 `//` 开头）防开放重定向，无参或非法值回首页；③ plus-ui 注册页忽略返回 data、行为不变（仍注册后回登录页），不构成破坏性变更；④ `/auth/register` 无请求限流为既有缺口（S18 只覆盖 login），本切片不扩大范围，留后续 | 本文件 §3 S22 / blog-web/docs/plan.md §2.20 |
 
 ### 待决策
