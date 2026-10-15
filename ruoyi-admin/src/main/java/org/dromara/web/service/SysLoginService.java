@@ -2,6 +2,7 @@ package org.dromara.web.service;
 
 import cn.dev33.satoken.exception.NotLoginException;
 import cn.dev33.satoken.stp.StpUtil;
+import cn.dev33.satoken.stp.parameter.SaLoginParameter;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.lang.Opt;
@@ -15,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import me.zhyd.oauth.model.AuthUser;
 import org.dromara.common.core.constant.CacheNames;
 import org.dromara.common.core.constant.Constants;
+import org.dromara.common.core.constant.SystemConstants;
 import org.dromara.common.core.enums.LoginType;
 import org.dromara.common.core.enums.UserType;
 import org.dromara.common.core.exception.ServiceException;
@@ -33,6 +35,7 @@ import org.dromara.system.domain.bo.SysUserBo;
 import org.dromara.system.domain.vo.*;
 import org.dromara.system.mapper.SysUserMapper;
 import org.dromara.system.service.*;
+import org.dromara.web.domain.vo.LoginVo;
 import org.dromara.web.service.support.SocialAccountNamer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -162,6 +165,40 @@ public class SysLoginService {
         sysSocialService.insertByBo(socialBo);
         log.info("社交登录自动注册成功, source={}, uuid={}, userId={}", authUserData.getSource(), authUserData.getUuid(), user.getUserId());
         return user;
+    }
+
+    /**
+     * 注册即登录：为刚注册成功的账号建立会话并生成访问令牌（ROADMAP S22 / D35）。
+     * <p>
+     * 与 {@link #socialAutoRegister} 同一模式（建号后直接登录），区别在于账号凭证由用户本人在注册
+     * 请求内提交、图形验证码已在注册时校验并消费，故本方法不做二次凭证校验。客户端与授权类型校验
+     * 由 {@code AuthController#register} 按 {@code AuthController#login} 同口径完成，本方法只构建会话。
+     *
+     * @param username 注册用户名
+     * @param client   客户端配置
+     * @return 登录令牌信息
+     */
+    public LoginVo registerAutoLogin(String username, SysClientVo client) {
+        SysUserVo user = userMapper.lambda()
+            .eq(SysUser::getUserName, username)
+            .voOne();
+        if (ObjectUtil.isNull(user)) {
+            throw new UserException("user.not.exists", username);
+        } else if (SystemConstants.DISABLE.equals(user.getStatus())) {
+            throw new UserException("user.blocked", username);
+        }
+        LoginUser loginUser = buildLoginUser(user);
+        loginUser.setClientKey(client.getClientKey());
+        loginUser.setDeviceType(client.getDeviceType());
+        SaLoginParameter model = IAuthStrategy.buildLoginParameter(client);
+        // 生成token
+        LoginHelper.login(loginUser, model);
+
+        LoginVo loginVo = new LoginVo();
+        loginVo.setAccessToken(StpUtil.getTokenValue());
+        loginVo.setExpireIn(StpUtil.getTokenTimeout());
+        loginVo.setClientId(client.getClientId());
+        return loginVo;
     }
 
     /**

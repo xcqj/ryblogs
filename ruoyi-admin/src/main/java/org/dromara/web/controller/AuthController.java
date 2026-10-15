@@ -200,12 +200,25 @@ public class AuthController {
      */
     @ApiEncrypt
     @PostMapping("/register")
-    public R<Void> register(@Validated @RequestBody RegisterBody user) {
+    public R<LoginVo> register(@Validated @RequestBody RegisterBody user) {
         if (!configService.selectRegisterEnabled()) {
             return R.fail("当前系统没有开启注册功能！");
         }
         registerService.register(user);
-        return R.ok();
+        // 注册即登录（ROADMAP S22 / D35）：建号后直接建立会话并下发 token，与 S14 socialAutoRegister 同口径。
+        // 图形验证码已在 registerService.register 内校验并消费一次，此处不再重复校验、不构成绕过。
+        // 客户端与授权类型校验与 login() 同口径（前端注册代理已注入 clientId/grantType）。
+        String clientId = user.getClientId();
+        String grantType = user.getGrantType();
+        SysClientVo client = clientService.queryByClientId(clientId);
+        // 查询不到 client 或 client 内不包含 grantType
+        if (ObjectUtil.isNull(client) || !StringUtils.contains(client.getGrantType(), grantType)) {
+            log.info("客户端id: {} 认证类型：{} 异常!.", clientId, grantType);
+            return R.fail(MessageUtils.message("auth.grant.type.error"));
+        } else if (!SystemConstants.NORMAL.equals(client.getStatus())) {
+            return R.fail(MessageUtils.message("auth.grant.type.blocked"));
+        }
+        return R.ok(loginService.registerAutoLogin(user.getUsername(), client));
     }
 
 }

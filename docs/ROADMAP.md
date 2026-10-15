@@ -43,6 +43,7 @@
 | S19 | plus-ui 登录页/后台首页改版 | — | — | 前端(plus-ui) | ✅ 已完成（2026-10-15；plus-ui 5 commit 零后端改动，详 §3 S19；人工视觉验收留用户 Windows 浏览器） | 0.5~1d |
 | S20 | Lenis 平滑滚动（动效收缩，D38） | — | — | 前端(blog-web) | ✅ 已验收（2026-10-15 人工确认：桌面手感/移动端跟手/reduced-motion 切换/PWA 安装态叠加全过；blog-web `bde6043` 零后端改动，详 §3 S20） | 0.5d |
 | S21 | CI/CD 补全（可选） | — | — | 后端+前端 | ⏸ 可选 | 1d |
+| S22 | 注册即登录（去掉注册后手动登录中间态） | §2.8（登录，复用） | — | 后端+前端(blog-web) | ✅ 已验收（2026-10-16；Agent E2E 六用例实测通过：注册种 token / session / 登录态 API / 401 对照 / 错误验证码 / 重复用户名；后端 1 commit + blog-web 1 commit，详 §3 S22） | 0.5d |
 
 > 与 PRD §12.1 的顺序差异：评论提前到前台站之前，保证后端 API 闭环先行；
 > S9 前台可在 S5 完成后于前端仓库并行启动（首页/列表/详情依赖 S2+S6+S8 的接口）。
@@ -539,6 +540,23 @@ S2 遗留接入（已落地）：
 
 验收：push / PR 触发全绿；失败可阻断合并（branch protection 可选）。
 
+### S22 注册即登录 ✅（2026-10-16 实施并 E2E 实测关闭；0.5d）
+
+背景（D35）：`/auth/register` 原返回 `R<Void>` 不下发 token，且 `SysRegisterService` 校验时即消费图形验证码（一次性），前端无法"注册成功后就地再调一次登录"——blog-web 注册页因此一直是「注册成功态 + 去登录按钮」，用户须再手动登录一次（与 plus-ui 注册页旧口径一致）。用户 2026-10-16 要求去掉该中间态，跳转目标定为「回来源页」。
+
+范围与实现（跨仓，D32 分两个 commit）：
+
+1. 后端（ruoyi-admin，1 commit）：
+   - `AuthController#register` 返回类型 `R<Void>` → `R<LoginVo>`：注册成功后按 `login()` 同口径校验 clientId/grantType/status，调 `SysLoginService#registerAutoLogin` 建会话并返回 token；
+   - `SysLoginService#registerAutoLogin`（新增）：按用户名回查新账号 → `buildLoginUser` + `LoginHelper.login` + `IAuthStrategy.buildLoginParameter(client)`，与 S14 `socialAutoRegister` 同一模式；图形验证码已在注册时校验并消费一次，此处不重复校验、不构成绕过；
+   - 兼容性：plus-ui 注册页忽略返回 data，行为不变（仍注册后回登录页）；`/auth/register` 无限流为既有问题（S18 只覆盖 login），本切片不扩大范围。
+2. blog-web（1 commit，细项见该仓 `docs/plan.md` §2.20）：
+   - `server/api/auth/register.post.ts`：响应出现 `access_token` 时按 login.post.ts 同口径种 httpOnly cookie；兼容旧后端 `R<Void>`（无 token 时退回只建档）；
+   - `app/pages/register.vue`：删除「去登录」成功态，改为 toast「欢迎加入，已为你完成登录」+ `navigateTo(returnPath)`；来源页经 `?return=` 传入（LoginModal 注册链接带上 `route.fullPath`），页面仅接受站内相对路径（拒 `//` 开头）防开放重定向；
+   - `useAuth.register`：成功后 `refresh()` 刷新会话（与 login 一致）。
+
+验收（Agent E2E，2026-10-16）：另起 8082 新后端实例 + blog-web 生产实例指向 8082（用户原 8081 实例未动），六用例全过——① 新用户名 + 正确验证码注册 → `{registered:true, logged:true}` + httpOnly token cookie（JWT 含新 userId）；② 注册后 `/api/auth/session` → `logged:true` + profile；③ 带 cookie 调 `/api/blog/user/profile` → 200 返回资料（token 对博客 API 生效）；④ 无 cookie 同接口 → 401；⑤ 错误验证码 → 后端原文「验证码错误」且不种 token；⑥ 重复用户名 →「保存用户…注册账号已存在」且不种 token。测试用户（`e2e_reg_20261016`）与临时实例均已清理。浏览器视觉验收（toast 呈现、跳转落地、移动视口）留人工。
+
 ### 一次性 SQL 脚本执行状态（docs/）
 
 > 下列迁移 / 清理 / 菜单脚本均为一次性执行，截至 2026-10-05 已全部在 `ry-vue` 库执行完毕，在此登记以免被误当作待办或重复执行。建表基线 `blog_schema_v0.1.sql` 属环境初始化（见 SETUP §3），不列入本表。
@@ -654,6 +672,7 @@ S0 → S1 → S2 → S3 → S4 → S5 → S6 → S7 → S8   （后端关键路�
 | 2026-10-14 | S16-D4（索引同步最终一致 + 降级哲学，与 S15 同脉）：① 事件只作触发信号不携带状态，监听方事务提交后按 DB 现状重推导（重复/乱序消费幂等），索引失败仅记 error 由对账定时任务兜底（不阻断主业务，接受最终一致的秒级窗口）；② 回表查询复用 `selectPublicPage` 三条件底座——堵住"ES 查询后、DB 回表前文章被隐藏"的竞态泄露窗口（红线核验点：三条件在 indexOrRemove / initialFullSync / reconcile 的 MySQL 侧三处同源）；③ ES 运行期异常降级 MySQL LIKE（响应无 highlight/nextAfter），保证搜索可用性；④ 已备案边界：标签 rename/merge 不即时同步索引（tags 字段靠对账任务兜底刷新） | 本文件 / ArticleIndexServiceImpl / EsArticleSearchService |
 | 2026-10-14 | S16-D5（演示数据与对比留档登记）：`blog_s16_demo_data.sql`（24 篇中文文 + 2 万压测，recursive CTE；ID 全落 9e18 标记段、tag slug 一律 s16- 前缀防既有标签唯一键冲突；SQL 直插绕过应用事件，ES 侧由对账任务补齐——顺带完成"对账发现并修复不同步"验收）；`blog_s16_cleanup.sql`（按段 DELETE + ES 清理两法）；`blog_s16_benchmark.md`（对比方法/命令留档，结果表人工实测后填写，清理方式随切片登记于此与 §3 SQL 状态表） | 本文件 / docs/blog_s16_*.sql / docs/blog_s16_benchmark.md |
 | 2026-10-15 | S18-D1（限流实现形态与键阈值备案，开工前拍板）：① **放弃框架 `@RateLimiter` 注解、选「配置化阈值 + 薄封装直调 `RedisUtils.rateLimiter`」**——注解 `count/time` 为编译期字面量读不到配置，违背 S18 要求 2「不硬编码」；仍复用框架 Redisson `RRateLimiter` 与 i18n `rate.limiter.message`，超限行为与注解路径一致（`ServiceException` → `R.fail`，HTTP 200 + envelope code 500 + msg「访问过于频繁，请稍候再试」，**非 429**），Redis 异常同口径包装 `RuntimeException("服务器限流异常，请稍候再试")`；② 三点位键与阈值：`/auth/login` = `global:rate_limit:auth/login:{ip}:{username}` 5 次/60s（username 取加密内层 `PasswordLoginBody`，置于 client 校验前；非密码 grant 无用户名字段时退化为同 IP 共享键）；发表评论 = `global:rate_limit:blog/article/comments:{userId}` 10 次/60s（全站每用户配额、不区分文章；与 `@RepeatSubmit` 互补）；`/blog/public/search` = `global:rate_limit:blog/public/search:{ip}` 30 次/60s；策略存活 86400s（与框架 timeout 默认一致）；③ 键前缀复用框架 `global:rate_limit:`（`GlobalConstants.RATE_LIMIT_KEY`）便于运维统一观测；实现为 `org.dromara.blog.ratelimit`（`RateLimitKeys` 纯静态键组装 + `RateLimitChecker` `@Value` 绑定，内联默认值与 yml 同源）；单测 9 条；④ 阈值取「正常用户无感」口径：登录 5 次/分（忘记密码重试 2~3 次有余量，与账号密码错误锁定互补）、评论 10 次/分、搜索 30 次/分（防输入联想连打又留 NAT 共享 IP 余量），如实测偏紧改 yml 即可、无需改代码 | 本文件 §3 S18 / RateLimitChecker / RateLimitKeys / application.yml |
+| 2026-10-16 | D35（注册即登录，S22）：① `/auth/register` 由「只建档」改为注册成功即下发 token（返回类型 `R<Void>` → `R<LoginVo>`），参照 S14 `socialAutoRegister` 建号即登录模式；图形验证码在注册时已校验并消费一次，自动登录不重复校验、不构成绕过；clientId/grantType/status 校验与 `login()` 同口径（前端注册代理早已注入 clientId/grantType）；② blog-web 注册成功后跳转目标为「回来源页」——LoginModal 注册链接带 `?return=route.fullPath`，注册页仅接受站内相对路径（拒 `//` 开头）防开放重定向，无参或非法值回首页；③ plus-ui 注册页忽略返回 data、行为不变（仍注册后回登录页），不构成破坏性变更；④ `/auth/register` 无请求限流为既有缺口（S18 只覆盖 login），本切片不扩大范围，留后续 | 本文件 §3 S22 / blog-web/docs/plan.md §2.20 |
 
 ### 待决策
 
