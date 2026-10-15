@@ -1,6 +1,6 @@
 # 博客 MVP 开发路线图（ROADMAP）
 
-> 状态：v0.4 · 2026-10-15（新增 S13~S21 面试亮点切片；MVP S0–S12 已全部关闭；S14~S19 已关闭，S13 仍阻塞 D37，S20/S21 待定）
+> 状态：v0.4 · 2026-10-15（新增 S13~S21 面试亮点切片；MVP S0–S12 已全部关闭；S14~S20 已关闭，S13 仍阻塞 D37，S21 可选待定）
 > 定位：排期文档——做什么、按什么顺序做、每一步的完成标准是什么。
 > 本文件不重复权威内容，只引用：
 >
@@ -41,7 +41,7 @@
 | S17 | PWA + SEO 三件套 | — | — | 前端(blog-web) | ✅ 已验收（2026-10-15 人工实测通过：Lighthouse SEO/Perf/A11y 100、SW 安装/预缓存/断网可读/回落/`/me` 红线全过；blog-web 6 commit 零后端改动，详 §3 S17） | 1~1.5d |
 | S18 | 接口限流 | — | — | 后端 | ✅ 已验收（2026-10-15；三点位超限实感/无感回归/Redis 键核验人工实测通过；Apifox 用例补录留人工，详 §3 S18） | 0.5d |
 | S19 | plus-ui 登录页/后台首页改版 | — | — | 前端(plus-ui) | ✅ 已完成（2026-10-15；plus-ui 5 commit 零后端改动，详 §3 S19；人工视觉验收留用户 Windows 浏览器） | 0.5~1d |
-| S20 | Lenis 平滑滚动（动效收缩，D38） | — | — | 前端(blog-web) | ⏸ 待定（核心完成后，可砍） | 0.5d |
+| S20 | Lenis 平滑滚动（动效收缩，D38） | — | — | 前端(blog-web) | ✅ 已验收（2026-10-15 人工确认：桌面手感/移动端跟手/reduced-motion 切换/PWA 安装态叠加全过；blog-web `bde6043` 零后端改动，详 §3 S20） | 0.5d |
 | S21 | CI/CD 补全（可选） | — | — | 后端+前端 | ⏸ 可选 | 1d |
 
 > 与 PRD §12.1 的顺序差异：评论提前到前台站之前，保证后端 API 闭环先行；
@@ -525,11 +525,13 @@ S2 遗留接入（已落地）：
 
 验收结果（2026-10-15 agent 侧全绿）：`vue-tsc` 0 错 + `pnpm build` 通过；playwright 冒烟——浏览器真实登录成功（验证码答案经 Redis 读取复刻）、首页 6 卡拿到真实数据（文章 20055/已发布 20041/草稿 14/隐藏中 1/评论 3/标签 49）、登录页/首页/作者页/三治理页无控制台错误无 5xx、桌面+移动截图正常、清理项（页脚/favicon/顶栏图标/角色标签）逐项断言通过。注：Impeccable 技能本机不可用，视觉按 D39 token 纪律直接落地，未使用技能默认产物。
 
-### S20 Lenis 平滑滚动 ⏸（blog-web；待定，核心完成后；0.5d）
+### S20 Lenis 平滑滚动 ✅（blog-web；0.5d，2026-10-15 验收关闭）
 
 范围（D38 收缩后）：仅 Lenis；hero 视差 / 逐字进场待定；**不做 three.js 背景、不引 GSAP**（内容站违和，SSR 与首屏成本不成比例；GSAP 与 Lenis 收益重叠）。纯表现层：无契约/数据/状态机改动，独立 commit，随时插拔。
 
 验收：与页面过渡、PWA 叠加无冲突；`prefers-reduced-motion` 兜底生效（transitions.css 已有，确认 Lenis 同样尊重）；移动端滚动手感人工确认。
+
+验收结果（2026-10-15）：agent 侧无头 Chrome 冒烟全 PASS——`html.lenis` class、wheel 平滑渐进曲线（lerp ramp 非瞬跳）、路由跳转滚到顶且实例存活、`reducedMotion=reduce` 下无 lenis class 且原生滚动可用、SW 注册态刷新无冲突、三视口零 console error/5xx；人工侧（用户 Windows 浏览器）桌面手感 / 移动端跟手 / 系统减少动效切换 / PWA 安装态叠加全部确认无问题。实现：`app/plugins/lenis.client.ts`（matchMedia 门控 + 偏好切换监听 + `stopInertiaOnNavigate` + lerp 0.1 温和默认，移动端 syncTouch 关闭保持原生跟手）+ transitions.css 官方配套规则（`lenis-smooth` 期间中和 `scroll-behavior: smooth` 防双动画）；坑位：Nuxt 4.6 unimport 会剥离 plugins 下 bare 包静态默认导入致运行时报 `Lenis is not defined` 白屏，改动态 `import('lenis')`（已记入 `blog-web/docs/plan.md` §2.17 与 README）。blog-web `bde6043`，零后端改动，细项见 `blog-web/docs/plan.md` §2.17。
 
 ### S21 CI/CD 补全 ⏸（可选；1d）
 
