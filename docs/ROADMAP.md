@@ -44,6 +44,7 @@
 | S20 | Lenis 平滑滚动（动效收缩，D38） | — | — | 前端(blog-web) | ✅ 已验收（2026-10-15 人工确认：桌面手感/移动端跟手/reduced-motion 切换/PWA 安装态叠加全过；blog-web `bde6043` 零后端改动，详 §3 S20） | 0.5d |
 | S21 | CI/CD 补全（可选） | — | — | 后端+前端 | ⏸ 可选 | 1d |
 | S22 | 注册即登录（去掉注册后手动登录中间态） | §2.8（登录，复用） | — | 后端+前端(blog-web) | ✅ 已验收（2026-10-16；Agent E2E 六用例 + 人工浏览器验收均通过；后端 1 commit + blog-web 1 commit，详 §3 S22） | 0.5d |
+| S23 | blog-web 全站视觉改版（方向 C） | — | — | 前端(blog-web) | ⏳ 待启动（D41；P1 补屏中，首页 1.1 版式已冻结） | 6~8d |
 
 > 与 PRD §12.1 的顺序差异：评论提前到前台站之前，保证后端 API 闭环先行；
 > S9 前台可在 S5 完成后于前端仓库并行启动（首页/列表/详情依赖 S2+S6+S8 的接口）。
@@ -557,6 +558,36 @@ S2 遗留接入（已落地）：
 
 验收（Agent E2E，2026-10-16）：另起 8082 新后端实例 + blog-web 生产实例指向 8082（用户原 8081 实例未动），六用例全过——① 新用户名 + 正确验证码注册 → `{registered:true, logged:true}` + httpOnly token cookie（JWT 含新 userId）；② 注册后 `/api/auth/session` → `logged:true` + profile；③ 带 cookie 调 `/api/blog/user/profile` → 200 返回资料（token 对博客 API 生效）；④ 无 cookie 同接口 → 401；⑤ 错误验证码 → 后端原文「验证码错误」且不种 token；⑥ 重复用户名 →「保存用户…注册账号已存在」且不种 token。测试用户（`e2e_reg_20261016`）与临时实例均已清理。浏览器视觉验收（toast 呈现、跳回来源页落地、移动视口）2026-10-16 用户确认通过。
 
+### S23 blog-web 全站视觉改版（方向 C · 冷米白 + 衬线）⏳（blog-web；6~8d，2026-10-26 立项）
+
+背景（D41）：首页 1.1 在 Google Stitch 中冻结后，视觉语言与 S9/S12 已交付页面产生冲突——暖纸 `#f4f1ea` + 黄 CTA + 系统字体 + 圆角 2/4 分族，要换成冷米白 `#faf9f6` + 靛蓝 `#1a4d8f` + **Noto Serif SC 衬线标题** + 统一 3px 圆角。必须一次性全站统一，否则新旧两套皮肤并存。
+
+范围（纯表现层）：
+
+1. **零契约/数据/状态机改动**：不动 `server/**`、`app/types/**`，三层 API 边界（`/blog/public|article|user/**` vs `/blog/admin/**` 禁入）零变化。
+2. **明示推翻三条已锁规格**（`blog-web/design/mechanisms.md` §0）：① 色板（暖纸→冷米白）；② 字体（首度引入 webfont，推翻"永不加载 webfont"）；③ 圆角（2/4 分族→统一 3px）。动效基线与反馈分层两条继续有效。
+3. **plus-ui 不同步**（用户拍板）：Element Plus 体系不套 blog-web token，只借版式思路做登录页/首页小改，独立仓独立 commit（可与 S19 遗留合并处理）。
+4. 作者中心仍走 `/blog/article|user/**` 作者自助层，不因改版引入任何治理入口。
+
+阶段与门禁：
+
+| 阶段 | 内容 | 门禁 |
+|---|---|---|
+| P1 补屏 | Stitch 出：首页列表缩略图混排、深色版首页、文章详情页 | 深浅两版都成立；详情页含 68ch 正文 + 编号小节 + 代码块 |
+| P2 立规范 | `blog-web/design/stitch/README.md`（屏台账/落地映射/不吸收清单）+ `.impeccable.md` 方向叙述 + token old→new 对照表 | 规范文件就位，代码零改动 |
+| P3 换地基 | `tokens.css` 重建（色/字/圆角/阴影）+ Noto Serif SC 分片引入 + `uno.config.ts` shortcut 重建 + `Sd*` 基础件 | **唯一一次全站同时变样**；`contrast.mjs` 16 项重算并更新期望值；`shot.mjs` 退 0；深浅双主题 |
+| P4 逐页 | 壳层 → 首页 → 详情 → 标签 → 搜索 → 用户 → 作者中心 → 浮层/状态页 | 每页 `build` + `shot.mjs` 退 0 + 四视口（桌面 1440/移动 390 × 深浅） |
+| P5 plus-ui | 登录页/首页小改（独立仓） | 登录链路 E2E 复测，`vue-tsc` 0 错 |
+
+已知风险与代价（提前登记，避免上线才发现）：
+
+1. **LCP 会掉**：衬线标题是首屏 LCP 元素。对策 = 自托管 + `cn-font-split` 分片 + `unicode-range` + `font-display: swap` + 首屏分片 `preload`，只加载 700 一个字重；验收线 LCP ≤ 2.5s（模拟 Slow 4G）、CLS = 0、首屏字体下载 ≤ 100KB。S17 的 Lighthouse 全 100 基线须在 P3 后重测并记录差异。
+2. **改公共组件 = 改多页**：`ArticleCard`（搜索/标签/用户页复用）、`CtaBand`（6 页复用）、`TagChip`、`SdButton`/`SdCard` 任一改动都要 grep 全部复用点。
+3. **`contrast.mjs` 期望值绑定旧色板**：换色后必须同步更新期望值，否则门禁恒红（改期望值需人工核对新色对，不得为过门禁调低标准）。
+4. 可能变孤儿：`ArchiveGroup`（C 去按月分组）、`HeroVisual`/`LayerStack`（叠框母题被系统状态卡取代）、`ArticleListSkeleton`；废弃前先确认无其他复用点。
+
+任务粒度（T1~T22，含每项门禁）见 `blog-web/docs/plan.md` §2.21；Stitch 屏台账与"不吸收清单"见 `blog-web/design/stitch/README.md`。
+
 ### 一次性 SQL 脚本执行状态（docs/）
 
 > 下列迁移 / 清理 / 菜单脚本均为一次性执行，截至 2026-10-05 已全部在 `ry-vue` 库执行完毕，在此登记以免被误当作待办或重复执行。建表基线 `blog_schema_v0.1.sql` 属环境初始化（见 SETUP §3），不列入本表。
@@ -675,6 +706,8 @@ S0 → S1 → S2 → S3 → S4 → S5 → S6 → S7 → S8   （后端关键路�
 | 2026-10-16 | D39（前台质感精修轮验收关闭）：用户发起的三轮质感精修（非排期切片，先例见 plan.md §2.12）共 13 个 polish commit 全部实施完毕，2026-10-16 用户 Windows 浏览器 + 真机人工验收通过，样式改动暂告一段落；力度口径固化——「精修」= 可动间距节奏/字号字距/组件视觉/局部布局微调，**不动信息架构、页面骨架、交互逻辑与数据流**；设计上下文单一来源固化为 `blog-web/.impeccable.md`（后续设计类会话自动生效） | blog-web/docs/plan.md §2.19 |
 | 2026-10-16 | D40（社交账号绑定/解绑管理不在 blog-web 提供，保持 S14 登录-only 范围，用户拍板）：入口仅 plus-ui「个人资料 → 第三方账号」（框架原带），普通用户不可达，且社交自动建号账号（随机 UUID 密码）无法登录 plus-ui——解绑对 blog-web 社交用户实际不可用；评估三个场景（平台账号丢失致博客账号锁死 / 无法追加第二平台 / 无法解绑）后 MVP 维持现状（PRD 未要求绑定管理，S14-D2 已列为"将来显式功能"），登记为已知边界；若后续补齐，最小方案 = 作者中心「账号与登录」小节复用 `GET /system/social/list` + `DELETE /auth/unlock/{socialId}`（零后端改动，约 0.5d），必须带「若为唯一登录方式，解绑后将无法登录」警示文案 | 本文件 §3 S14 / S14-D2 / blog-web/docs/plan.md §2.15 |
 | 2026-10-16 | D35（注册即登录，S22）：① `/auth/register` 由「只建档」改为注册成功即下发 token（返回类型 `R<Void>` → `R<LoginVo>`），参照 S14 `socialAutoRegister` 建号即登录模式；图形验证码在注册时已校验并消费一次，自动登录不重复校验、不构成绕过；clientId/grantType/status 校验与 `login()` 同口径（前端注册代理早已注入 clientId/grantType）；② blog-web 注册成功后跳转目标为「回来源页」——LoginModal 注册链接带 `?return=route.fullPath`，注册页仅接受站内相对路径（拒 `//` 开头）防开放重定向，无参或非法值回首页；③ plus-ui 注册页忽略返回 data、行为不变（仍注册后回登录页），不构成破坏性变更；④ `/auth/register` 无请求限流为既有缺口（S18 只覆盖 login），本切片不扩大范围，留后续 | 本文件 §3 S22 / blog-web/docs/plan.md §2.20 |
+| 2026-10-26 | D41（blog-web 全站视觉改版方向 C，用户拍板）：① **视觉语言全换**——冷米白底 `#faf9f6` + 深靛蓝强调 `#1a4d8f` + **Noto Serif SC 衬线标题**（正文仍无衬线）+ 圆角统一 3px + 近乎取消阴影；首页版式在 Stitch「首页1.1」冻结（头条 LATEST + 数据行列表 + 右栏双卡 + 编号锚点 01/02/03 + 系统状态卡）。**明示推翻已锁规格三条**：色板（暖纸→冷米白）、字体（首度引入 webfont）、圆角（2/4 分族→统一 3px）；动效基线与反馈分层两条继续有效。② 字体策略：自托管 + `cn-font-split` 分片 + `unicode-range` + `font-display: swap` + 首屏分片 `preload`，只加载 700 一个字重；验收 LCP ≤2.5s（模拟 Slow 4G）、CLS=0、首屏字体下载 ≤100KB；S17 的 Lighthouse 全 100 基线须在换地基后重测记录差异。③ 方案来源 = **Google Stitch 辅助**（含 MCP）：仅产出视觉方案，产物必须回译成 `tokens.css` 变量与 `uno.config.ts` shortcut，**禁止搬运内联样式/px 魔法值/编造数据**；每屏须过"数据契约"核对（导航仅首页/标签/搜索，禁止分类/专栏/话题/归档——Category 永久舍弃红线）。④ plus-ui **不同步**，只借版式思路做登录页/首页小改（独立仓独立 commit）。⑤ 立项新切片 S23（P1 补屏 → P2 立规范 → P3 换地基 → P4 逐页 → P5 plus-ui），纯表现层、零契约与数据改动；D39「精修」口径（不动信息架构）**不适用**本轮 | 本文件 §2/§3 S23 / blog-web/docs/plan.md §2.21 / blog-web/design/stitch/README.md |
+| 2026-10-26 | D41 附注（编号缺陷登记，未擅改）：`D39` 在 2026-10-13（plus-ui 门面改版）与 2026-10-16（前台质感精修轮验收关闭）被**两次使用**，检索存在歧义；后续新决策自 D41 起编号，D39 歧义待单独修订（修订时须同步 §3 S19 与 blog-web plan §2.19 的引用） | 本文件 §6 |
 
 ### 待决策
 
