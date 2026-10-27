@@ -1,3 +1,14 @@
+# =============================================================================
+# 本机开发形态（S25 更新）
+#
+# 默认只起四个中间件（mysql/redis/minio/es），应用仍用 IDE /npm run dev 跑——保持原有开发节奏；
+# 需要容器化联调时加 `--profile app`：
+#   docker compose -f docker-compose.dev.yml --profile app up -d --build
+#
+# 与生产形态（docker-compose.yml）的区别：
+#   不固定镜像 tag、端口全暴露、后端用 18081（避开 IDE 占用的 8081）、不挂 .env 密钥。
+# =============================================================================
+
 services:
 
   mysql:
@@ -17,6 +28,12 @@ services:
       - --collation-server=utf8mb4_general_ci
       - --explicit_defaults_for_timestamp=true
       - --lower_case_table_names=1
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   redis:
     image: redis:8.6.3
@@ -27,6 +44,11 @@ services:
       - "6379:6379"
     volumes:
       - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "ruoyi123", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   minio:
     image: pgsty/minio:RELEASE.2026-04-17T00-00-00Z
@@ -42,11 +64,16 @@ services:
       - "9001:9001"
     volumes:
       - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # Elasticsearch 7.17.28 单节点 + IK 中文分词（S16 博客搜索，D19 预留的 LIKE 替换点）
   # 构建上下文 script/docker/es：IK 7.17.28 经 ghproxy 镜像安装 + 自定义技术词典（详见 Dockerfile 注释）
   # 前置：宿主机 vm.max_map_count ≥ 262144（当前环境 1048576 已达标；未达标时 ES 起不来）
-  # xpack.security 在 7.17 默认发行版默认关闭，本地开发免鉴机；9200 仅监听本机
+  # xpack.security 在 7.17 默认发行版默认关闭，本地开发免鉴权；9200 仅监听本机
   es:
     build:
       context: ./es
@@ -64,32 +91,95 @@ services:
       - "9200:9200"
     volumes:
       - es-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
 
-  # blog-web 前台（Nuxt 4 SSR，node-server 镜像）——profile 门控，不影响默认 `up -d` 的三件套
-  # 启动：docker compose -f docker-compose.dev.yml --profile web up -d --build
-  # 构建上下文是同级仓库 blog-web（SETUP §10.1 同级 clone 为硬性前提）；镜像内 npm ci + nuxt build
-  # 密钥（web client_id、RSA 公私钥）不入库：由 blog-web/.env 或 shell 导出后 compose 透传
+  # ---------- 应用（profile: app，按需起）----------
+
+  backend:
+    image: sd-backend:dev
+    container_name: blog-backend
+    profiles: ["app"]
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_URL: jdbc:mysql://mysql:3306/ry-vue?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&serverTimezone=GMT%2B8&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_USERNAME: root
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_PASSWORD: root
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      SPRING_DATA_REDIS_PASSWORD: ruoyi123
+      BLOG_ES_ADDRESS: es:9200
+    ports:
+      # 18081 而非 8081：本机开发时 IDE 里的后端常占着 8081
+      - "18081:8081"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      es:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8081/"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
   web:
     image: blog-web:dev
     container_name: blog-web
-    profiles: ["web"]
+    profiles: ["app"]
     build:
-      context: ../../blog-web
+      context: ../../../blog-web
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
       TZ: Asia/Shanghai
       NUXT_HOST: 0.0.0.0
       NUXT_PORT: "3000"
-      # 容器内访问宿主机上跑的后端（DromaraApplication :8081）
-      NUXT_API_BASE: http://host.docker.internal:8081
+      # 容器内用服务名访问后端（原为 host.docker.internal:8081，指向宿主机 IDE 里的后端）
+      NUXT_API_BASE: http://backend:8081
       NUXT_APP_CLIENT_ID: ${NUXT_APP_CLIENT_ID:-}
       NUXT_RSA_PUBLIC_KEY: ${NUXT_RSA_PUBLIC_KEY:-}
       NUXT_RSA_PRIVATE_KEY: ${NUXT_RSA_PRIVATE_KEY:-}
     ports:
-      - "3000:3000"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - "3100:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  admin:
+    image: sd-admin:dev
+    container_name: blog-admin
+    profiles: ["app"]
+    build:
+      context: ../../../plus-ui
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
 
 volumes:
   mysql-data:

@@ -46,7 +46,7 @@
 | S22 | 注册即登录（去掉注册后手动登录中间态） | §2.8（登录，复用） | — | 后端+前端(blog-web) | ✅ 已验收（2026-10-16；Agent E2E 六用例 + 人工浏览器验收均通过；后端 1 commit + blog-web 1 commit，详 §3 S22） | 0.5d |
 | S23 | blog-web 全站视觉改版（方向 C） | — | — | 前端(blog-web) | ✅ 已交付并关闭（2026-10-27；P1~P4 全部完成，P5 缩水为「仅移除登录页第三方登录入口」；44 张截图全绿 + Lighthouse 95/100/100/100） | 6~8d |
 | S24 | 正文语法高亮（方案 B：保存时高亮） | — | — | 后端 + 前端(blog-web) | ✅ 已交付（2026-10-27；T25~T31 全部完成；作者端增量 74.7KB gzip，读者首屏零增量） | 1.5~2d |
-| S25 | 工程化与一键启动（部署就绪） | — | — | 三仓 + 根编排 | ⏳ 待启动（2026-10-28 立项；不阻塞于服务器，CD 后置） | 2d |
+| S25 | 工程化与一键启动（部署就绪） | — | — | 三仓 + 根编排 | ✅ 已交付（2026-10-28；7 服务一键起，冒烟 12/12，三仓 README 重写） | 2d |
 | S26 | 演示数据种子（min / demo 两级） | — | — | 后端 + 编排 | ⏳ 待启动（依赖 S25 P3） | 0.5d |
 | S27 | 阅读体验三项（TOC / 上传前压缩 / 关于页） | — | — | 前端(blog-web) | ⏳ 待启动（与 S25 无依赖，可并行） | 1d |
 | S28 | 后续增强（上一篇/下一篇 + 前端测试） | — | — | 后端 + 前端 | ⏳ 待启动（需改契约，后置） | 1.5d |
@@ -667,7 +667,7 @@ S2 遗留接入（已落地）：
 6. **待作者验证**：历史文章正文没有 tok span，**需在编辑器里重新保存一次**才能看到高亮（无登录态无法代验）。
 7. **连带修复（plus-ui，独立提交 `1ce754c` + `9b3263f`）**：验收后回看后台「查看版本」抽屉，发现暗色模式下代码块仍是亮底 + 亮色 token；把底色改深后文字又带一圈白色发光。根因是 WangEditor 自带 prism 亮色主题，且 `pre > code` 写死 `text-shadow: 0 1px #fff`（亮色底的文字浮雕），而 plus-ui 此前**没有任何 `html.dark` 下的编辑器覆盖**。新增 `src/assets/styles/components/_editor-dark.scss`：变量指向 Element Plus 暗色体系、token 色换 GitHub Dark（与前台同口径）、`text-shadow: none`。详见 `plus-ui/docs/frontend-plan.md` §5。
 
-### S25 工程化与一键启动（部署就绪）⏳（跨三仓 + 根编排；2d，2026-10-28 立项）
+### S25 工程化与一键启动（部署就绪）✅ 已交付（2026-10-28；跨三仓 + 根编排）
 
 **目标**：把「三个应用 + 四个中间件」收进一套 compose，一条命令起完整站；镜像可在任意机器重建；README 说清三仓关系与启动方式。**不做自动部署**（当前无目标服务器，CD 作为后续切片）。
 
@@ -695,6 +695,19 @@ S2 遗留接入（已落地）：
 **非目标**：K8s、镜像仓库推送、自动部署到服务器、多环境（staging/prod）切换脚本。这些依赖目标服务器，等有服务器再单开切片。
 
 **与 S26 的衔接**：P3 完成后加 `seed` profile，把种子 SQL 挂进 mysql 初始化，实现「一条命令起来就是个有内容的站」。
+
+**实施结果（2026-10-28 交付）**
+
+1. **镜像**：后端 `Dockerfile`（maven 多阶段 + BuildKit cache mount 持久化 `~/.m2`，`-Pprod` 固化 profile；运行层 JRE21 + 243MB fat jar → 镜像 773MB）；plus-ui `Dockerfile`（node:24-alpine 构建 → nginx:alpine，**109MB**）；blog-web 沿用既有 Dockerfile。三者均配 `.dockerignore`。
+2. **P1 硬门禁实测通过**：Spring relaxed binding 成功覆盖 dynamic-datasource 的嵌套键——注入 `SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_URL` 后日志出现 `add a datasource named [master] success`，容器内 `curl /` 返回 200 且 **ERROR 0 条**。因此**不需要**新增 `application-docker.yml`，也不改任何 yml。
+3. **三个踩坑（均已写进代码注释，避免复发）**：
+   - plus-ui 依赖层漏 `pnpm-workspace.yaml` → `ERR_PNPM_LOCKFILE_CONFIG_MISMATCH`（本项目把 `overrides`/`allowBuilds` 写在 workspace 文件而非 package.json）；
+   - nginx 硬解析 upstream：后端未起时 `[emerg] host not found` 直接退出，且后端重启换 IP 会永久 502 → 改 `resolver 127.0.0.11` + 变量形式 `proxy_pass $upstream`；
+   - `set` 必须写在 `rewrite ... break` **之前**：break 会终止后续 rewrite 阶段指令，否则 `uninitialized variable` + 500。
+4. **编排**：新增 `docker-compose.yml`（生产：7 服务全起、固定 tag、`env_file`、无源码挂载、healthcheck 串起 `mysql/redis/minio → backend → web/admin`，ES 用 `service_started` 因其慢且搜索可降级）；`docker-compose.dev.yml` 把 backend/web/admin 放进 `app` profile（默认仍只起 4 中间件），web 的 `NUXT_API_BASE` 由 `host.docker.internal:8081` 改为 `backend:8081`。去掉 compose 的 `name:` 以复用既有数据卷。
+5. **数据库初始化**：只挂两个文件（`ry_vue.sql` / `blog_schema_v0.1.sql`）。**不能挂整个 `script/sql` 目录**——7 个 `blog*Menu.sql` 按字母序排在 `ry_vue.sql` 之前，会在 `sys_menu` 尚不存在时执行（实测 `ERROR 1146` 且最终 0 张表）。
+6. **冒烟**：`script/docker/smoke.sh` **12 项全过**（7 容器运行 / 7 张博客表 / `/auth/code` 200 / `/prod-api` 反代 200 / 前台 SSR 200 / 公共列表 200）。未做「登录 → 发文」链路：登录需验证码位图 + RSA 加密，脚本内取答案脆弱且与业务耦合，该链路交由浏览器侧 `SHOT_TOKEN` 方案。
+7. **README**：后端与 plus-ui 的框架自带内容整段替换（原为 Gitee logo / 平台简介 / 加群），改为三仓关系图 + 一键启动 + 本地开发 + 变量表 + 常见问题（端口冲突 / ES 内存 / **OSS 地址在数据库表里** / 改了源码要 `--build`）；blog-web 补「容器化与一键启动」章节。
 
 ### S26 演示数据种子 ⏳（后端 + 编排；0.5d，依赖 S25 P3）
 

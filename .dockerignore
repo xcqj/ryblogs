@@ -1,0 +1,26 @@
+# 构建产物（宿主机上 IDE 编译出的，绝不能进上下文）
+target/
+**/target/
+
+# 版本控制与 IDE
+.git/
+.gitignore
+.idea/
+*.iml
+.vscode/
+
+# 运行期产物
+logs/
+**/logs/
+*.log
+
+# 与运行时无关的文档与脚本（体积 + 构建缓存失效面）
+docs/
+*.md
+script/sql/
+script/docker/
+
+# 本机环境
+.env
+.env.*
+!.env.example
