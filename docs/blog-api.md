@@ -182,6 +182,13 @@ POST /blog/article
 | content | 是 | 富文本 HTML |
 | tagNames | 是 | 标签名称集合，1～6 个 |
 
+**正文 HTML 白名单（S24 / D43 起补充）：**
+
+- 允许的标签沿用现有净化规则；S24 **新增放开 `<span class="tok-*">`**——`tok-` 是代码高亮的 token 类名，值须匹配 `^tok-[a-z0-9]+$`，其余 class 一律剥掉。
+- 该标记由 **blog-web 编辑器在保存前生成**（shiki 高亮后经 `transformerStyleToClass` 转成 class），读者站只做 CSS 着色、不再二次处理。
+- **历史文章不回溯**：S24 之前保存的正文没有 span，代码块显示为纯文本；作者重新保存一次即自然获得高亮。
+- **不放开 `style` 属性**：样式一律走 class + 站点 CSS，避免 `url()` / `position:fixed` 之类的注入面。
+
 **业务行为：**
 
 ```text

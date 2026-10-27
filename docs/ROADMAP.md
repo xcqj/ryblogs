@@ -44,7 +44,8 @@
 | S20 | Lenis 平滑滚动（动效收缩，D38） | — | — | 前端(blog-web) | ✅ 已验收（2026-10-15 人工确认：桌面手感/移动端跟手/reduced-motion 切换/PWA 安装态叠加全过；blog-web `bde6043` 零后端改动，详 §3 S20） | 0.5d |
 | S21 | CI/CD 补全（可选） | — | — | 后端+前端 | ⏸ 可选 | 1d |
 | S22 | 注册即登录（去掉注册后手动登录中间态） | §2.8（登录，复用） | — | 后端+前端(blog-web) | ✅ 已验收（2026-10-16；Agent E2E 六用例 + 人工浏览器验收均通过；后端 1 commit + blog-web 1 commit，详 §3 S22） | 0.5d |
-| S23 | blog-web 全站视觉改版（方向 C） | — | — | 前端(blog-web) | ✅ 已交付（2026-10-27；P1~P4 全部完成，P5 缩水为「仅移除登录页第三方登录入口」；44 张截图全绿 + Lighthouse 95/100/100/100） | 6~8d |
+| S23 | blog-web 全站视觉改版（方向 C） | — | — | 前端(blog-web) | ✅ 已交付并关闭（2026-10-27；P1~P4 全部完成，P5 缩水为「仅移除登录页第三方登录入口」；44 张截图全绿 + Lighthouse 95/100/100/100） | 6~8d |
+| S24 | 正文语法高亮（方案 B：保存时高亮） | — | — | 后端 + 前端(blog-web) | ⏳ 待启动（D43；开工前须先过 D5 往返验证门禁） | 1.5~2d |
 
 > 与 PRD §12.1 的顺序差异：评论提前到前台站之前，保证后端 API 闭环先行；
 > S9 前台可在 S5 完成后于前端仓库并行启动（首页/列表/详情依赖 S2+S6+S8 的接口）。
@@ -600,6 +601,46 @@ S2 遗留接入（已落地）：
 7. **遗留（不阻塞交付）**：① 语法高亮未接入（shiki 从未引入；已定方案 A「客户端高亮」——不改契约、不动入库数据、历史文章自动生效，约 +85KB gzip，尚未实施）；② WangEditor 深色主题**已完成**（17 个 `--w-e-*` 变量映射到 token）；③ 代码块空行撑高（内容多余空行，需净化层 trim `<pre>`）——用户已决定**不做**（可能吃掉作者故意留的缩进空行）；④ OSS 图片裁剪——**不做**（默认存储是 MinIO，不支持 `x-oss-process`；换存储或后端生成缩略图成本过高，收益仅 Lighthouse 95→98）。
 7. **同期附带交付**：**D42 博客域上传接口**（见 §6）——解决博客作者传封面 403（原复用 `/resource/oss/upload` 需 `system:oss:upload`，而注册不分配角色）。
 
+### S24 正文语法高亮（方案 B：保存时高亮）⏳（后端 + blog-web；1.5~2d，2026-10-27 立项）
+
+背景（D43）：代码块自建站起一直是纯文本（shiki 从未接入，`plan.md` 长期标「按需 / MVP 后再定」）。技术博客里代码块是主角，无高亮的观感损失明显。S23 期间评估三条路，用户选定 **B（保存时高亮）**。
+
+| 方案 | 做法 | 取舍 |
+|---|---|---|
+| A 客户端高亮 | hydration 后动态高亮 | 不改契约、**历史文章自动生效**；+约 85KB gzip、有 FOUC |
+| **B 保存时高亮（选定）** | 编辑器保存前用 shiki 生成带标记的 HTML 入库 | 读时零成本、SEO 带高亮、无 FOUC；**改后端白名单 + 历史文章无高亮** |
+| C Nitro 层高亮 | 服务端渲染时处理 | 每请求都有开销，需缓存层 |
+
+范围：
+
+1. **blog-web**：编辑器保存前对正文 `<pre><code>` 做高亮，输出带标记的 HTML。
+2. **后端**：`SdBlogArticleServiceImpl` 的 jsoup `Safelist` 放开高亮标记。
+3. **契约**：`blog-api.md` §3.1 `content` 字段补白名单说明。
+4. **plus-ui**：暂不接（其编辑器保存的文章无高亮），见 D3。
+
+**五个待决策（开工前必须定，否则返工）**
+
+| # | 问题 | 建议 |
+|---|---|---|
+| D1 | 高亮标记用 class 还是 inline style | **class（`tok-*`）**——净化只需校验 `^tok-[a-z0-9]+$`，彻底规避 `style` 注入面（`url()`、`position:fixed`） |
+| D2 | 双主题怎么存 | 一套 class + 读者站两份 CSS（`.prose .tok-x` / `.dark .prose .tok-x`），约 2KB |
+| D3 | plus-ui 是否同步 | **先不接**，接受两端不一致；后续可复用同一工具函数 |
+| D4 | 历史文章怎么办 | **不处理**；作者重新保存即自然获得高亮 |
+| D5 | 编辑器往返是否幂等 | **必须先实测**（见下） |
+
+**最大的技术风险 = D5，必须先验证再开工**：WangEditor 对带 `<span class="tok-*">` 的 HTML 做「打开 → 保存」往返后：① span 是保留、被剥、还是嵌套？② `code.language-*` 类是否还在？丢了就无从判断语言。保存前一律「取 `<code>` 的 textContent 重新高亮」可保证幂等，但这依赖 language 类存活。
+
+阶段与门禁：
+
+| 阶段 | 内容 | 门禁 |
+|---|---|---|
+| P1 验证 | 最小 demo：入库带 tok-class 的 HTML → 编辑器打开 → 保存 → 检查 span 幂等性与 language 类存活 | **不过此门禁不进 P2** |
+| P2 前端管线 | 保存前高亮（shiki + `transformerStyleToClass`）+ 生成 token CSS | 详情页渲染正常，深浅两主题都对 |
+| P3 后端白名单 | `Safelist` 放开 `span[class]`，class 值须匹配 `^tok-[a-z0-9]+$` | 净化后合法 span 存活、恶意 class 被剥 |
+| P4 契约与回归 | `blog-api.md` §3.1 补说明；`shot.mjs` 44 张 + `contrast.mjs` | 截图全绿；新增 token 色过对比度（代码块内文字至少 3:1） |
+
+已知代价（用户已接受）：**历史文章永远没有高亮**（除非重新保存或批量重刷）；blog-web 构建产物增加 shiki 依赖（只进编辑页 chunk，不影响读者首屏）；读者站多一份约 2KB 的 token CSS。
+
 ### 一次性 SQL 脚本执行状态（docs/）
 
 > 下列迁移 / 清理 / 菜单脚本均为一次性执行，截至 2026-10-05 已全部在 `ry-vue` 库执行完毕，在此登记以免被误当作待办或重复执行。建表基线 `blog_schema_v0.1.sql` 属环境初始化（见 SETUP §3），不列入本表。
@@ -721,6 +762,7 @@ S0 → S1 → S2 → S3 → S4 → S5 → S6 → S7 → S8   （后端关键路�
 | 2026-10-26 | D41（blog-web 全站视觉改版方向 C，用户拍板）：① **视觉语言全换**——冷米白底 `#faf9f6` + 深靛蓝强调 `#1a4d8f` + **Noto Serif SC 衬线标题**（正文仍无衬线）+ 圆角统一 3px + 近乎取消阴影；首页版式在 Stitch「首页1.1」冻结（头条 LATEST + 数据行列表 + 右栏双卡 + 编号锚点 01/02/03 + 系统状态卡）。**明示推翻已锁规格三条**：色板（暖纸→冷米白）、字体（首度引入 webfont）、圆角（2/4 分族→统一 3px）；动效基线与反馈分层两条继续有效。② 字体策略（2026-10-26 实测修正为方案 A）：`@fontsource/noto-serif-sc` 只引 700 字重——101 个 `unicode-range` 分片、合计 3.1MB、按需下载，实测典型首屏命中 11 片约 420KB；`font-display: swap` 由包内 CSS 提供、不做 preload、衬线仅用于 H1 级标题（正文与列表行标题仍无衬线）；验收 LCP ≤2.5s（模拟 Slow 4G）、CLS=0、**首屏字体 ≤500KB**（100KB 指标对中文衬线不可达，已作废）；S17 的 Lighthouse 全 100 基线须在换地基后重测记录差异。③ 方案来源 = **Google Stitch 辅助**（含 MCP）：仅产出视觉方案，产物必须回译成 `tokens.css` 变量与 `uno.config.ts` shortcut，**禁止搬运内联样式/px 魔法值/编造数据**；每屏须过"数据契约"核对（导航仅首页/标签/搜索，禁止分类/专栏/话题/归档——Category 永久舍弃红线）。④ plus-ui **不同步**，只借版式思路做登录页/首页小改（独立仓独立 commit）。⑤ 立项新切片 S23（P1 补屏 → P2 立规范 → P3 换地基 → P4 逐页 → P5 plus-ui），纯表现层、零契约与数据改动；D39「精修」口径（不动信息架构）**不适用**本轮 | 本文件 §2/§3 S23 / blog-web/docs/plan.md §2.21 / blog-web/design/stitch/README.md |
 | 2026-10-26 | D41 附注（编号缺陷登记，未擅改）：`D39` 在 2026-10-13（plus-ui 门面改版）与 2026-10-16（前台质感精修轮验收关闭）被**两次使用**，检索存在歧义；后续新决策自 D41 起编号，D39 歧义待单独修订（修订时须同步 §3 S19 与 blog-web plan §2.19 的引用） | 本文件 §6 |
 | 2026-10-27 | D42（博客域上传接口，起因：作者传封面返回 403「没有访问权限，请联系管理员授权」）：① **新增 `POST /blog/oss/upload`**（`org.dromara.system.controller.blog.BlogOssController`），**只要求登录、不设按钮权限**，内部转调 `ISysOssService.upload(file, null)` 返回 `SysOssUploadVo`；② 根因实锤——`SysRegisterService.register()` 只调 `userService.registerUser`，**不写 `sys_user_role`**，博客用户默认零权限；而 `SysOssController.upload` 带 `@SaCheckPermission("system:oss:upload")`，复用后台接口必然 403（封面与正文插图同链路）；③ **否决**「给角色配 `system:oss:upload`」：每来一个新用户都要手工授权，不可持续，且给普通读者授予后台「文件管理」权限语义不成立；④ 前端仅改 Nitro 代理的转发目标（`server/api/resource/oss/upload.post.ts`），浏览器端路径 `/api/resource/oss/upload` 与所有组件零改动；plus-ui **不随本决策变更**（其使用者是管理员，持有该权限）；⑤ 合规说明：接口只做「登录校验 + 转调」，**未新建对象存储实现**，符合 AGENTS.md「复用 RuoYi OSS 能力，不重复实现」；`ruoyi-api` 的 `OssService` 接口未改，避免动跨模块契约 | blog-api.md §2.4 / architecture.md 请求链 / blog-web/docs/plan.md §2.8 / plus-ui/docs/frontend-plan.md |
+| 2026-10-27 | D43（S23 关闭 + S24 立项：正文语法高亮走方案 B「保存时高亮」）：① **S23 正式关闭**——三仓工作区干净、构建全绿、44 张截图 + Lighthouse 95/100/100/100 留档；P5 缩水为「仅移除 plus-ui 登录页第三方登录入口」（后台首页按用户拍板不改）；② 代码块语法高亮单开 **S24**（后端 + blog-web，1.5~2d），方案由用户选定 **B：编辑器保存前用 shiki 高亮、带标记的 HTML 入库**——读时零成本、SEO 带高亮、无 FOUC；**明确接受「历史文章无高亮」这一代价**（不批量重刷，作者重新保存即自然生效）；③ 方案 A（客户端高亮，不改契约、历史文章自动生效，约 +85KB gzip）与 C（Nitro 层高亮）不采用，三方案对比存档于 §3 S24；④ 高亮标记倾向 **class（`tok-*`）而非 inline style**：jsoup 白名单只需校验 `^tok-[a-z0-9]+$`，可彻底规避 `style` 注入面（`url()`、`position:fixed` 等）；⑤ **开工前必须先过 D5 验证门禁**——WangEditor 对带 `<span class="tok-*">` 的 HTML 做「打开→保存」往返后，span 是否幂等、`code.language-*` 是否保留；不过此门禁不进实现阶段；⑥ plus-ui 暂不同步（其编辑器保存的文章无高亮），后续可复用同一工具函数 | 本文件 §2/§3 S24 / blog-web/docs/plan.md §2.22 / blog-api.md §3.1 |
 
 ### 待决策
 
