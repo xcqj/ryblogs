@@ -60,6 +60,16 @@ docker compose up -d --build
 
 字符集由 [`script/docker/mysql/my.cnf`](script/docker/mysql/my.cnf) 提供：initdb 调用的 `mysql` 客户端默认 `latin1`，会把中文按字节拆开、撑爆 `varchar(30)` 并中止初始化（`ERROR 1406`）。该文件同时固定 `lower_case_table_names=1`。
 
+**验收登录**：验证码存在 Redis，key 带 `global:` 前缀（不是 `captcha_codes:`）：
+
+```bash
+# 登录页加载时请求 /auth/code 拿到 uuid，再用 uuid 读答案
+docker exec blog-redis redis-cli -a ruoyi123 --no-auth-warning \
+  GET "global:captcha_codes:<uuid>"
+```
+
+实测（2026-10-28，**全新数据卷**）：admin / admin123 + 该验证码 → 跳转 `/index`，localStorage 出现 `Admin-Token`，全链路涵盖 RSA 请求加密、`client_id` 校验、BCrypt 密码与验证码。
+
 ## 本地开发
 
 不容器化应用、只在 IDE 里跑后端时：
