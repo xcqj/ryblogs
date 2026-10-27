@@ -83,28 +83,44 @@ sd_blog_article / sys_user 1─N sd_blog_comment（一级，parent_id 恒 NULL�
 
 字段、索引、状态机全图见 `database-design-v0.1.md` §5~§15，本文不重复。
 
-## 5. 部署拓扑（开发环境）
+## 5. 部署拓扑
+
+### 5.1 生产形态（S25 起，一键启动）
+
+```text
+docker-compose.yml（script/docker/）
+├── blog-mysql   mysql:8.4.9            :3306   库 ry-vue（字符集/lower_case 由 mysql/my.cnf）
+├── blog-redis   redis:8.6.3            :6379   requirepass 见 .env
+├── blog-minio   pgsty/minio            :9000/:9001  OSS（RuoYi oss 配置指向它）
+├── blog-es      自建 blog-es:7.17.28-ik :9200  ES 7.17 + IK + tech.dic；512m 堆
+├── blog-backend 自建 sd-backend        :8081   数据源 → mysql:3306；Redis → redis:6379；ES → es:9200
+│                                               全部环境变量注入，镜像内不含密钥
+├── blog-web     自建 blog-web          :3000   NUXT_API_BASE → http://backend:8081
+└── blog-admin   自建 sd-admin          :8080   nginx；/prod-api/* → http://backend:8081/
+```
+
+容器间用**服务名**互访（无 `host.docker.internal`）。启动顺序由 healthcheck 强制：
+`mysql/redis/minio` 健康 → `backend` 启动 → 健康 → `web`/`admin` 启动；ES 用 `service_started`
+（启动慢，且搜索异常会自动降级 MySQL，不必阻塞）。
+
+生产形态不挂源码、密钥走 `.env`（`env_file`）、镜像固定 tag。
+
+### 5.2 开发形态
 
 ```text
 docker-compose.dev.yml（script/docker/）
-├── blog-mysql   mysql:8.4.9    :3306   库 ry-vue（utf8mb4_general_ci, lower_case_table_names=1）
-├── blog-redis   redis:8.6.3    :6379   requirepass 见 compose
-├── blog-minio   minio          :9000/:9001  OSS 兼容存储（RuoYi oss 配置指向它）
-├── blog-es      自建镜像 blog-es:7.17.28-ik :9200  ES 7.17.28 单节点 + IK 7.17.28（经 ghproxy 安装）
-│                + tech.dic 自定义技术词典；512m 堆；构建上下文 = script/docker/es（S16）
-└── blog-web     自建镜像（profile=web 才启动）:3000
-                 Nuxt 4 SSR node-server 产物；构建上下文 = 同级仓库 blog-web/Dockerfile
-                 NUXT_API_BASE 指向 host.docker.internal:8081；密钥经 env 注入不入库
+├── 四个中间件（同 5.1，默认 `up -d` 只起这些）
+└── backend / web / admin —— profile: app 才启动，端口 18081 / 3100 / 8080
 本机（WSL2）
-├── DromaraApplication（ruoyi-admin，dev profile，端口见 application.yml）
-├── blog-web `npm run dev`（前端日常开发方式，与上容器二选一）
+├── DromaraApplication（ruoyi-admin，dev profile，:8081）← 与容器 backend 二选一
+├── blog-web `npm run dev`（:3000）
 └── IDEA / Maven 3.9.x / JDK 21（sdkman）
 ```
 
-启动前台容器：`docker compose -f docker-compose.dev.yml --profile web up -d --build`（默认 `up -d` 仍只起基础设施三件套）。
-plus-ui 为纯静态前端，日常 `pnpm dev`、生产产物由 Web 服务器托管，不入本 compose。
+### 5.3 CI / CD 现状
 
-生产拓扑与 CI/CD 属 MVP 后议题（PRD §15），暂不设计。
+三仓各有 `.github/workflows/ci.yml`（构建级：后端 `mvn compile`、两个前端 `install + build`）。
+**自动部署是唯一依赖目标服务器的一环**，S25 明确列为非目标；镜像构建与一键编排已就绪（见 S25）。
 
 ## 6. 扩展边界（预留不改契约）
 

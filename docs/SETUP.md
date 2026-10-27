@@ -14,24 +14,44 @@
 | Docker | 任意近期版本 | 跑 MySQL/Redis/MinIO |
 | Git | — | 每个切片一个 commit（AGENTS.md §10） |
 
-## 2. 基础设施容器
+## 2. 容器与一键启动
+
+### 2.1 一键起全套（S25 起，推荐）
 
 ```bash
 cd script/docker
-docker compose -f docker-compose.dev.yml up -d
+cp .env.example .env          # 至少改 MYSQL_ROOT_PASSWORD / REDIS_PASSWORD / MINIO_ROOT_PASSWORD
+docker compose up -d --build
 ```
 
-三个容器（详细配置与密码见 compose 文件）：
+七个服务，启动顺序由 healthcheck 强制（中间件健康 → 后端健康 → 前台/后台）：
 
-| 容器 | 镜像 | 端口 | 用途 |
+| 服务 | 镜像 | 宿主机端口 | 说明 |
 |---|---|---|---|
-| blog-mysql | mysql:8.4.9 | 3306 | 主库，compose 已自动建库 `ry-vue`（utf8mb4、`lower_case_table_names=1`） |
-| blog-redis | redis:8.6.3 | 6379 | 缓存/会话/验证码，带 requirepass |
-| blog-minio | minio | 9000 / 9001 | OSS 兼容对象存储，控制台 :9001 |
+| mysql | mysql:8.4.9 | 3306 | 主库 `ry-vue`；字符集与 `lower_case_table_names=1` 由 `mysql/my.cnf` 提供 |
+| redis | redis:8.6.3 | 6379 | 缓存/会话/验证码，带 requirepass |
+| minio | pgsty/minio | 9000 / 9001 | OSS 兼容存储，控制台 :9001 |
+| es | 自建 `blog-es:7.17.28-ik` | 9200 | ES 7.17 + IK 分词；需宿主机 `vm.max_map_count ≥ 262144` |
+| backend | 自建 `sd-backend` | 8081 | 后端 jar；数据源/Redis/ES 地址全部由环境变量注入 |
+| web | 自建 `blog-web` | 3000 | Nuxt SSR；`NUXT_API_BASE=http://backend:8081` |
+| admin | 自建 `sd-admin` | 8080 | nginx + 静态产物；`/prod-api` 反代到 backend |
 
-> ⚠️ `lower_case_table_names=1` 必须在卷首次初始化时生效（已在 compose command 中）；已有数据卷改此参数无效。
+### 2.2 只起中间件（本机日常开发）
 
-## 3. 数据库初始化（最小集，就这两个文件）
+```bash
+cd script/docker
+docker compose -f docker-compose.dev.yml up -d                  # 默认只起四个中间件
+docker compose -f docker-compose.dev.yml --profile app up -d --build   # 需要容器化联调时
+```
+
+dev 形态把后端映射到 **18081**（避开 IDE 占用的 8081）、前台 3100、后台 8080。
+
+> ⚠️ `lower_case_table_names=1` 必须在卷首次初始化时生效（已由 `mysql/my.cnf` 提供）；已有数据卷改此参数无效，需重建卷。
+
+## 3. 数据库初始化（手工开发的最小集，就这两个文件）
+
+> **用 compose 一键启动时不需要手工导入**——initdb 会自动执行 7 个脚本（`ry_vue` / `blog_schema_v0.1` / `blog_s9_web_client` / 四个菜单脚本），清单与"为什么不能导哪些"见仓库根 `README.md` 的「数据库初始化」一节。
+> 本节只适用于「中间件用容器、后端在 IDE 里跑」的手工路径。
 
 按顺序导入到 `ry-vue` 库：
 
@@ -85,7 +105,7 @@ IDEA 默认用 Bundled Maven，与命令行 sdkman Maven 不同源会出现"命�
 ## 9. 冒烟验收清单（新环境搭建完成的定义）
 
 - [ ] 所需仓库按 §10 同级布局 clone 完成（MVP 期 = `RuoYi-Vue-Plus` + `plus-ui`），多根工作区可打开且 `../plus-ui` 可达
-- [ ] `docker ps` 三容器 Up
+- [ ] `docker ps` 四容器 Up（mysql / redis / minio / es）
 - [ ] `mysql> show tables like 'sd_blog_%';` 返回 7 行
 - [ ] `mvn compile -pl ruoyi-admin -am` 全绿
 - [ ] 应用启动无 ERROR，`/swagger-ui/index.html` 可见「博客模块」分组
