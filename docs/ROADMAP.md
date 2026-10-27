@@ -661,6 +661,7 @@ S2 遗留接入（已落地）：
 4. **token CSS**：`tooling/gen-highlight-css.mjs` 对 12 种语言跑样本合并 `getCSS()`，产出 `app/assets/css/highlight.css`——**9 个 token 色、1.1KB**；应用层用 `.prose pre span[class^='tok-']` + `.dark` 两态分别映射 `--shiki-light/dark`。
 5. **回归**：build 绿（9.71s）；44 张截图退出码 0、无 console error / 5xx；`contrast.mjs` 18/18；Playwright 实测双主题着色（浅 `rgb(215,58,73)` / 深 `rgb(249,117,131)`）**PASS**；管线端到端 8 个用例（别名归一、未知语言回落、无 language 类、已高亮幂等、HTML 实体、段落 `<br>` 不误伤、中文注释）全部符合预期，二次执行幂等。
 6. **待作者验证**：历史文章正文没有 tok span，**需在编辑器里重新保存一次**才能看到高亮（无登录态无法代验）。
+7. **连带修复（plus-ui，独立提交 `1ce754c` + `9b3263f`）**：验收后回看后台「查看版本」抽屉，发现暗色模式下代码块仍是亮底 + 亮色 token；把底色改深后文字又带一圈白色发光。根因是 WangEditor 自带 prism 亮色主题，且 `pre > code` 写死 `text-shadow: 0 1px #fff`（亮色底的文字浮雕），而 plus-ui 此前**没有任何 `html.dark` 下的编辑器覆盖**。新增 `src/assets/styles/components/_editor-dark.scss`：变量指向 Element Plus 暗色体系、token 色换 GitHub Dark（与前台同口径）、`text-shadow: none`。详见 `plus-ui/docs/frontend-plan.md` §5。
 
 ### 一次性 SQL 脚本执行状态（docs/）
 
