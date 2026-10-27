@@ -131,11 +131,21 @@ total
 
 ### 2.4 文件与图片上传
 
-博客不提供独立上传 API。封面、正文图片等上传直接复用 RuoYi 现有 OSS 上传接口（`/resource/oss/upload`）。
+封面、正文图片等上传走**博客域接口** `POST /blog/oss/upload`（D42，2026-10-27）。
 
-**身份：** 登录用户。
+**身份：** 登录用户（**不要求**后台按钮权限 `system:oss:upload`）。
 
-上传返回的 ossId / url 由前端回填到业务字段（如 `coverUrl`）；文件类型与大小限制沿用 RuoYi OSS 现有配置。
+**请求：** `multipart/form-data`，字段名 `file`。
+
+**响应：** `{ ossId, url, originalName }`（同 RuoYi `SysOssUploadVo`），由前端回填到业务字段（如 `coverUrl`）。
+
+> **为什么不再复用 `/resource/oss/upload`**：该接口带 `@SaCheckPermission("system:oss:upload")`，
+> 而注册流程不分配角色（`SysRegisterService.register()` 只建用户、不写 `sys_user_role`），
+> 博客用户默认零权限 → 封面与正文插图一律 403「没有访问权限，请联系管理员授权」。
+> 给普通读者授予后台「文件管理」权限在语义上不成立，故博客域单开一个只做「登录校验 + 转调
+> `ISysOssService`」的接口，不重复实现对象存储（符合 AGENTS.md「复用 RuoYi OSS 能力」）。
+
+文件类型与大小限制沿用 RuoYi OSS 现有配置。
 
 ## 3. Article API
 

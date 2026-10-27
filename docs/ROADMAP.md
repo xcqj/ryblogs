@@ -98,6 +98,7 @@
 ### S3 编辑器与上传 ✅（已验收 2026-09-30）
 
 范围：契约 §2.4（复用 `/resource/oss/upload`，已存在零后端改动）+ 富文本 HTML 净化（§18.9）。
+（**已被 D42 取代**：上传改走 `POST /blog/oss/upload`，前端仍零改动。）
 
 实施结果（D6 已关闭，细化见 §6 S3-D1/D2/D3）：
 
@@ -285,7 +286,7 @@ S2 遗留接入（已落地）：
 
 - 我的文章列表：`GET /blog/article/my`（status/visibility/keyword 过滤 + 分页），行内动作 发布/hide/show/delete
 - 新建/编辑：`POST /blog/article`（草稿）、`PUT /blog/article/{id}`（内容变化则建新版本）；**编辑器复用 WangEditor `@wangeditor-next/editor` + `@wangeditor-next/editor-for-vue` 6.4.1**，`<ClientOnly>` 包裹 + 按需加载（`ssr:false`），产出净化前 HTML（后端 jsoup 净化），**不上 Markdown**
-- 封面/正文传图：复用 `/resource/oss/upload`（契约 §2.4，S3 已就位）+ `oss://` 引用解析（照 plus-ui `src/utils/ossContent.ts`）
+- 封面/正文传图：**原**复用 `/resource/oss/upload`（契约 §2.4，S3 已就位），**D42 起改走 `/blog/oss/upload`**（登录即可，不依赖后台按钮权限）+ `oss://` 引用解析（照 plus-ui `src/utils/ossContent.ts`）
 - 发布 / 隐藏 / 重新公开 / 删除：`POST /blog/article/{id}/publish|hide|show`、`DELETE /{id}`（服务端按 `author_id` 校验）
 - 版本只读（可选子视图）：`GET /blog/article/{id}/versions[/vId]`
 - 认证：复用 blog-web 已登录 `web` 会话（cookie + Nitro 代理），**无需二次登录**
@@ -708,6 +709,7 @@ S0 → S1 → S2 → S3 → S4 → S5 → S6 → S7 → S8   （后端关键路�
 | 2026-10-16 | D35（注册即登录，S22）：① `/auth/register` 由「只建档」改为注册成功即下发 token（返回类型 `R<Void>` → `R<LoginVo>`），参照 S14 `socialAutoRegister` 建号即登录模式；图形验证码在注册时已校验并消费一次，自动登录不重复校验、不构成绕过；clientId/grantType/status 校验与 `login()` 同口径（前端注册代理早已注入 clientId/grantType）；② blog-web 注册成功后跳转目标为「回来源页」——LoginModal 注册链接带 `?return=route.fullPath`，注册页仅接受站内相对路径（拒 `//` 开头）防开放重定向，无参或非法值回首页；③ plus-ui 注册页忽略返回 data、行为不变（仍注册后回登录页），不构成破坏性变更；④ `/auth/register` 无请求限流为既有缺口（S18 只覆盖 login），本切片不扩大范围，留后续 | 本文件 §3 S22 / blog-web/docs/plan.md §2.20 |
 | 2026-10-26 | D41（blog-web 全站视觉改版方向 C，用户拍板）：① **视觉语言全换**——冷米白底 `#faf9f6` + 深靛蓝强调 `#1a4d8f` + **Noto Serif SC 衬线标题**（正文仍无衬线）+ 圆角统一 3px + 近乎取消阴影；首页版式在 Stitch「首页1.1」冻结（头条 LATEST + 数据行列表 + 右栏双卡 + 编号锚点 01/02/03 + 系统状态卡）。**明示推翻已锁规格三条**：色板（暖纸→冷米白）、字体（首度引入 webfont）、圆角（2/4 分族→统一 3px）；动效基线与反馈分层两条继续有效。② 字体策略（2026-10-26 实测修正为方案 A）：`@fontsource/noto-serif-sc` 只引 700 字重——101 个 `unicode-range` 分片、合计 3.1MB、按需下载，实测典型首屏命中 11 片约 420KB；`font-display: swap` 由包内 CSS 提供、不做 preload、衬线仅用于 H1 级标题（正文与列表行标题仍无衬线）；验收 LCP ≤2.5s（模拟 Slow 4G）、CLS=0、**首屏字体 ≤500KB**（100KB 指标对中文衬线不可达，已作废）；S17 的 Lighthouse 全 100 基线须在换地基后重测记录差异。③ 方案来源 = **Google Stitch 辅助**（含 MCP）：仅产出视觉方案，产物必须回译成 `tokens.css` 变量与 `uno.config.ts` shortcut，**禁止搬运内联样式/px 魔法值/编造数据**；每屏须过"数据契约"核对（导航仅首页/标签/搜索，禁止分类/专栏/话题/归档——Category 永久舍弃红线）。④ plus-ui **不同步**，只借版式思路做登录页/首页小改（独立仓独立 commit）。⑤ 立项新切片 S23（P1 补屏 → P2 立规范 → P3 换地基 → P4 逐页 → P5 plus-ui），纯表现层、零契约与数据改动；D39「精修」口径（不动信息架构）**不适用**本轮 | 本文件 §2/§3 S23 / blog-web/docs/plan.md §2.21 / blog-web/design/stitch/README.md |
 | 2026-10-26 | D41 附注（编号缺陷登记，未擅改）：`D39` 在 2026-10-13（plus-ui 门面改版）与 2026-10-16（前台质感精修轮验收关闭）被**两次使用**，检索存在歧义；后续新决策自 D41 起编号，D39 歧义待单独修订（修订时须同步 §3 S19 与 blog-web plan §2.19 的引用） | 本文件 §6 |
+| 2026-10-27 | D42（博客域上传接口，起因：作者传封面返回 403「没有访问权限，请联系管理员授权」）：① **新增 `POST /blog/oss/upload`**（`org.dromara.system.controller.blog.BlogOssController`），**只要求登录、不设按钮权限**，内部转调 `ISysOssService.upload(file, null)` 返回 `SysOssUploadVo`；② 根因实锤——`SysRegisterService.register()` 只调 `userService.registerUser`，**不写 `sys_user_role`**，博客用户默认零权限；而 `SysOssController.upload` 带 `@SaCheckPermission("system:oss:upload")`，复用后台接口必然 403（封面与正文插图同链路）；③ **否决**「给角色配 `system:oss:upload`」：每来一个新用户都要手工授权，不可持续，且给普通读者授予后台「文件管理」权限语义不成立；④ 前端仅改 Nitro 代理的转发目标（`server/api/resource/oss/upload.post.ts`），浏览器端路径 `/api/resource/oss/upload` 与所有组件零改动；plus-ui **不随本决策变更**（其使用者是管理员，持有该权限）；⑤ 合规说明：接口只做「登录校验 + 转调」，**未新建对象存储实现**，符合 AGENTS.md「复用 RuoYi OSS 能力，不重复实现」；`ruoyi-api` 的 `OssService` 接口未改，避免动跨模块契约 | blog-api.md §2.4 / architecture.md 请求链 / blog-web/docs/plan.md §2.8 / plus-ui/docs/frontend-plan.md |
 
 ### 待决策
 
