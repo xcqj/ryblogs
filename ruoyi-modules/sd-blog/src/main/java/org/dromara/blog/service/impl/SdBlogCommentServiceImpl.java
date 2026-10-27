@@ -11,17 +11,22 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.dromara.blog.domain.SdBlogArticle;
+import org.dromara.blog.domain.SdBlogArticleVersion;
 import org.dromara.blog.domain.bo.BlogAdminCommentQueryBo;
 import org.dromara.blog.domain.vo.BlogCommentListItemVo;
 import org.dromara.blog.domain.SdBlogComment;
 import org.dromara.blog.mapper.SdBlogArticleMapper;
+import org.dromara.blog.mapper.SdBlogArticleVersionMapper;
 import org.dromara.blog.mapper.SdBlogCommentMapper;
 import org.dromara.blog.service.ISdBlogCommentService;
 import org.dromara.blog.service.support.ArticleGuards;
 import org.dromara.blog.util.HtmlSanitizer;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 博客评论Service业务层处理
@@ -36,6 +41,7 @@ public class SdBlogCommentServiceImpl implements ISdBlogCommentService {
 
     private final SdBlogCommentMapper sdBlogCommentMapper;
     private final SdBlogArticleMapper sdBlogArticleMapper;
+    private final SdBlogArticleVersionMapper sdBlogArticleVersionMapper;
 
     /**
      * 发表评论（契约 §10.2）：目标文章必须 PUBLISHED+PUBLIC+未删（软删文章 selectById 被
@@ -93,7 +99,40 @@ public class SdBlogCommentServiceImpl implements ISdBlogCommentService {
             .orderByDesc(SdBlogComment::getCommentId)
             .build();
         Page<SdBlogComment> page = sdBlogCommentMapper.selectPage(pageQuery.build(), lqw);
-        return PageResult.build(page.getRecords().stream().map(this::toListItem).toList(), page.getTotal());
+        List<BlogCommentListItemVo> list = page.getRecords().stream().map(this::toListItem).toList();
+        // 审核时必须知道评论挂在哪篇文章下，否则只有一个 articleId 等于盲审
+        fillArticleTitles(list);
+        return PageResult.build(list, page.getTotal());
+    }
+
+    /**
+     * 批量回填「所属文章标题」：评论表只存 articleId，标题在版本表里。
+     * 两跳查询（文章 → currentVersionId，版本 → title），按当前分页一次取完，避免 N+1。
+     * 查不到标题时保持 null，前端回落显示 {@code #articleId}。
+     *
+     * @param list 当前页评论
+     */
+    private void fillArticleTitles(List<BlogCommentListItemVo> list) {
+        if (list.isEmpty()) {
+            return;
+        }
+        Set<Long> articleIds = list.stream()
+            .map(BlogCommentListItemVo::getArticleId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+        if (articleIds.isEmpty()) {
+            return;
+        }
+        Map<Long, Long> versionIdByArticle = sdBlogArticleMapper.selectByIds(articleIds).stream()
+            .filter(a -> a.getCurrentVersionId() != null)
+            .collect(Collectors.toMap(SdBlogArticle::getArticleId, SdBlogArticle::getCurrentVersionId, (a, b) -> a));
+        if (versionIdByArticle.isEmpty()) {
+            return;
+        }
+        Map<Long, String> titleByVersion = sdBlogArticleVersionMapper.selectByIds(versionIdByArticle.values()).stream()
+            .filter(v -> StringUtils.isNotBlank(v.getTitle()))
+            .collect(Collectors.toMap(SdBlogArticleVersion::getVersionId, SdBlogArticleVersion::getTitle, (a, b) -> a));
+        list.forEach(vo -> vo.setArticleTitle(titleByVersion.get(versionIdByArticle.get(vo.getArticleId()))));
     }
 
     /**

@@ -33,6 +33,11 @@ public class BlogCommentListItemVo implements Serializable {
     private Long articleId;
 
     /**
+     * 所属文章标题（治理列表展示用；由 Service 批量回填，避免逐条查询）
+     */
+    private String articleTitle;
+
+    /**
      * 评论内容（纯文本）
      */
     private String content;
