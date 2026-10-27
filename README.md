@@ -134,12 +134,12 @@ SEED_FILE=seed-demo.sql docker compose --profile seed run --rm seed    # demo：
 
 | 文件 | 规模 | 用途 |
 |---|---|---|
-| `seed-min.sql` | 3 作者 / 8 篇 / 30 评论 / 10 标签 | 本地开发，覆盖有/无封面、有/无代码块、多/单标签、草稿/发布/隐藏/下线四种状态 |
-| `seed-demo.sql` | 5 作者 / **52 篇** / 200 评论 / 20 标签 | 演示 / 面试，首页翻 5 页、标签云有长尾 |
+| `script/sql/seed/seed-min.sql` | 3 作者 / 8 篇 / 30 评论 / 10 标签 | 本地开发，覆盖有/无封面、有/无代码块、多/单标签、草稿/发布/隐藏/下线四种状态 |
+| `script/sql/seed/seed-demo.sql` | 5 作者 / **52 篇** / 200 评论 / 20 标签 | 演示 / 面试，首页翻 5 页、标签云有长尾 |
 
 **几个特性**
 
-- **幂等**：种子先删 `22xx` 段再插入，可反复执行；不会碰框架 ID 与真实数据
+- **幂等**：种子先删 `22xx` 段再插入，可反复执行；不会碰框架 ID（`17xx`）与真实数据（`21xx`）
 - **代码块带真实高亮**：生成时就跑过 shiki，打开详情页即彩色
 - **封面克制**：约 10 篇有封面（复用 MinIO 现有图），其余走无封面降级版式
 - **时间与关联自洽**：发布时间分散在近 90 天，评论时间全部晚于文章
@@ -147,13 +147,58 @@ SEED_FILE=seed-demo.sql docker compose --profile seed run --rm seed    # demo：
 **演示账号**：`chenyu` / `linshen` / `suwan` / `zhoumu` / `hexi`，密码统一 `admin123`。
 ⚠️ 仅演示用，生产禁止沿用。
 
-**改内容**：编辑 `blog-web/tooling/seed/data-*.mjs`，然后重跑生成器
+### 三个 `.mjs` 是什么（种子源码）
+
+两个 `.sql` 是**产物**，`blog-web/tooling/` 下的三个文件是**源码**：
+
+| 文件 | 作用 |
+|---|---|
+| `tooling/seed/data-min.mjs` | 8 篇内容定义（标题 / 摘要 / 标签 / 代码块 / 状态 / 时间偏移） |
+| `tooling/seed/data-demo.mjs` | 扩展 44 篇，与 min 合并成 52 篇 |
+| `tooling/gen-demo-seed.mjs` | 跑一遍 shiki 把代码块着色，再序列化成 SQL |
+
+**只装载不改内容时，这三个文件完全不用管。**
+
+为什么不能只留 SQL：正文里的 `<span class="tok-1itgoe">` 是 shiki 算出来的哈希，对应「关键字」这一种颜色，手写编不出来。要改内容就必须走生成器重算一遍：
 
 ```bash
-cd ../blog-web && node tooling/gen-demo-seed.mjs
+cd ../blog-web
+node tooling/gen-demo-seed.mjs            # 重新生成两个 SQL
+node tooling/gen-demo-seed.mjs --check    # 只看规模，不写文件
 ```
 
-**清理历史脏数据**：`script/sql/cleanup-legacy-test-data.sql`。手动执行，分「预览 → 取消注释删除」两步，会删掉 `22xx` 段之外的**全部博客数据**（`admin` 等系统账号不受影响）。执行前先备份。
+### 清理历史脏数据（手动、不可撤销）
+
+`script/sql/cleanup-legacy-test-data.sql` 用于清掉 `S3测试` / `32131aaa` 这类开发期数据，只删 `22xx` 段之外的博客数据，`admin` 等系统账号不受影响。
+
+**为什么没做成 compose 服务**：种子幂等、跑错重来即可；清理不可撤销，一键化太危险。
+
+四步：
+
+```bash
+cd RuoYi-Vue-Plus
+
+# ① 备份（必做）
+docker exec blog-mysql mysqldump -uroot -proot --single-transaction \
+  --default-character-set=utf8mb4 --databases ry-vue > ~/backup-ry-vue-$(date +%F).sql
+
+# ② 预览（只读，安全）——输出各类行数与 20 条标题样本
+docker exec -i blog-mysql mysql -uroot -proot --default-character-set=utf8mb4 ry-vue \
+  < script/sql/cleanup-legacy-test-data.sql
+
+# ③ 确认无误后，编辑该文件，去掉「步骤 2」整段的 `--` 注释，再执行同一条命令
+
+# ④ 核对（应等于种子规模）
+docker exec blog-mysql mysql -uroot -proot -N -e "
+SELECT '文章', COUNT(*) FROM \`ry-vue\`.sd_blog_article
+UNION ALL SELECT '版本', COUNT(*) FROM \`ry-vue\`.sd_blog_article_version
+UNION ALL SELECT '评论', COUNT(*) FROM \`ry-vue\`.sd_blog_comment;"
+```
+
+> ⚠️ **清理必须按各表「自身主键」判断，不能按 `article_id` 之类的外键列判断。**
+> 实测踩过：库里有一条 `version_id` 在 `21xx` 段、但 `article_id = 9000000000000020024` 的孤儿版本
+> （对应文章早已删除），按 `article_id` 过滤会漏掉它，导致「版本 53 / 文章 52」对不上。
+> 脚本里三张表已改为 `version_id` / `article_tag_id` / `tag_alias_id`。
 
 ## 常见问题
 
