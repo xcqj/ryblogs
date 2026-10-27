@@ -45,7 +45,7 @@
 | S21 | CI/CD 补全（可选） | — | — | 后端+前端 | ⏸ 可选 | 1d |
 | S22 | 注册即登录（去掉注册后手动登录中间态） | §2.8（登录，复用） | — | 后端+前端(blog-web) | ✅ 已验收（2026-10-16；Agent E2E 六用例 + 人工浏览器验收均通过；后端 1 commit + blog-web 1 commit，详 §3 S22） | 0.5d |
 | S23 | blog-web 全站视觉改版（方向 C） | — | — | 前端(blog-web) | ✅ 已交付并关闭（2026-10-27；P1~P4 全部完成，P5 缩水为「仅移除登录页第三方登录入口」；44 张截图全绿 + Lighthouse 95/100/100/100） | 6~8d |
-| S24 | 正文语法高亮（方案 B：保存时高亮） | — | — | 后端 + 前端(blog-web) | ⏳ 待启动（D43；开工前须先过 D5 往返验证门禁） | 1.5~2d |
+| S24 | 正文语法高亮（方案 B：保存时高亮） | — | — | 后端 + 前端(blog-web) | ✅ 已交付（2026-10-27；T25~T31 全部完成；作者端增量 74.7KB gzip，读者首屏零增量） | 1.5~2d |
 
 > 与 PRD §12.1 的顺序差异：评论提前到前台站之前，保证后端 API 闭环先行；
 > S9 前台可在 S5 完成后于前端仓库并行启动（首页/列表/详情依赖 S2+S6+S8 的接口）。
@@ -601,7 +601,7 @@ S2 遗留接入（已落地）：
 7. **遗留（不阻塞交付）**：① 语法高亮未接入（shiki 从未引入；已定方案 A「客户端高亮」——不改契约、不动入库数据、历史文章自动生效，约 +85KB gzip，尚未实施）；② WangEditor 深色主题**已完成**（17 个 `--w-e-*` 变量映射到 token）；③ 代码块空行撑高（内容多余空行，需净化层 trim `<pre>`）——用户已决定**不做**（可能吃掉作者故意留的缩进空行）；④ OSS 图片裁剪——**不做**（默认存储是 MinIO，不支持 `x-oss-process`；换存储或后端生成缩略图成本过高，收益仅 Lighthouse 95→98）。
 7. **同期附带交付**：**D42 博客域上传接口**（见 §6）——解决博客作者传封面 403（原复用 `/resource/oss/upload` 需 `system:oss:upload`，而注册不分配角色）。
 
-### S24 正文语法高亮（方案 B：保存时高亮）⏳（后端 + blog-web；1.5~2d，2026-10-27 立项）
+### S24 正文语法高亮（方案 B：保存时高亮）✅ 已交付（2026-10-27；后端 + blog-web）
 
 背景（D43）：代码块自建站起一直是纯文本（shiki 从未接入，`plan.md` 长期标「按需 / MVP 后再定」）。技术博客里代码块是主角，无高亮的观感损失明显。S23 期间评估三条路，用户选定 **B（保存时高亮）**。
 
@@ -652,6 +652,15 @@ S2 遗留接入（已落地）：
 | P4 契约与回归 | `blog-api.md` §3.1 补说明；`shot.mjs` 44 张 + `contrast.mjs` | 截图全绿；新增 token 色过对比度（代码块内文字至少 3:1） |
 
 已知代价（用户已接受）：**历史文章永远没有高亮**（除非重新保存或批量重刷）；blog-web 构建产物增加 shiki 依赖（只进编辑页 chunk，不影响读者首屏）；读者站多一份约 2KB 的 token CSS。
+
+**实施结果（2026-10-27 交付）**
+
+1. **依赖与体积**：`shiki@4.5.0` + `@shikijs/transformers@4.5.0`，用 `createJavaScriptRegexEngine` 避开 200KB+ 的 oniguruma wasm。esbuild 实测 entry（core + 引擎 + 双主题）**53.4KB gzip**、语言包 16.3KB，作者端首屏约 **74.7KB**（门禁 100KB）。真实产物：编辑页 chunk 836K 解包 / **262KB gzip**（含 WangEditor 原有约 200KB），**首页不引用该 chunk**——读者首屏零增量。
+2. **关键实现决策**：用 `structure: 'inline'` 消除 `<span class="line">`（该 class 不带 `tok-` 前缀会被后端剥掉）；代价是它用 `<br>` 分行，故渲染后转回 `\n`，与 T26-a 的入库约定一致。
+3. **后端**：改动落在 `org.dromara.blog.util.HtmlSanitizer`（净化逻辑不在 Service）——`buildSafelist()` 增 `.addAttributes("span","class")`，新增 `SAFE_TOKEN_CLASS = ^tok-[a-z0-9]+$` 与 `stripUnsafeTokenClasses()`，在 clean **之后**逐 token 校验。**13 个单测全过**（新增 3 个：合法保留 / 非法剥离 / 幂等）。
+4. **token CSS**：`tooling/gen-highlight-css.mjs` 对 12 种语言跑样本合并 `getCSS()`，产出 `app/assets/css/highlight.css`——**9 个 token 色、1.1KB**；应用层用 `.prose pre span[class^='tok-']` + `.dark` 两态分别映射 `--shiki-light/dark`。
+5. **回归**：build 绿（9.71s）；44 张截图退出码 0、无 console error / 5xx；`contrast.mjs` 18/18；Playwright 实测双主题着色（浅 `rgb(215,58,73)` / 深 `rgb(249,117,131)`）**PASS**；管线端到端 8 个用例（别名归一、未知语言回落、无 language 类、已高亮幂等、HTML 实体、段落 `<br>` 不误伤、中文注释）全部符合预期，二次执行幂等。
+6. **待作者验证**：历史文章正文没有 tok span，**需在编辑器里重新保存一次**才能看到高亮（无登录态无法代验）。
 
 ### 一次性 SQL 脚本执行状态（docs/）
 

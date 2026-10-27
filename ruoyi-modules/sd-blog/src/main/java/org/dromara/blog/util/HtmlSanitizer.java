@@ -9,6 +9,7 @@ import org.jsoup.safety.Cleaner;
 import org.jsoup.safety.Safelist;
 
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 /**
  * 富文本 HTML 净化纯函数工具（契约 §18.9 / §9 安全红线，ROADMAP D6 决策）
@@ -36,6 +37,16 @@ public final class HtmlSanitizer {
      * style 值防御性剔除的危险关键字（IE 遗留表达式/行为绑定；小写匹配）
      */
     private static final String[] DANGEROUS_STYLE_KEYWORDS = {"expression(", "behavior:", "javascript:", "vbscript:"};
+
+    /**
+     * 代码高亮 token 类名的唯一合法格式（S24 / D43）。
+     * <p>
+     * 前端用 shiki 的 {@code transformerStyleToClass} 生成 {@code tok-xxxxxx}（6 位小写字母数字），
+     * 后端只放行这一种字面量格式，其余 class 一律剥除——把「放开 span[class]」的风险
+     * 收窄到可枚举的范围，避免脏数据或作者手写语义类名（如 {@code header}/{@code admin}）
+     * 撞上站点 CSS。
+     */
+    private static final Pattern SAFE_TOKEN_CLASS = Pattern.compile("^tok-[a-z0-9]+$");
 
     /**
      * 允许携带 style/id 公共属性的标签集（jsoup 无全局属性 API，逐标签声明）
@@ -78,6 +89,10 @@ public final class HtmlSanitizer {
             // 语法高亮标记（language-java 等）：relaxed 未给 pre/code 放开 class，技术博客必须保留
             .addAttributes("pre", "class")
             .addAttributes("code", "class")
+            // 代码高亮 token 类（S24/D43）：relaxed 同样不给 span 放开 class。
+            // 这里放行只是避免 Cleaner 提前剥掉，真正的取值校验在 sanitizeHtml 末尾的
+            // stripUnsafeTokenClasses（只留 ^tok-[a-z0-9]+$）。
+            .addAttributes("span", "class")
             // 编辑器图片协议：data:image 内联图（粘贴截图）+ oss://ossId 标记（“上传图片”落 OSS 后由
             // 前端 Editor 编码为 oss://ossId，回显时经 listByIds 解析为可用 URL）；不放行会被 jsoup 剥 src 致正文图丢失
             .addProtocols("img", "src", "data", "oss")
@@ -102,7 +117,10 @@ public final class HtmlSanitizer {
         }
         Document doc = Jsoup.parseBodyFragment(html, BASE_URI);
         stripDangerousStyles(doc);
-        return tidyOutput(HTML_CLEANER.clean(doc));
+        Document cleaned = HTML_CLEANER.clean(doc);
+        // span 的 class 在 Safelist 里是整类放行，这里再按格式收一遍（S24/D43）
+        stripUnsafeTokenClasses(cleaned);
+        return tidyOutput(cleaned);
     }
 
     /**
@@ -132,6 +150,37 @@ public final class HtmlSanitizer {
                     el.removeAttr("style");
                     break;
                 }
+            }
+        }
+    }
+
+    /**
+     * span 上的 class 只保留高亮 token（{@code tok-xxxxxx}），其余全部移除（S24 / D43）。
+     * <p>
+     * 为什么要额外收一道：{@link #buildSafelist()} 里 {@code span} 的 class 是整类放行，
+     * jsoup 无法按值过滤。这里按 {@link #SAFE_TOKEN_CLASS} 逐个校验，
+     * 既能放行前端 shiki 生成的高亮类，又能挡掉作者手写或脏数据带来的语义类名。
+     * <p>
+     * 幂等：对已净化的内容再执行一次结果不变（合法 class 保留、空 class 被移除），
+     * 满足类注释里「S4 内容比对不因净化产生伪差异」的要求。
+     *
+     * @param doc 已通过 Safelist 清洗的文档
+     */
+    private static void stripUnsafeTokenClasses(Document doc) {
+        for (Element el : doc.select("span[class]")) {
+            StringBuilder safe = new StringBuilder();
+            for (String token : el.attr("class").trim().split("\\s+")) {
+                if (!token.isEmpty() && SAFE_TOKEN_CLASS.matcher(token).matches()) {
+                    if (safe.length() > 0) {
+                        safe.append(' ');
+                    }
+                    safe.append(token);
+                }
+            }
+            if (safe.length() == 0) {
+                el.removeAttr("class");
+            } else {
+                el.attr("class", safe.toString());
             }
         }
     }

@@ -110,4 +110,37 @@ class HtmlSanitizerTest {
         assertNull(HtmlSanitizer.sanitizePlainText(null));
     }
 
+    @Test
+    @DisplayName("代码高亮 token 类名被保留（S24/D43）")
+    void shouldKeepHighlightTokenClass() {
+        String out = HtmlSanitizer.sanitizeHtml(
+            "<pre><code class=\"language-java\"><span class=\"tok-1itgoe\">const</span> a = 1</code></pre>");
+        assertTrue(out.contains("class=\"tok-1itgoe\""));
+        assertTrue(out.contains("class=\"language-java\""));
+        assertTrue(out.contains("const"));
+    }
+
+    @Test
+    @DisplayName("span 上的非 token 类名被剥除，合法 token 保留")
+    void shouldStripNonTokenSpanClass() {
+        String out = HtmlSanitizer.sanitizeHtml(
+            "<p><span class=\"admin header\">危险</span><span class=\"tok-abc123 evil\">正常</span></p>");
+        // 全部非法：class 属性整个消失
+        assertFalse(out.contains("admin"));
+        assertFalse(out.contains("header"));
+        // 混合：只留合法 token，evil 被剥
+        assertTrue(out.contains("class=\"tok-abc123\""));
+        assertFalse(out.contains("evil"));
+        assertTrue(out.contains("危险"));
+        assertTrue(out.contains("正常"));
+    }
+
+    @Test
+    @DisplayName("净化幂等：二次净化结果不变（保证 S4 内容比不产生伪差异）")
+    void shouldBeIdempotentForTokenClasses() {
+        String once = HtmlSanitizer.sanitizeHtml(
+            "<pre><code class=\"language-js\"><span class=\"tok-1itgoe\">a</span></code></pre>");
+        assertEquals(once, HtmlSanitizer.sanitizeHtml(once));
+    }
+
 }
