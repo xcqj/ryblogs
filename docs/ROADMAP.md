@@ -46,6 +46,10 @@
 | S22 | 注册即登录（去掉注册后手动登录中间态） | §2.8（登录，复用） | — | 后端+前端(blog-web) | ✅ 已验收（2026-10-16；Agent E2E 六用例 + 人工浏览器验收均通过；后端 1 commit + blog-web 1 commit，详 §3 S22） | 0.5d |
 | S23 | blog-web 全站视觉改版（方向 C） | — | — | 前端(blog-web) | ✅ 已交付并关闭（2026-10-27；P1~P4 全部完成，P5 缩水为「仅移除登录页第三方登录入口」；44 张截图全绿 + Lighthouse 95/100/100/100） | 6~8d |
 | S24 | 正文语法高亮（方案 B：保存时高亮） | — | — | 后端 + 前端(blog-web) | ✅ 已交付（2026-10-27；T25~T31 全部完成；作者端增量 74.7KB gzip，读者首屏零增量） | 1.5~2d |
+| S25 | 工程化与一键启动（部署就绪） | — | — | 三仓 + 根编排 | ⏳ 待启动（2026-10-28 立项；不阻塞于服务器，CD 后置） | 2d |
+| S26 | 演示数据种子（min / demo 两级） | — | — | 后端 + 编排 | ⏳ 待启动（依赖 S25 P3） | 0.5d |
+| S27 | 阅读体验三项（TOC / 上传前压缩 / 关于页） | — | — | 前端(blog-web) | ⏳ 待启动（与 S25 无依赖，可并行） | 1d |
+| S28 | 后续增强（上一篇/下一篇 + 前端测试） | — | — | 后端 + 前端 | ⏳ 待启动（需改契约，后置） | 1.5d |
 
 > 与 PRD §12.1 的顺序差异：评论提前到前台站之前，保证后端 API 闭环先行；
 > S9 前台可在 S5 完成后于前端仓库并行启动（首页/列表/详情依赖 S2+S6+S8 的接口）。
@@ -663,6 +667,63 @@ S2 遗留接入（已落地）：
 6. **待作者验证**：历史文章正文没有 tok span，**需在编辑器里重新保存一次**才能看到高亮（无登录态无法代验）。
 7. **连带修复（plus-ui，独立提交 `1ce754c` + `9b3263f`）**：验收后回看后台「查看版本」抽屉，发现暗色模式下代码块仍是亮底 + 亮色 token；把底色改深后文字又带一圈白色发光。根因是 WangEditor 自带 prism 亮色主题，且 `pre > code` 写死 `text-shadow: 0 1px #fff`（亮色底的文字浮雕），而 plus-ui 此前**没有任何 `html.dark` 下的编辑器覆盖**。新增 `src/assets/styles/components/_editor-dark.scss`：变量指向 Element Plus 暗色体系、token 色换 GitHub Dark（与前台同口径）、`text-shadow: none`。详见 `plus-ui/docs/frontend-plan.md` §5。
 
+### S25 工程化与一键启动（部署就绪）⏳（跨三仓 + 根编排；2d，2026-10-28 立项）
+
+**目标**：把「三个应用 + 四个中间件」收进一套 compose，一条命令起完整站；镜像可在任意机器重建；README 说清三仓关系与启动方式。**不做自动部署**（当前无目标服务器，CD 作为后续切片）。
+
+**现状审查**（`script/docker/docker-compose.dev.yml`，98 行）：
+
+| 已有 | 缺口 |
+|---|---|
+| mysql 8.4.9 / redis 8.6.3 / minio / **es**（自建 IK 分词镜像 `blog-es:7.17.28-ik`） | **后端容器**（现跑宿主机 IDEA :8081） |
+| **blog-web**（`profiles: ["web"]` 门控，`build.context: ../../blog-web`，多阶段 Dockerfile 已就绪） | **plus-ui 容器** |
+| 卷 mysql-data / redis-data / minio-data / es-data | 生产形态（固定 tag、env_file、healthcheck） |
+
+关键约束：`NUXT_API_BASE` 现为 `http://host.docker.internal:8081`（指向宿主机后端），部署形态必须改为容器间服务名；compose 位于后端仓、构建上下文跨仓（`../../blog-web`），依赖「三仓同级 clone」。
+
+**阶段与门禁**
+
+| 阶段 | 内容 | 门禁 |
+|---|---|---|
+| **P1 后端镜像** | `RuoYi-Vue-Plus/Dockerfile`：maven 多阶段。依赖层先 `copy pom` + `dependency:go-offline`，再 copy 源码 `package -DskipTests`；运行层 JRE 21 + `ruoyi-admin.jar` | `docker build` 成功，镜像内 `java -jar` 能起 |
+| **P2 plus-ui 镜像** | `plus-ui/Dockerfile`：node 构建 → nginx 静态。`nginx.conf` 含 `try_files $uri $uri/ /index.html`（history 路由）与 `/prod-api` 反代后端 | 容器内能打开登录页且接口通 |
+| **P3 compose 编排** | 新增 `backend` / `admin` 服务；**移除 `host.docker.internal`**，blog-web 改 `NUXT_API_BASE=http://backend:8081`，admin 反代同样指向 `backend`；`depends_on` + healthcheck 串起 mysql/redis/minio/es → backend → web/admin | `docker compose up -d` 后四个入口全部可访问 |
+| **P4 生产形态** | 拆两套：`docker-compose.yml`（生产：固定镜像 tag、无源码挂载、密钥走 `env_file`）+ 保留 `docker-compose.dev.yml`（开发：热更、暴露全部端口） | 两套都能起，dev 不影响现有开发流程 |
+| **P5 README** | 三仓 README 重写：**三仓关系图**、本地启动（dev）、一键启动（compose）、环境变量清单、目录结构。后端与 plus-ui 现有内容整段是 RuoYi 框架自带（Gitee logo / 平台简介），**必须替换**，否则新人会以为是框架 fork | 新人只按 README 能从零跑到首页 |
+| **P6 冒烟** | `script/smoke.sh`：起容器 → 等健康 → 登录拿 token → 建草稿 → 公共列表能查到 → 清理 | 退出码 0，可接入 CI |
+
+**非目标**：K8s、镜像仓库推送、自动部署到服务器、多环境（staging/prod）切换脚本。这些依赖目标服务器，等有服务器再单开切片。
+
+**与 S26 的衔接**：P3 完成后加 `seed` profile，把种子 SQL 挂进 mysql 初始化，实现「一条命令起来就是个有内容的站」。
+
+### S26 演示数据种子 ⏳（后端 + 编排；0.5d，依赖 S25 P3）
+
+**为什么不能早做**：表结构或契约一变，种子就要重写。正确的绑定点是「compose 能一键起之后」，让种子成为初始化流程的一部分。
+
+**现状**：库里全是测试脏数据（标题 `32131aaa`、`3213131`，标签 `全新标签aaaaaaa` / `测试` / `1` / `1321`），既不能演示也不适合面试展示。
+
+两级种子，**固定前缀、可重放、可清理**：
+
+| 文件 | 内容 | 用途 |
+|---|---|---|
+| `script/sql/seed/seed-min.sql` | 3 用户 + 8 篇文章（覆盖：有封面/无封面、有代码块/纯文、多标签/单标签、草稿/已发布/已隐藏）+ 30 条评论 | 本地开发，够触发各分支 |
+| `script/sql/seed/seed-demo.sql` | 50 篇 + 200 评论 + 20 标签（首页翻页、标签云、搜索都有内容） | 演示 / 面试 |
+
+**开发环境与演示环境不需要相同数据**，但同一套 schema：开发用 min（够跑通功能），演示用 demo（够撑满版式）。切换靠 compose 的 `seed` profile 选择挂载哪个文件。
+
+### S27 阅读体验三项（TOC / 上传前压缩 / 关于页）⏳（blog-web；1d）
+
+三项互相独立、**均不依赖后端契约**：
+
+1. **TOC（文章目录）**：详情页扫正文 `h2/h3` 生成锚点 + 右侧吸顶目录（宽屏常驻、窄屏折叠）。正文 HTML 已含标题，纯前端可做——此前「契约无对应接口」的判断是错的
+2. **上传前图片压缩**：`CoverField` / `ArticleEditor` 的 `customUpload` 里用 canvas 压到长边 1600、质量 0.85；GIF / SVG 跳过。直接改善首页总传输（现 5.86MB 几乎全是未裁剪原图）
+3. **关于页 `/about`**：站名 + 定位 + 作者 + 技术栈 + 更新方式，复用 CtaBand 版式
+
+### S28 后续增强（上一篇/下一篇 + 前端测试）⏳（后端 + 前端；1.5d）
+
+- **上一篇/下一篇**：详情接口扩展返回 `prev` / `next`（按 `publishedAt` 相邻），一次请求带出，避免两次调用；需改 `blog-api.md` §5.2 与后端 VO
+- **前端测试**：先定框架（Vitest 组件级 + Playwright E2E），优先覆盖三处高风险——登录态 SSR 转发、发文保存链路（含换行规范化与高亮）、代码块渲染与注入时机
+
 ### 一次性 SQL 脚本执行状态（docs/）
 
 > 下列迁移 / 清理 / 菜单脚本均为一次性执行，截至 2026-10-05 已全部在 `ry-vue` 库执行完毕，在此登记以免被误当作待办或重复执行。建表基线 `blog_schema_v0.1.sql` 属环境初始化（见 SETUP §3），不列入本表。
@@ -785,6 +846,7 @@ S0 → S1 → S2 → S3 → S4 → S5 → S6 → S7 → S8   （后端关键路�
 | 2026-10-26 | D41 附注（编号缺陷登记，未擅改）：`D39` 在 2026-10-13（plus-ui 门面改版）与 2026-10-16（前台质感精修轮验收关闭）被**两次使用**，检索存在歧义；后续新决策自 D41 起编号，D39 歧义待单独修订（修订时须同步 §3 S19 与 blog-web plan §2.19 的引用） | 本文件 §6 |
 | 2026-10-27 | D42（博客域上传接口，起因：作者传封面返回 403「没有访问权限，请联系管理员授权」）：① **新增 `POST /blog/oss/upload`**（`org.dromara.system.controller.blog.BlogOssController`），**只要求登录、不设按钮权限**，内部转调 `ISysOssService.upload(file, null)` 返回 `SysOssUploadVo`；② 根因实锤——`SysRegisterService.register()` 只调 `userService.registerUser`，**不写 `sys_user_role`**，博客用户默认零权限；而 `SysOssController.upload` 带 `@SaCheckPermission("system:oss:upload")`，复用后台接口必然 403（封面与正文插图同链路）；③ **否决**「给角色配 `system:oss:upload`」：每来一个新用户都要手工授权，不可持续，且给普通读者授予后台「文件管理」权限语义不成立；④ 前端仅改 Nitro 代理的转发目标（`server/api/resource/oss/upload.post.ts`），浏览器端路径 `/api/resource/oss/upload` 与所有组件零改动；plus-ui **不随本决策变更**（其使用者是管理员，持有该权限）；⑤ 合规说明：接口只做「登录校验 + 转调」，**未新建对象存储实现**，符合 AGENTS.md「复用 RuoYi OSS 能力，不重复实现」；`ruoyi-api` 的 `OssService` 接口未改，避免动跨模块契约 | blog-api.md §2.4 / architecture.md 请求链 / blog-web/docs/plan.md §2.8 / plus-ui/docs/frontend-plan.md |
 | 2026-10-27 | D43（S23 关闭 + S24 立项：正文语法高亮走方案 B「保存时高亮」）：① **S23 正式关闭**——三仓工作区干净、构建全绿、44 张截图 + Lighthouse 95/100/100/100 留档；P5 缩水为「仅移除 plus-ui 登录页第三方登录入口」（后台首页按用户拍板不改）；② 代码块语法高亮单开 **S24**（后端 + blog-web，1.5~2d），方案由用户选定 **B：编辑器保存前用 shiki 高亮、带标记的 HTML 入库**——读时零成本、SEO 带高亮、无 FOUC；**明确接受「历史文章无高亮」这一代价**（不批量重刷，作者重新保存即自然生效）；③ 方案 A（客户端高亮，不改契约、历史文章自动生效，约 +85KB gzip）与 C（Nitro 层高亮）不采用，三方案对比存档于 §3 S24；④ 高亮标记倾向 **class（`tok-*`）而非 inline style**：jsoup 白名单只需校验 `^tok-[a-z0-9]+$`，可彻底规避 `style` 注入面（`url()`、`position:fixed` 等）；⑤ **D5 验证已完成（2026-10-27，本地最小页面 + WangEditor UMD 包，未用登录态也未写库）**——实测四组：`span.tok-*` 被 Slate **剥掉**、`code.language-*` **保留**、`pre[data-lang]` **丢失**、`<br>` 读回时**被吃掉**（`a<br>b` → `ab`）。结论 **方案 B 成立**：language 存活即可按 textContent 重建高亮，span 被剥反而让幂等更简单（编辑器内永远是纯文本，不存在嵌套）。**同时暴露一个既有缺陷**：代码块换行往返不一致（`getHtml` 输出 `<br>`、`setHtml` 不认 `<br>`），意味着「作者打开编辑页 → 再保存」会把多行代码压平；方案 B 每次保存都要往返，故须在 S24 内一并修（blog-web plan T26-a：入库统一用 `\n`，渲染靠 `white-space: pre`）；⑥ plus-ui 暂不同步（其编辑器保存的文章无高亮），后续可复用同一工具函数 | 本文件 §2/§3 S24 / blog-web/docs/plan.md §2.22 / blog-api.md §3.1 |
+| 2026-10-28 | D44（S25~S28 立项：工程化优先于体验增补，并厘清 CD 的阻塞边界）：① 用户拍板「一键启动为将来部署做准备」，故按**生产形态**设计（固定镜像 tag、`env_file` 密钥、healthcheck、nginx 反代），不做成仅便利本地开发的玩具；② **概念澄清**——打镜像属于构建产物、一键启动属于运行时编排，二者都不是 CD；真正的 CD 是「push → 自动构建 → 推 registry → 目标机拉取重启」，也是**唯一依赖目标服务器的一环**，故 S25 把它列为非目标，等有服务器再单开；③ 现状审查：`script/docker/docker-compose.dev.yml` 已有四件套（mysql / redis / minio / **自建 IK 的 es**）与 blog-web 镜像（`profiles:["web"]` 门控、构建上下文跨仓 `../../blog-web`），**缺后端与 plus-ui 容器**，且 blog-web 用 `host.docker.internal:8081` 指向宿主机后端——部署形态下必须改为容器间服务名 `backend:8081`；④ **假数据时机判断**：不在功能变动期造（表结构或契约一变就得重写），绑定到「compose 可一键起之后」的初始化流程，分 `seed-min`（开发用，8 篇覆盖有封面/无封面、有代码块/纯文、草稿/已发布/已隐藏各分支）与 `seed-demo`（演示用，50 篇 + 200 评论撑满版式）两级，同 schema 不同量，靠 `seed` profile 切换；⑤ README 现状：blog-web 已项目化，**后端与 plus-ui 仍是 RuoYi 框架自带内容**（Gitee logo / 平台简介），新人会误以为是框架 fork，S25 P5 必须整段替换 | 本文件 §2/§3 S25~S28 / script/docker/ |
 
 ### 待决策
 
