@@ -33,23 +33,27 @@ LIMIT 20;
 -- ---------- 步骤 2：确认后执行（取消下面所有注释）----------
 -- 注意顺序：先子表后父表，避免中间态出现悬挂引用。
 --
+-- ⚠️ 每张表都按**自身主键**判断，而不是按 article_id 之类的外键列：
+--    实测遇到过 article_id 不在 21xx 段、但 version_id 在 21xx 段的孤儿版本
+--    （文章早已删除，版本残留），按 article_id 过滤会漏掉它。
+--
 -- START TRANSACTION;
 --
 -- DELETE FROM sd_blog_comment
 --  WHERE comment_id < 2210000000000000000;
 --
 -- DELETE FROM sd_blog_article_tag
---  WHERE article_id < 2210000000000000000;
+--  WHERE article_tag_id < 2210000000000000000;
 --
 -- DELETE FROM sd_blog_article_version
---  WHERE article_id < 2210000000000000000;
+--  WHERE version_id < 2210000000000000000;
 --
 -- DELETE FROM sd_blog_article
 --  WHERE article_id < 2210000000000000000;
 --
 -- -- 标签：只删没有被种子文章引用的，避免删掉种子关系
 -- DELETE FROM sd_blog_tag_alias
---  WHERE tag_id < 2210000000000000000;
+--  WHERE tag_alias_id < 2210000000000000000;
 --
 -- DELETE FROM sd_blog_tag
 --  WHERE tag_id < 2210000000000000000
