@@ -60,4 +60,14 @@ public class BlogPublicArticleDetailVo implements Serializable {
      */
     private List<SdBlogTagVo> tags;
 
+    /**
+     * 上一篇（发布时间更早的相邻公共文章），没有则为 null（S28）
+     */
+    private BlogAdjacentArticleVo prev;
+
+    /**
+     * 下一篇（发布时间更晚的相邻公共文章），没有则为 null（S28）
+     */
+    private BlogAdjacentArticleVo next;
+
 }

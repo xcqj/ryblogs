@@ -497,7 +497,36 @@ public class SdBlogArticleServiceImpl implements ISdBlogArticleService {
             vo.setCurrentVersion(toVersionVo(sdBlogArticleVersionMapper.selectById(article.getCurrentVersionId())));
         }
         vo.setTags(queryTagsByArticleIds(List.of(articleId)).getOrDefault(articleId, List.of()));
+        fillAdjacentArticles(vo, article);
         return vo;
+    }
+
+    /**
+     * 组装上一篇/下一篇（S28）。
+     * <p>
+     * 只在公共可见集合内跳转（条件写死在 Mapper 的 SQL 里）：草稿、用户隐藏、管理员下线的
+     * 文章不进链路，否则读者点进去就是 404。
+     * <p>
+     * 同秒发布的两篇由 articleId 兜底比较——只按时间排序时顺序不确定，导航会来回跳。
+     * 标题缺失（版本表左连接没命中）时整条置 null：宁可少一项导航，也不给出无法识别的条目。
+     *
+     * @param vo      详情 VO
+     * @param article 当前文章（已校验公共可见）
+     */
+    private void fillAdjacentArticles(BlogPublicArticleDetailVo vo, SdBlogArticle article) {
+        if (ObjectUtil.isNull(article.getPublishedAt())) {
+            return;
+        }
+        Long articleId = article.getArticleId();
+        LocalDateTime publishedAt = article.getPublishedAt();
+        vo.setPrev(sdBlogArticleMapper.selectPrevPublic(articleId, publishedAt));
+        vo.setNext(sdBlogArticleMapper.selectNextPublic(articleId, publishedAt));
+        if (ObjectUtil.isNotNull(vo.getPrev()) && StringUtils.isBlank(vo.getPrev().getTitle())) {
+            vo.setPrev(null);
+        }
+        if (ObjectUtil.isNotNull(vo.getNext()) && StringUtils.isBlank(vo.getNext().getTitle())) {
+            vo.setNext(null);
+        }
     }
 
     /**

@@ -3,10 +3,12 @@ package org.dromara.blog.mapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.github.yulichang.base.MPJBaseMapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 import org.dromara.blog.domain.SdBlogArticle;
 import org.dromara.blog.domain.SdBlogArticleVersion;
 import org.dromara.blog.domain.bo.BlogArticleMyQueryBo;
+import org.dromara.blog.domain.vo.BlogAdjacentArticleVo;
 import org.dromara.blog.domain.vo.BlogArticleListItemVo;
 import org.dromara.blog.domain.vo.BlogPublicArticleListItemVo;
 import org.dromara.blog.domain.vo.SdBlogArticleVo;
@@ -15,6 +17,7 @@ import org.dromara.blog.enums.BlogVisibility;
 import org.dromara.common.mybatis.core.mapper.BaseMapperPlus;
 import org.dromara.common.mybatis.core.query.QueryBuilder;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 
 /**
@@ -76,6 +79,56 @@ public interface SdBlogArticleMapper extends BaseMapperPlus<SdBlogArticle, SdBlo
             .orderByDesc("a", SdBlogArticle::getArticleId)
             .page(page, BlogPublicArticleListItemVo.class);
     }
+
+    /**
+     * 上一篇（S28）：发布时间**更早**的相邻公共文章，供详情页底部导航。
+     * <p>
+     * 两条硬约束，缺一即错：
+     * <ul>
+     *   <li><b>限定公共可见</b>（status='1' 且 visibility='0'）——否则会链到草稿或已下线文章，
+     *       读者点进去就是 404。原生 SQL 不受 {@code @TableLogic} 保护，del_flag 必须手写。</li>
+     *   <li><b>双键排序</b>（published_at + article_id）——只按时间排序时，同一秒发布的两篇
+     *       顺序不确定，上下篇会来回跳。</li>
+     * </ul>
+     * 用原生 SQL 而非 QueryBuilder：需要 `(A or (B and C))` 这种 OR 嵌套，DSL 表达不了。
+     *
+     * @param articleId   当前文章ID（同秒时用于兜底比较）
+     * @param publishedAt 当前文章发布时间
+     * @return 相邻文章（articleId + title）；没有更早的公共文章时返回 null
+     */
+    @Select("""
+        select a.article_id as articleId, v.title as title
+        from sd_blog_article a
+        left join sd_blog_article_version v on v.version_id = a.current_version_id
+        where a.status = '1' and a.visibility = '0' and a.del_flag = '0'
+          and (a.published_at < #{publishedAt}
+               or (a.published_at = #{publishedAt} and a.article_id < #{articleId}))
+        order by a.published_at desc, a.article_id desc
+        limit 1
+        """)
+    BlogAdjacentArticleVo selectPrevPublic(@Param("articleId") Long articleId,
+                                           @Param("publishedAt") LocalDateTime publishedAt);
+
+    /**
+     * 下一篇（S28）：发布时间**更晚**的相邻公共文章。约束与排序方向均与
+     * {@link #selectPrevPublic} 互为镜像。
+     *
+     * @param articleId   当前文章ID（同秒时用于兜底比较）
+     * @param publishedAt 当前文章发布时间
+     * @return 相邻文章（articleId + title）；没有更晚的公共文章时返回 null
+     */
+    @Select("""
+        select a.article_id as articleId, v.title as title
+        from sd_blog_article a
+        left join sd_blog_article_version v on v.version_id = a.current_version_id
+        where a.status = '1' and a.visibility = '0' and a.del_flag = '0'
+          and (a.published_at > #{publishedAt}
+               or (a.published_at = #{publishedAt} and a.article_id > #{articleId}))
+        order by a.published_at asc, a.article_id asc
+        limit 1
+        """)
+    BlogAdjacentArticleVo selectNextPublic(@Param("articleId") Long articleId,
+                                           @Param("publishedAt") LocalDateTime publishedAt);
 
     /**
      * 阅读量原子自增（契约 §5.2 / D8：同步单条 UPDATE，view_count = view_count + 1 原子安全，
