@@ -181,6 +181,30 @@ services:
       backend:
         condition: service_healthy
 
+  # 演示数据装载（一次性，不随 up -d 启动）：
+  #   docker compose -f docker-compose.dev.yml --profile seed run --rm seed
+  #   SEED_FILE=seed-demo.sql docker compose -f docker-compose.dev.yml --profile seed run --rm seed
+  seed:
+    image: mysql:8.4.9
+    container_name: blog-seed
+    profiles: ["seed"]
+    volumes:
+      - ../sql/seed:/seed:ro
+    environment:
+      MYSQL_PWD: root
+      SEED_FILE: ${SEED_FILE:-seed-min.sql}
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -e
+        echo "装载 /seed/$$SEED_FILE → ry-vue ..."
+        mysql -hmysql -uroot --default-character-set=utf8mb4 ry-vue < /seed/$$SEED_FILE
+        echo "完成。"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
 volumes:
   mysql-data:
   redis-data:

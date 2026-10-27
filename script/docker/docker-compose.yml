@@ -217,6 +217,42 @@ services:
       backend:
         condition: service_healthy
 
+  # ---------------------------------------------------------------------------
+  # 演示数据装载（一次性服务，不会随 up -d 启动）
+  #
+  #   docker compose --profile seed run --rm seed                            # seed-min（开发）
+  #   SEED_FILE=seed-demo.sql docker compose --profile seed run --rm seed     # seed-demo（演示）
+  #
+  # 为什么不用 initdb：initdb 只在数据卷为空时执行一次，而种子需要「演示前随时重置」。
+  # 为什么不用 profiles 控制挂载：compose 的 volumes 不支持条件挂载，所以改为
+  # 「固定挂整个目录 + 用 SEED_FILE 选文件」。
+  # 幂等：种子 SQL 自身先删 22xx 段再插入，可反复执行。
+  # ---------------------------------------------------------------------------
+  seed:
+    image: mysql:8.4.9
+    container_name: blog-seed
+    profiles: ["seed"]
+    volumes:
+      - ../sql/seed:/seed:ro
+    environment:
+      MYSQL_PWD: ${MYSQL_ROOT_PASSWORD:-root}
+      SEED_FILE: ${SEED_FILE:-seed-min.sql}
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -e
+        echo "装载 /seed/$$SEED_FILE → ry-vue ..."
+        mysql -hmysql -uroot --default-character-set=utf8mb4 ry-vue < /seed/$$SEED_FILE
+        echo "完成，当前 22xx 段规模："
+        mysql -hmysql -uroot -N --default-character-set=utf8mb4 ry-vue -e "
+          SELECT CONCAT('  文章 ', COUNT(*)) FROM sd_blog_article WHERE article_id >= 2230000000000000000 AND article_id < 2240000000000000000;
+          SELECT CONCAT('  评论 ', COUNT(*)) FROM sd_blog_comment WHERE comment_id >= 2250000000000000000 AND comment_id < 2260000000000000000;
+          SELECT CONCAT('  标签 ', COUNT(*)) FROM sd_blog_tag WHERE tag_id >= 2220000000000000000 AND tag_id < 2230000000000000000;"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
 volumes:
   mysql-data:
   redis-data:

@@ -123,6 +123,38 @@ docs/                 ROADMAP / 契约 / 架构 / 部署说明
 Dockerfile            后端生产镜像（多阶段，BuildKit 缓存 Maven 依赖）
 ```
 
+## 演示数据（S26）
+
+库里默认是空的。两级种子任选，装载后立刻有内容：
+
+```bash
+docker compose --profile seed run --rm seed                            # min：8 篇，开发用
+SEED_FILE=seed-demo.sql docker compose --profile seed run --rm seed    # demo：52 篇，演示用
+```
+
+| 文件 | 规模 | 用途 |
+|---|---|---|
+| `seed-min.sql` | 3 作者 / 8 篇 / 30 评论 / 10 标签 | 本地开发，覆盖有/无封面、有/无代码块、多/单标签、草稿/发布/隐藏/下线四种状态 |
+| `seed-demo.sql` | 5 作者 / **52 篇** / 200 评论 / 20 标签 | 演示 / 面试，首页翻 5 页、标签云有长尾 |
+
+**几个特性**
+
+- **幂等**：种子先删 `22xx` 段再插入，可反复执行；不会碰框架 ID 与真实数据
+- **代码块带真实高亮**：生成时就跑过 shiki，打开详情页即彩色
+- **封面克制**：约 10 篇有封面（复用 MinIO 现有图），其余走无封面降级版式
+- **时间与关联自洽**：发布时间分散在近 90 天，评论时间全部晚于文章
+
+**演示账号**：`chenyu` / `linshen` / `suwan` / `zhoumu` / `hexi`，密码统一 `admin123`。
+⚠️ 仅演示用，生产禁止沿用。
+
+**改内容**：编辑 `blog-web/tooling/seed/data-*.mjs`，然后重跑生成器
+
+```bash
+cd ../blog-web && node tooling/gen-demo-seed.mjs
+```
+
+**清理历史脏数据**：`script/sql/cleanup-legacy-test-data.sql`。手动执行，分「预览 → 取消注释删除」两步，会删掉 `22xx` 段之外的**全部博客数据**（`admin` 等系统账号不受影响）。执行前先备份。
+
 ## 常见问题
 
 **端口被占用**：改 `.env` 里的 `BACKEND_PORT` / `WEB_PORT` / `ADMIN_PORT`，容器内端口不用动。
