@@ -44,7 +44,7 @@
 | S20 | Lenis 平滑滚动（动效收缩，D38） | — | — | 前端(blog-web) | ✅ 已验收（2026-10-15 人工确认：桌面手感/移动端跟手/reduced-motion 切换/PWA 安装态叠加全过；blog-web `bde6043` 零后端改动，详 §3 S20） | 0.5d |
 | S21 | CI/CD 补全（可选） | — | — | 后端+前端 | ⏸ 可选 | 1d |
 | S22 | 注册即登录（去掉注册后手动登录中间态） | §2.8（登录，复用） | — | 后端+前端(blog-web) | ✅ 已验收（2026-10-16；Agent E2E 六用例 + 人工浏览器验收均通过；后端 1 commit + blog-web 1 commit，详 §3 S22） | 0.5d |
-| S23 | blog-web 全站视觉改版（方向 C） | — | — | 前端(blog-web) | ✅ 已交付（2026-10-27；P1~P4 全部完成，P5 plus-ui 未做；44 张截图全绿 + Lighthouse 95/100/100/100） | 6~8d |
+| S23 | blog-web 全站视觉改版（方向 C） | — | — | 前端(blog-web) | ✅ 已交付（2026-10-27；P1~P4 全部完成，P5 缩水为「仅移除登录页第三方登录入口」；44 张截图全绿 + Lighthouse 95/100/100/100） | 6~8d |
 
 > 与 PRD §12.1 的顺序差异：评论提前到前台站之前，保证后端 API 闭环先行；
 > S9 前台可在 S5 完成后于前端仓库并行启动（首页/列表/详情依赖 S2+S6+S8 的接口）。
@@ -559,7 +559,7 @@ S2 遗留接入（已落地）：
 
 验收（Agent E2E，2026-10-16）：另起 8082 新后端实例 + blog-web 生产实例指向 8082（用户原 8081 实例未动），六用例全过——① 新用户名 + 正确验证码注册 → `{registered:true, logged:true}` + httpOnly token cookie（JWT 含新 userId）；② 注册后 `/api/auth/session` → `logged:true` + profile；③ 带 cookie 调 `/api/blog/user/profile` → 200 返回资料（token 对博客 API 生效）；④ 无 cookie 同接口 → 401；⑤ 错误验证码 → 后端原文「验证码错误」且不种 token；⑥ 重复用户名 →「保存用户…注册账号已存在」且不种 token。测试用户（`e2e_reg_20261016`）与临时实例均已清理。浏览器视觉验收（toast 呈现、跳回来源页落地、移动视口）2026-10-16 用户确认通过。
 
-### S23 blog-web 全站视觉改版（方向 C · 冷米白 + 衬线）✅ 已交付（2026-10-27；blog-web 全部完成，P5 plus-ui 小改未做）
+### S23 blog-web 全站视觉改版（方向 C · 冷米白 + 衬线）✅ 已交付（2026-10-27；blog-web 全部完成，P5 缩水为「仅移除登录页第三方登录入口」）
 
 背景（D41）：首页 1.1 在 Google Stitch 中冻结后，视觉语言与 S9/S12 已交付页面产生冲突——暖纸 `#f4f1ea` + 黄 CTA + 系统字体 + 圆角 2/4 分族，要换成冷米白 `#faf9f6` + 靛蓝 `#1a4d8f` + **Noto Serif SC 衬线标题** + 统一 3px 圆角。必须一次性全站统一，否则新旧两套皮肤并存。
 
@@ -596,7 +596,8 @@ S2 遗留接入（已落地）：
 3. **删除 6 个孤儿组件**：`ArticleCard`、`ArchiveGroup`、`utils/archiveGroup.ts`、`BgDrift`、`LayerStack`、`HeroVisual`（组件目录 36 → 30）。
 4. **T13 回归**：`shot.mjs` **44 张退出码 0、无 console error / 5xx**（生产构建 :3100）；`contrast.mjs` 由 16 项扩到 **18 项**并重算（首跑挂 2 项三级文字：深色 `#767c84` 仅 4.05:1、浅色 `#8b949e` 仅 3.1:1，修正为 `#8a9099` / `#667080` 后全过）；Lighthouse desktop **Perf 95 / A11y 100 / BP 100 / SEO 100**，FCP 1.0s、LCP 1.3s、TBT 0ms、CLS 0.007、首屏字体 6 片 213KB。相对 S17 全 100 **掉 5 分**，主因 total-byte-weight（5.86MB，几乎全是 OSS 未裁剪的封面原图）与 entry.css 内含 101 条 `@font-face`（分片方案固有成本）；图片优化归内容层（OSS resize 参数），字体方案不改。
 5. **回归中查出的规格不符**：移动端头条图被 `hidden sm:block` 一并隐藏（§4.2 要求 <640 保留满宽 16:9 作首屏锚点），改 `flex-col-reverse` + `aspect-video` 后修复。
-6. **遗留（不阻塞交付）**：① 语法高亮未接入（shiki 从未引入；方案 B「保存时高亮」需放开后端 jsoup 白名单，跨仓另排）；② WangEditor 无深色主题，深色下写作仍是白底；③ 代码块空行撑高（内容多余空行，需净化层 trim `<pre>`，后端小改）；④ **P5 plus-ui 小改未做**。
+6. **P5 缩水完成**：按用户 2026-10-27 拍板「后台首页不再改，就这样」，只移除登录页（`plus-ui/src/views/login.vue`）的第三方登录入口——微信/maxkey/topiam/Gitee/GitHub 五个圆形按钮、`doSocialLogin()`、两个只为它存在的 import、三段 CSS 及媒体查询两段；`index.vue` 不改。保留 `api/system/social/auth.ts` 与 i18n `login.social.*`。`oxlint` 0 警告、`vite build` 成功；**未跑** `vue-tsc` 与登录 E2E（纯删除，未触及验证码链路与 SocialCallback 路由）。
+7. **遗留（不阻塞交付）**：① 语法高亮未接入（shiki 从未引入；已定方案 A「客户端高亮」——不改契约、不动入库数据、历史文章自动生效，约 +85KB gzip，尚未实施）；② WangEditor 深色主题**已完成**（17 个 `--w-e-*` 变量映射到 token）；③ 代码块空行撑高（内容多余空行，需净化层 trim `<pre>`）——用户已决定**不做**（可能吃掉作者故意留的缩进空行）；④ OSS 图片裁剪——**不做**（默认存储是 MinIO，不支持 `x-oss-process`；换存储或后端生成缩略图成本过高，收益仅 Lighthouse 95→98）。
 7. **同期附带交付**：**D42 博客域上传接口**（见 §6）——解决博客作者传封面 403（原复用 `/resource/oss/upload` 需 `system:oss:upload`，而注册不分配角色）。
 
 ### 一次性 SQL 脚本执行状态（docs/）
