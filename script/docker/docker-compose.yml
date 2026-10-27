@@ -31,19 +31,35 @@ services:
       - "${MYSQL_PORT:-3306}:3306"
     volumes:
       - mysql-data:/var/lib/mysql
-      # 首次启动（数据卷为空）时自动执行，按文件名排序：
-      #   ① RuoYi 核心表 + 菜单 + 默认数据
-      #   ② 博客业务表（sd_blog_ 前缀 7 张）
-      # 明确不导入 ry_workflow / ry_job / ry_ai —— 属独立服务模块，博客 MVP 不使用（ROADMAP D10）。
-      # ⚠️ 不能挂整个 ../sql 目录：里面 7 个 blog*Menu.sql 按字母序排在 ry_vue.sql 之前，
-      #    会在 sys_menu 尚不存在时执行（ERROR 1146）并让建表脚本无法按预期落地（实测踩过）。
+      # 字符集：initdb 用的 mysql 客户端默认 latin1，会把 ry_vue.sql 的中文按字节拆开，
+      # 撑爆 varchar(30) 导致 ERROR 1406 并中止初始化（详见 mysql/my.cnf 注释）
+      - ./mysql/my.cnf:/etc/mysql/conf.d/my.cnf:ro
+      # 首次启动（数据卷为空）时自动执行，按文件名前缀排序：
+      #   01 RuoYi 核心表 + 菜单 + 默认数据（sys_client 只含 pc/app）
+      #   02 博客业务表（sd_blog_ 前缀 7 张，已含「无 del_flag」的最终结构）
+      #   03 web 客户端 —— ry_vue.sql 里没有，前台登录靠这条（D28），漏了会「客户端不存在」
+      #   10~13 后台治理菜单（S5/S6/S7/S10 逐步追加；脚本自带 DELETE 守卫，幂等可重跑）
+      #
+      # 明确不导入：
+      #   ry_workflow / ry_job / ry_ai —— 独立服务模块，博客 MVP 不使用（D10）；
+      #   blog_s2_migration.sql —— schema 已是最新结构（article_tag 无 del_flag），无需迁移；
+      #   blog_s0/s3/s16_cleanup.sql —— 清理测试数据用；
+      #   blog_s16_demo_data.sql —— 演示数据，归 S26；
+      #   script/sql/blog*Menu.sql —— **另一套菜单 id（2104273...）**，与上面 10~13 的
+      #     2105090... 不是同一套，两者都导入会在后台出现重复菜单。
+      #
+      # ⚠️ 不能挂整个 ../sql 目录：7 个 blog*Menu.sql 按字母序排在 ry_vue.sql 之前，
+      #    会在 sys_menu 尚不存在时执行（实测 ERROR 1146，最终 0 张表）。
       - ../sql/ry_vue.sql:/docker-entrypoint-initdb.d/01-ry-vue.sql:ro
       - ../../docs/blog_schema_v0.1.sql:/docker-entrypoint-initdb.d/02-blog-schema.sql:ro
+      - ../../docs/blog_s9_web_client.sql:/docker-entrypoint-initdb.d/03-blog-web-client.sql:ro
+      - ../../docs/blog_s5_menu.sql:/docker-entrypoint-initdb.d/10-menu-s5.sql:ro
+      - ../../docs/blog_s6_menu.sql:/docker-entrypoint-initdb.d/11-menu-s6.sql:ro
+      - ../../docs/blog_s7_menu.sql:/docker-entrypoint-initdb.d/12-menu-s7.sql:ro
+      - ../../docs/blog_s10_menu.sql:/docker-entrypoint-initdb.d/13-menu-s10.sql:ro
     command:
-      - --character-set-server=utf8mb4
-      - --collation-server=utf8mb4_general_ci
+      # 字符集与 lower_case_table_names 统一由 mysql/my.cnf 提供（后者必须在初始化时生效）
       - --explicit_defaults_for_timestamp=true
-      - --lower_case_table_names=1
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-root}"]
       interval: 10s

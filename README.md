@@ -47,10 +47,18 @@ docker compose up -d --build
 
 **启动顺序**由 healthcheck 强制：MySQL / Redis / MinIO 健康 → 后端启动 → 健康 → 前台与后台启动。ES 启动慢且搜索会自动降级到 MySQL，因此只等「已启动」不等「健康」。
 
-**数据库初始化**：MySQL 数据卷为空时，自动执行
-① `script/sql/ry_vue.sql`（核心表 + 菜单 + 默认数据）
-② `docs/blog_schema_v0.1.sql`（博客 7 张表）。
-不导入 `ry_workflow` / `ry_job` / `ry_ai`（独立服务模块，博客 MVP 不使用，见 ROADMAP D10）。
+**数据库初始化**：MySQL 数据卷为空时，按文件名前缀依次执行 7 个脚本：
+
+| 顺序 | 文件 | 作用 |
+|---|---|---|
+| 01 | `script/sql/ry_vue.sql` | 核心表 + 菜单 + 默认数据（`sys_client` 只有 `pc`/`app`） |
+| 02 | `docs/blog_schema_v0.1.sql` | 博客 7 张表（已含"无 del_flag"的最终结构） |
+| 03 | `docs/blog_s9_web_client.sql` | **`web` 客户端**——前台登录必需，`ry_vue.sql` 里没有 |
+| 10~13 | `docs/blog_s5/s6/s7/s10_menu.sql` | 后台治理菜单（自带 DELETE 守卫，幂等可重跑） |
+
+**不导入**：`ry_workflow` / `ry_job` / `ry_ai`（独立服务模块，D10）；`blog_s2_migration.sql`（结构已是最新）；`blog_s0/s3/s16_cleanup.sql`（清理用）；`blog_s16_demo_data.sql`（演示数据，归 S26）；`script/sql/blog*Menu.sql`（**另一套菜单 id**，与 10~13 不是同一套，同时导入会出现重复菜单）。
+
+字符集由 [`script/docker/mysql/my.cnf`](script/docker/mysql/my.cnf) 提供：initdb 调用的 `mysql` 客户端默认 `latin1`，会把中文按字节拆开、撑爆 `varchar(30)` 并中止初始化（`ERROR 1406`）。该文件同时固定 `lower_case_table_names=1`。
 
 ## 本地开发
 

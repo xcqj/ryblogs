@@ -705,7 +705,11 @@ S2 遗留接入（已落地）：
    - nginx 硬解析 upstream：后端未起时 `[emerg] host not found` 直接退出，且后端重启换 IP 会永久 502 → 改 `resolver 127.0.0.11` + 变量形式 `proxy_pass $upstream`；
    - `set` 必须写在 `rewrite ... break` **之前**：break 会终止后续 rewrite 阶段指令，否则 `uninitialized variable` + 500。
 4. **编排**：新增 `docker-compose.yml`（生产：7 服务全起、固定 tag、`env_file`、无源码挂载、healthcheck 串起 `mysql/redis/minio → backend → web/admin`，ES 用 `service_started` 因其慢且搜索可降级）；`docker-compose.dev.yml` 把 backend/web/admin 放进 `app` profile（默认仍只起 4 中间件），web 的 `NUXT_API_BASE` 由 `host.docker.internal:8081` 改为 `backend:8081`。去掉 compose 的 `name:` 以复用既有数据卷。
-5. **数据库初始化**：只挂两个文件（`ry_vue.sql` / `blog_schema_v0.1.sql`）。**不能挂整个 `script/sql` 目录**——7 个 `blog*Menu.sql` 按字母序排在 `ry_vue.sql` 之前，会在 `sys_menu` 尚不存在时执行（实测 `ERROR 1146` 且最终 0 张表）。
+5. **数据库初始化（两轮修正，第二版经空数据卷实测）**：按序挂 7 个脚本——`ry_vue.sql`（核心）/ `blog_schema_v0.1.sql`（博客 7 表）/ **`blog_s9_web_client.sql`（`web` 客户端，`ry_vue.sql` 只含 `pc`/`app`，漏了前台登录会「客户端不存在」）** / `blog_s5|s6|s7|s10_menu.sql`（治理菜单，自带 DELETE 守卫故幂等）。
+   - **不能挂整个 `script/sql` 目录**：7 个 `blog*Menu.sql` 按字母序排在 `ry_vue.sql` 之前，在 `sys_menu` 尚不存在时执行（实测 `ERROR 1146`，最终 0 张表）；
+   - **不能导 `script/sql/blog*Menu.sql`**：那是另一套菜单 id（`2104273...`），与 `docs/blog_s*_menu.sql` 的 `2105090...` 同时导入会出现重复菜单；
+   - **新增 `script/docker/mysql/my.cnf`**：initdb 用的 `mysql` 客户端默认 `latin1`，会把 `ry_vue.sql` 的中文按字节拆开——`'本部门及以下 密码666666'`（15 字符 / 31 字节）撑爆 `sys_user.nick_name varchar(30)`，报 `ERROR 1406` 后 entrypoint 中止并停容器，表现为「一键启动后库是空的」。修法是在 `[mysqld]`+`[client]` 两侧都设 `utf8mb4`（MySQL 8.4 已移除 `character-set-client-handshake`，传了会 unknown variable 直接起不来）；
+   - 空卷实测结果：**总表 31 / 博客表 7 / web 客户端 1 / 博客菜单 15 / 用户 3**，`ERROR` 0 条。
 6. **冒烟**：`script/docker/smoke.sh` **12 项全过**（7 容器运行 / 7 张博客表 / `/auth/code` 200 / `/prod-api` 反代 200 / 前台 SSR 200 / 公共列表 200）。未做「登录 → 发文」链路：登录需验证码位图 + RSA 加密，脚本内取答案脆弱且与业务耦合，该链路交由浏览器侧 `SHOT_TOKEN` 方案。
 7. **README**：后端与 plus-ui 的框架自带内容整段替换（原为 Gitee logo / 平台简介 / 加群），改为三仓关系图 + 一键启动 + 本地开发 + 变量表 + 常见问题（端口冲突 / ES 内存 / **OSS 地址在数据库表里** / 改了源码要 `--build`）；blog-web 补「容器化与一键启动」章节。
 
