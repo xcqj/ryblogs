@@ -626,9 +626,21 @@ S2 遗留接入（已落地）：
 | D2 | 双主题怎么存 | 一套 class + 读者站两份 CSS（`.prose .tok-x` / `.dark .prose .tok-x`），约 2KB |
 | D3 | plus-ui 是否同步 | **先不接**，接受两端不一致；后续可复用同一工具函数 |
 | D4 | 历史文章怎么办 | **不处理**；作者重新保存即自然获得高亮 |
-| D5 | 编辑器往返是否幂等 | **必须先实测**（见下） |
+| D5 | 编辑器往返是否幂等 | **已实测（2026-10-27）**：span 被剥、language 保留、`<br>` 读回丢失 → 方案 B 成立，但须先修换行往返（T26-a） |
 
-**最大的技术风险 = D5，必须先验证再开工**：WangEditor 对带 `<span class="tok-*">` 的 HTML 做「打开 → 保存」往返后：① span 是保留、被剥、还是嵌套？② `code.language-*` 类是否还在？丢了就无从判断语言。保存前一律「取 `<code>` 的 textContent 重新高亮」可保证幂等，但这依赖 language 类存活。
+**D5 已验证（2026-10-27，本地最小页面 + WangEditor UMD 包，未用登录态、未写库）**，五组 `setHtml → getHtml`：
+
+| 输入 | 输出 | 结论 |
+|---|---|---|
+| `<code class="language-js"><span class="tok-x">…` | `<code class="language-js">…` | span 被 Slate 剥掉 |
+| `<code class="language-js">…` | 原样 | **language 类保留** ✓ |
+| `<pre data-lang="js">` | `<pre>` | data-lang 丢失（备选方案不再需要） |
+| `<code>a\nb</code>` | `<code>a<br>b</code>` | `\n` → `<br>` |
+| `<code>a<br>b</code>` | `<code>ab</code>` | **`<br>` 读回被吃掉** |
+
+结论：**方案 B 成立**——language 存活即可按 `textContent` 重建高亮；span 被剥意味着编辑器内始终是纯文本，保存时重新生成，天然幂等、无嵌套风险。
+
+**附带挖出一个既有缺陷**：换行往返不一致（`getHtml` 出 `<br>` / `setHtml` 不认 `<br>`）就是"多行代码被压平"的根因，与高亮无关但必须先修（blog-web `T26-a`：入库统一用 `\n`，渲染靠 `white-space: pre`）。
 
 阶段与门禁：
 
@@ -762,7 +774,7 @@ S0 → S1 → S2 → S3 → S4 → S5 → S6 → S7 → S8   （后端关键路�
 | 2026-10-26 | D41（blog-web 全站视觉改版方向 C，用户拍板）：① **视觉语言全换**——冷米白底 `#faf9f6` + 深靛蓝强调 `#1a4d8f` + **Noto Serif SC 衬线标题**（正文仍无衬线）+ 圆角统一 3px + 近乎取消阴影；首页版式在 Stitch「首页1.1」冻结（头条 LATEST + 数据行列表 + 右栏双卡 + 编号锚点 01/02/03 + 系统状态卡）。**明示推翻已锁规格三条**：色板（暖纸→冷米白）、字体（首度引入 webfont）、圆角（2/4 分族→统一 3px）；动效基线与反馈分层两条继续有效。② 字体策略（2026-10-26 实测修正为方案 A）：`@fontsource/noto-serif-sc` 只引 700 字重——101 个 `unicode-range` 分片、合计 3.1MB、按需下载，实测典型首屏命中 11 片约 420KB；`font-display: swap` 由包内 CSS 提供、不做 preload、衬线仅用于 H1 级标题（正文与列表行标题仍无衬线）；验收 LCP ≤2.5s（模拟 Slow 4G）、CLS=0、**首屏字体 ≤500KB**（100KB 指标对中文衬线不可达，已作废）；S17 的 Lighthouse 全 100 基线须在换地基后重测记录差异。③ 方案来源 = **Google Stitch 辅助**（含 MCP）：仅产出视觉方案，产物必须回译成 `tokens.css` 变量与 `uno.config.ts` shortcut，**禁止搬运内联样式/px 魔法值/编造数据**；每屏须过"数据契约"核对（导航仅首页/标签/搜索，禁止分类/专栏/话题/归档——Category 永久舍弃红线）。④ plus-ui **不同步**，只借版式思路做登录页/首页小改（独立仓独立 commit）。⑤ 立项新切片 S23（P1 补屏 → P2 立规范 → P3 换地基 → P4 逐页 → P5 plus-ui），纯表现层、零契约与数据改动；D39「精修」口径（不动信息架构）**不适用**本轮 | 本文件 §2/§3 S23 / blog-web/docs/plan.md §2.21 / blog-web/design/stitch/README.md |
 | 2026-10-26 | D41 附注（编号缺陷登记，未擅改）：`D39` 在 2026-10-13（plus-ui 门面改版）与 2026-10-16（前台质感精修轮验收关闭）被**两次使用**，检索存在歧义；后续新决策自 D41 起编号，D39 歧义待单独修订（修订时须同步 §3 S19 与 blog-web plan §2.19 的引用） | 本文件 §6 |
 | 2026-10-27 | D42（博客域上传接口，起因：作者传封面返回 403「没有访问权限，请联系管理员授权」）：① **新增 `POST /blog/oss/upload`**（`org.dromara.system.controller.blog.BlogOssController`），**只要求登录、不设按钮权限**，内部转调 `ISysOssService.upload(file, null)` 返回 `SysOssUploadVo`；② 根因实锤——`SysRegisterService.register()` 只调 `userService.registerUser`，**不写 `sys_user_role`**，博客用户默认零权限；而 `SysOssController.upload` 带 `@SaCheckPermission("system:oss:upload")`，复用后台接口必然 403（封面与正文插图同链路）；③ **否决**「给角色配 `system:oss:upload`」：每来一个新用户都要手工授权，不可持续，且给普通读者授予后台「文件管理」权限语义不成立；④ 前端仅改 Nitro 代理的转发目标（`server/api/resource/oss/upload.post.ts`），浏览器端路径 `/api/resource/oss/upload` 与所有组件零改动；plus-ui **不随本决策变更**（其使用者是管理员，持有该权限）；⑤ 合规说明：接口只做「登录校验 + 转调」，**未新建对象存储实现**，符合 AGENTS.md「复用 RuoYi OSS 能力，不重复实现」；`ruoyi-api` 的 `OssService` 接口未改，避免动跨模块契约 | blog-api.md §2.4 / architecture.md 请求链 / blog-web/docs/plan.md §2.8 / plus-ui/docs/frontend-plan.md |
-| 2026-10-27 | D43（S23 关闭 + S24 立项：正文语法高亮走方案 B「保存时高亮」）：① **S23 正式关闭**——三仓工作区干净、构建全绿、44 张截图 + Lighthouse 95/100/100/100 留档；P5 缩水为「仅移除 plus-ui 登录页第三方登录入口」（后台首页按用户拍板不改）；② 代码块语法高亮单开 **S24**（后端 + blog-web，1.5~2d），方案由用户选定 **B：编辑器保存前用 shiki 高亮、带标记的 HTML 入库**——读时零成本、SEO 带高亮、无 FOUC；**明确接受「历史文章无高亮」这一代价**（不批量重刷，作者重新保存即自然生效）；③ 方案 A（客户端高亮，不改契约、历史文章自动生效，约 +85KB gzip）与 C（Nitro 层高亮）不采用，三方案对比存档于 §3 S24；④ 高亮标记倾向 **class（`tok-*`）而非 inline style**：jsoup 白名单只需校验 `^tok-[a-z0-9]+$`，可彻底规避 `style` 注入面（`url()`、`position:fixed` 等）；⑤ **开工前必须先过 D5 验证门禁**——WangEditor 对带 `<span class="tok-*">` 的 HTML 做「打开→保存」往返后，span 是否幂等、`code.language-*` 是否保留；不过此门禁不进实现阶段；⑥ plus-ui 暂不同步（其编辑器保存的文章无高亮），后续可复用同一工具函数 | 本文件 §2/§3 S24 / blog-web/docs/plan.md §2.22 / blog-api.md §3.1 |
+| 2026-10-27 | D43（S23 关闭 + S24 立项：正文语法高亮走方案 B「保存时高亮」）：① **S23 正式关闭**——三仓工作区干净、构建全绿、44 张截图 + Lighthouse 95/100/100/100 留档；P5 缩水为「仅移除 plus-ui 登录页第三方登录入口」（后台首页按用户拍板不改）；② 代码块语法高亮单开 **S24**（后端 + blog-web，1.5~2d），方案由用户选定 **B：编辑器保存前用 shiki 高亮、带标记的 HTML 入库**——读时零成本、SEO 带高亮、无 FOUC；**明确接受「历史文章无高亮」这一代价**（不批量重刷，作者重新保存即自然生效）；③ 方案 A（客户端高亮，不改契约、历史文章自动生效，约 +85KB gzip）与 C（Nitro 层高亮）不采用，三方案对比存档于 §3 S24；④ 高亮标记倾向 **class（`tok-*`）而非 inline style**：jsoup 白名单只需校验 `^tok-[a-z0-9]+$`，可彻底规避 `style` 注入面（`url()`、`position:fixed` 等）；⑤ **D5 验证已完成（2026-10-27，本地最小页面 + WangEditor UMD 包，未用登录态也未写库）**——实测四组：`span.tok-*` 被 Slate **剥掉**、`code.language-*` **保留**、`pre[data-lang]` **丢失**、`<br>` 读回时**被吃掉**（`a<br>b` → `ab`）。结论 **方案 B 成立**：language 存活即可按 textContent 重建高亮，span 被剥反而让幂等更简单（编辑器内永远是纯文本，不存在嵌套）。**同时暴露一个既有缺陷**：代码块换行往返不一致（`getHtml` 输出 `<br>`、`setHtml` 不认 `<br>`），意味着「作者打开编辑页 → 再保存」会把多行代码压平；方案 B 每次保存都要往返，故须在 S24 内一并修（blog-web plan T26-a：入库统一用 `\n`，渲染靠 `white-space: pre`）；⑥ plus-ui 暂不同步（其编辑器保存的文章无高亮），后续可复用同一工具函数 | 本文件 §2/§3 S24 / blog-web/docs/plan.md §2.22 / blog-api.md §3.1 |
 
 ### 待决策
 
