@@ -194,11 +194,11 @@ write_state() {
 }
 
 cmd_deploy() {
-  local from_state="" no_pull=0 no_smoke=0
+  local from_state="" no_pull=0 no_smoke=0 cli_version=""
   while (( $# )); do
     case "$1" in
       --from-state) from_state="$2"; shift 2 ;;
-      --version)    RELEASE_VERSION="$2"; shift 2 ;;
+      --version)    cli_version="$2"; shift 2 ;;
       --db-changed) DB_CHANGED=true; shift ;;
       --no-pull)    no_pull=1; shift ;;
       --no-smoke)   no_smoke=1; shift ;;
@@ -207,6 +207,10 @@ cmd_deploy() {
   done
 
   load_env
+  # ⚠️ 必须晚于 load_env：.env 里的 RELEASE_VERSION（本地演示为 local）会覆盖命令行参数，
+  # 否则 `up --version v0.1.0` 会去拉 `:local`（实测踩过，导致发布失败）
+  [[ -n "$cli_version" ]] && RELEASE_VERSION="$cli_version"
+
   if [[ -n "$from_state" ]]; then
     [[ -f "$from_state" ]] || die "找不到状态文件: $from_state"
     set -a
