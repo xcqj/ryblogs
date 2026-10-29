@@ -54,6 +54,12 @@ cp .env.example .env && chmod 600 .env     # 填三个口令 + NUXT_* + OAuth
 ./deploy.sh seed seed-demo.sql             # 可选：52 篇演示数据（会重建 ES 索引）
 ```
 
+> **部署目录约定**：流水线使用固定目录 `~/sdblog/current`（可用环境变量 `SDBLOG_DEPLOY_DIR` 覆盖），
+> 每次发布把部署包**覆盖**进去——`.env` 与 `.state` 不在包内，因此天然保留。
+> 从仓库里手动跑时目录是 `RuoYi-Vue-Plus/deploy`。
+> ⚠️ 两个目录不要各跑一次：`flock` 只能挡同机并发进程，挡不住两份 `.state` 分叉。
+> 首次在流水线目录部署前，先把 `.env` 与 `.state` 复制过去（或直接 `cp .env.example .env` 重填）。
+
 ## 4. 命令
 
 | 命令 | 说明 |
