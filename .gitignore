@@ -61,3 +61,13 @@ application-ga.yml
 .env
 .env.*
 !.env.example
+
+### 部署域（S29.1）：密钥、部署记录、运行时暂存的初始化资产、打包产物 ###
+deploy/.env
+deploy/.env.*
+!deploy/.env.example
+deploy/.state/
+deploy/sql/
+deploy/mysql/
+deploy/seed/
+deploy/dist/

@@ -1,0 +1,103 @@
+# =============================================================================
+# 应用层（S29.1）：纯 image:，无 build:，无宿主机端口
+#
+# 镜像名一律走变量插值，回滚时只需导出 digest，不改文件：
+#   image: ${BACKEND_IMAGE:-ghcr.io/xcqj/sdblog-backend:${RELEASE_VERSION:-latest}}
+#
+# 跨容器互访只用服务名（mysql / redis / minio / es / backend），
+# 不使用 host.docker.internal —— 部署机不存在"宿主机上的后端"。
+# =============================================================================
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+
+  backend:
+    image: ${BACKEND_IMAGE:-ghcr.io/xcqj/sdblog-backend:${RELEASE_VERSION:-latest}}
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      TZ: Asia/Shanghai
+      # 镜像以 -Pprod 构建（jar 内默认 profile 为 prod），这里再显式钉一次
+      SPRING_PROFILES_ACTIVE: prod
+      # dynamic-datasource 的 master 覆盖：Spring relaxed binding 允许大写+下划线覆盖嵌套 Map
+      # （S25 P1 已实测：日志出现 add a datasource named [master] success）
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-ry-vue}?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&serverTimezone=GMT%2B8&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_USERNAME: root
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
+      # 博客搜索：自定义键 blog.es.address（@Value 绑定，不是标准 spring.elasticsearch）
+      BLOG_ES_ADDRESS: es:9200
+      # 图床上传地址由数据库 sys_oss_config 决定，不在镜像里
+      JAVA_OPTS: ${JAVA_OPTS:--Xms256m -Xmx512m}
+      # 社交登录（prod justauth 已改为 env 读取，S29.1 W3）
+      JUSTAUTH_ADDRESS: ${JUSTAUTH_ADDRESS:-https://sdblog.us.ci}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      GITHUB_REDIRECT_URI: ${GITHUB_REDIRECT_URI:-}
+      GITEE_CLIENT_ID: ${GITEE_CLIENT_ID:-}
+      GITEE_CLIENT_SECRET: ${GITEE_CLIENT_SECRET:-}
+      GITEE_REDIRECT_URI: ${GITEE_REDIRECT_URI:-}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      # ES 慢启动，且搜索异常自动降级 MySQL LIKE，不必阻塞后端
+      es:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8081/"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
+
+  web:
+    image: ${WEB_IMAGE:-ghcr.io/xcqj/sdblog-web:${RELEASE_VERSION:-latest}}
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      TZ: Asia/Shanghai
+      NUXT_HOST: 0.0.0.0
+      NUXT_PORT: "3000"
+      NUXT_API_BASE: http://backend:8081
+      NUXT_APP_CLIENT_ID: ${NUXT_APP_CLIENT_ID:-}
+      NUXT_RSA_PUBLIC_KEY: ${NUXT_RSA_PUBLIC_KEY:-}
+      NUXT_RSA_PRIVATE_KEY: ${NUXT_RSA_PRIVATE_KEY:-}
+      # S17 SEO：sitemap / rss / robots / canonical 的绝对地址，必须配真实域名
+      NUXT_PUBLIC_SITE_URL: ${PUBLIC_SITE_URL:-https://sdblog.us.ci}
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  admin:
+    image: ${ADMIN_IMAGE:-ghcr.io/xcqj/sdblog-admin:${RELEASE_VERSION:-latest}}
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      TZ: Asia/Shanghai
+    depends_on:
+      backend:
+        condition: service_healthy
+    # nginx 的 /healthz 由 deploy/nginx.conf 提供（容器内 80）
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/healthz"]
+      interval: 15s
+      timeout: 3s
+      retries: 6
+      start_period: 10s

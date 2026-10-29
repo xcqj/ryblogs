@@ -1,0 +1,37 @@
+# =============================================================================
+# 本地构建覆盖层（仅本地演示，**永不进部署包**）
+#
+#   docker compose -f compose.deps.yml -f compose.app.yml -f compose.target-wsl.yml \
+#                  -f compose.build.yml build
+#
+# 为什么单独一份：
+#   1) 部署机不持源码、不编译，base/app 两份必须保持"纯 image:"；
+#   2) 这里的 build.context 跨仓（../../blog-web、../../../plus-ui），
+#      只有"三仓同级 clone"的开发机能满足，部署机拿到也无意义；
+#   3) 构建产物 tag 仍由 compose.app.yml 的 image: 规则决定（配合 .env 的
+#      RELEASE_VERSION=local），所以 build 完直接 up 即可，不需要 retag。
+#
+# 上下文相对路径以**第一个 -f 文件所在目录**为基准 → 本文件必须与其它四份同目录。
+# =============================================================================
+
+services:
+
+  es:
+    build:
+      context: ../script/docker/es
+      dockerfile: Dockerfile
+
+  backend:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+
+  web:
+    build:
+      context: ../../blog-web
+      dockerfile: Dockerfile
+
+  admin:
+    build:
+      context: ../../plus-ui
+      dockerfile: Dockerfile

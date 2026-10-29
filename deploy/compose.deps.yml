@@ -1,0 +1,139 @@
+# =============================================================================
+# 中间件层（S29.1）：纯 image:，不含 build:、不含宿主机端口
+#
+# 组合方式（必须与 target 覆盖层一起用，端口与数据目录都在 target 里）：
+#   docker compose -f compose.deps.yml -f compose.app.yml -f compose.target-wsl.yml up -d
+#
+# 约定：
+#   - 容器内端口永不变（mysql 3306 / redis 6379 / minio 9000-9001 / es 9200）
+#   - 宿主机端口一律在 compose.target-*.yml 里绑定，且只绑 127.0.0.1
+#   - 数据目录走 ${DATA_DIR}（绝对路径），不建命名卷：备份/恢复/守卫都依赖真实路径
+#   - initdb 只挂 ./sql/ 下按序号命名的 7 个文件，绝不挂整个目录
+#     （挂目录会按字母序先跑 menu 脚本，sys_menu 尚不存在 → ERROR 1146 → 0 张表）
+# =============================================================================
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+
+  mysql:
+    image: mysql:8.4.9
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      TZ: Asia/Shanghai
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD 未设置}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-ry-vue}
+    command:
+      - --explicit_defaults_for_timestamp=true
+    volumes:
+      - ${DATA_DIR:?DATA_DIR 未设置}/mysql:/var/lib/mysql
+      # 字符集 + lower_case_table_names=1：两者都必须在**空卷首次初始化**时生效，
+      # 已有数据卷再改无效（详见 mysql/my.cnf 注释）
+      - ./mysql/my.cnf:/etc/mysql/conf.d/my.cnf:ro
+      # 首次启动（数据卷为空）按文件名序号执行，顺序不可乱
+      - ./sql/01-ry-vue.sql:/docker-entrypoint-initdb.d/01-ry-vue.sql:ro
+      - ./sql/02-blog-schema.sql:/docker-entrypoint-initdb.d/02-blog-schema.sql:ro
+      - ./sql/03-blog-web-client.sql:/docker-entrypoint-initdb.d/03-blog-web-client.sql:ro
+      - ./sql/10-menu-s5.sql:/docker-entrypoint-initdb.d/10-menu-s5.sql:ro
+      - ./sql/11-menu-s6.sql:/docker-entrypoint-initdb.d/11-menu-s6.sql:ro
+      - ./sql/12-menu-s7.sql:/docker-entrypoint-initdb.d/12-menu-s7.sql:ro
+      - ./sql/13-menu-s10.sql:/docker-entrypoint-initdb.d/13-menu-s10.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  redis:
+    image: redis:8.6.3
+    restart: unless-stopped
+    logging: *default-logging
+    # 密码走命令行（覆盖 conf 里的项），持久化配置走挂载的 redis.conf：
+    # AOF everysec 是 S15-D1 ④ 遗留的"仓库外手动步骤"，此处落进部署包
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD 未设置}"]
+    volumes:
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - ${DATA_DIR:?DATA_DIR 未设置}/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+
+  minio:
+    image: pgsty/minio:RELEASE.2026-04-17T00-00-00Z
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      TZ: Asia/Shanghai
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER 未设置}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD 未设置}
+    command: server --address ":9000" --console-address ":9001" /data
+    volumes:
+      - ${DATA_DIR:?DATA_DIR 未设置}/minio:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  es:
+    image: ${ES_IMAGE:-ghcr.io/xcqj/sdblog-es:${RELEASE_VERSION:-latest}}
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      TZ: Asia/Shanghai
+      # 堆大小是 WSL 与云目标的差异项，放 .env；256m 起步（WSL 内存紧张）
+      ES_JAVA_OPTS: ${ES_JAVA_OPTS:--Xms256m -Xmx256m}
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      xpack.monitoring.enabled: "false"
+    volumes:
+      - ${DATA_DIR:?DATA_DIR 未设置}/es:/usr/share/elasticsearch/data
+    # ES 启动慢，且搜索异常会自动降级 MySQL，故后端只等 service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 90s
+
+  # ---------------------------------------------------------------------------
+  # 演示种子（S26 两级：seed-min 8 篇 / seed-demo 52 篇），一次性服务
+  #
+  #   docker compose ... --profile seed run --rm seed
+  #   SEED_FILE=seed-min.sql docker compose ... --profile seed run --rm seed
+  #
+  # 为什么不进 initdb：initdb 只在空卷执行一次，而种子需要"演示前随时重置"；
+  # 种子自身先删 22xx 段再插入，幂等可重放。
+  # ---------------------------------------------------------------------------
+  seed:
+    image: mysql:8.4.9
+    profiles: ["seed"]
+    logging: *default-logging
+    volumes:
+      - ./seed:/seed:ro
+    environment:
+      MYSQL_PWD: ${MYSQL_ROOT_PASSWORD}
+      SEED_FILE: ${SEED_FILE:-seed-demo.sql}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -e
+        echo "装载 /seed/$$SEED_FILE → ${MYSQL_DATABASE:-ry-vue} ..."
+        mysql -hmysql -uroot --default-character-set=utf8mb4 "${MYSQL_DATABASE:-ry-vue}" < /seed/$$SEED_FILE
+        echo "完成，当前规模："
+        mysql -hmysql -uroot -N --default-character-set=utf8mb4 "${MYSQL_DATABASE:-ry-vue}" -e "
+          SELECT CONCAT('  文章 ', COUNT(*)) FROM sd_blog_article;
+          SELECT CONCAT('  评论 ', COUNT(*)) FROM sd_blog_comment;
+          SELECT CONCAT('  标签 ', COUNT(*)) FROM sd_blog_tag;"

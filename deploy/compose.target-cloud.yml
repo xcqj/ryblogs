@@ -1,0 +1,56 @@
+# =============================================================================
+# 目标覆盖层：云服务器（S29.2，**占位，未启用**）
+#
+# 结构必须与 compose.target-wsl.yml 完全对齐，S29.2 只在此文件与入口层做增量：
+#   - 入口二选一（见 docs/cloud-deployment.md §4）：
+#       A) Caddy 自动 HTTPS：80/443 由 Caddy 监听，应用继续只绑 127.0.0.1
+#       B) 复用 Cloudflare Tunnel：直接沿用 wsl 版端口，无需 80/443
+#   - 内存按服务器规格上调；若 2C4G 且决定不上 ES，则把 blog.search.engine 切 mysql
+#     并注释掉 es 服务（不要删，保留可回切）
+#
+# 现在不要直接用它起栈：端口/资源尚未按真实服务器标定。
+# =============================================================================
+
+name: sdblog-cloud
+
+services:
+
+  mysql:
+    ports:
+      - "127.0.0.1:${MYSQL_PORT:-13306}:3306"
+    mem_limit: ${MYSQL_MEM:-1g}
+
+  redis:
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-16379}:6379"
+    mem_limit: ${REDIS_MEM:-256m}
+
+  minio:
+    ports:
+      - "127.0.0.1:${MINIO_PORT:-19000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-19001}:9001"
+    mem_limit: ${MINIO_MEM:-384m}
+
+  es:
+    ports:
+      - "127.0.0.1:${ES_PORT:-19200}:9200"
+    mem_limit: ${ES_MEM:-1g}
+    environment:
+      ES_JAVA_OPTS: ${ES_JAVA_OPTS:--Xms512m -Xmx512m}
+
+  backend:
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-19081}:8081"
+    mem_limit: ${BACKEND_MEM:-1500m}
+    environment:
+      JAVA_OPTS: ${JAVA_OPTS:--Xms512m -Xmx1024m}
+
+  web:
+    ports:
+      - "127.0.0.1:${WEB_PORT:-19300}:3000"
+    mem_limit: ${WEB_MEM:-768m}
+
+  admin:
+    ports:
+      - "127.0.0.1:${ADMIN_PORT:-19080}:80"
+    mem_limit: ${ADMIN_MEM:-128m}
