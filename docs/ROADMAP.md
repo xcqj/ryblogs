@@ -837,7 +837,8 @@ SEED_FILE=seed-demo.sql docker compose --profile seed run --rm seed    # seed-de
 6. **阻塞项（W4）**：① 需为 `ryblogs` 注册自托管 runner（label `sdblog-wsl`）；② 需在 WSL 以 user01 执行 `docker login ghcr.io`（PAT `read:packages`）；③ 需在 CF 为 `qdblog-demo` 加两条 Public Hostname，并给该隧道建独立 systemd unit + token（现有 `cloudflared.service` 的 token 文件已丢失）；④ 需 sudo 持久化 `vm.max_map_count`。
 7. **W4 公网打通（2026-10-30 晚）**：三条 Public Hostname 最初配成**两层子域**（`sdblog.us.ci.qdappt.us.ci`）→ Cloudflare 免费 Universal SSL 只覆盖「apex + 一层通配」，实测 TLS handshake failure；改单层 `sdblog.qdappt.us.ci` / `admin-sdblog.qdappt.us.ci` / `img-sdblog.qdappt.us.ci` 后全部 200。封面破图同步修掉：OSS 改 `endpoint=minio:9000`（容器内）+ `domain_url=https://img-sdblog.qdappt.us.ci`（公网）+ `access_policy=2`，10 条种子封面重写为图片域名，桶设匿名下载后封面 200；`smoke-public.sh` **8/8**。
 8. **发布验证（v0.1.0 / v0.1.1）**：三仓打 tag 后 4 枚镜像均产出（backend 942MB / es 1.03GB / admin 109MB / web 268MB）；`deploy.sh up --version` 真实拉取并起栈，`up → rollback → 前滚` 三连各 **19/19** 冒烟通过，状态文件记录 4 枚 digest、`previous` 可回退。**期间修掉一个发布脚本 bug**：`--version` 被 `.env` 的 `RELEASE_VERSION` 覆盖，导致去拉 `:local` 而非目标版本（`e83d217ab`，v0.1.1 即该修复）。
-9. **剩余两项**：① `release.yml` 的 `workflow_dispatch` 尚未人工点过一次（preflight → bundle → deploy → 公网冒烟 全自动链路待验证）；② `cloudflared.service` 的 token 文件仍未安装（`/etc/cloudflared/token` 缺失，进程内存里是旧 token，重启即失效，见 `docs/cloud-deployment.md` §3.3）。
+9. **收尾（2026-10-30 06:34）**：`release.yml` 首次全绿（Release #3：preflight 1m37s + deploy 33s = **2m18s**），`preflight → 打 bundle → 解包到 ~/sdblog/current → deploy.sh up → 公网冒烟` 全自动链路跑通；`cloudflared` token 已落盘 `/etc/cloudflared/token`（249B，服务 `enabled`+`active`，重启后三域名仍 200）。**S29.1 完成**，仅剩 S29.2（云目标，阻塞于服务器/备案）。
+10. **两个已知遗留（非阻塞）**：① GitHub 提示 `actions/checkout@v4` / `upload-artifact@v4` 在 Node 24 runner 上属 deprecated（warning，不影响执行，后续可升 v5）；② 本机存在两份部署目录（仓库 `deploy/` 用于开发、`~/sdblog/current` 供流水线），改动后需 `bundle.sh` 覆盖，**不要两边各跑一次**（`flock` 挡不住状态文件分叉）。
 
 **非目标**：云主机与备案（S29.2）、K8s、staging 多环境、灰度、异地备份。
 

@@ -57,8 +57,8 @@ S29.2 云服务器目标（承接已停用的 S13）
 | 前滚（再回到新版本 + 冒烟） | ≤ 60s | **~55s**（19/19） |
 | 备份 | ≤ 10s | ~2s（库 52K / MinIO 8K） |
 | 恢复（删库重建 + 起栈 + 冒烟） | ≤ 120s | ~65s |
-| release 流水线 run | ≤ 6min | **未测**（待 PAT + tag） |
-| 公网两域名 | 全程 200 | **未测**（待 CF 路由） |
+| release 流水线 run | ≤ 6min | **2m18s**（preflight 1m37s + deploy 33s，Release #3 全绿） |
+| 公网两域名 | 全程 200 | **200 / 200**（含图片域 200） |
 
 > 首次 `pull` 未测：私有包需先 `docker login ghcr.io`；四枚镜像合计约 2.3GB，首次拉取时长与增量发布不可比。
 
@@ -92,7 +92,8 @@ S29.2 云服务器目标（承接已停用的 S13）
 - sitemap 内链接为 `https://sdblog.qdappt.us.ci`，robots 声明 sitemap，详情页 SSR 正常
 - **图片链路**：OSS 配置改为 `endpoint=minio:9000`（容器内）+ `domain_url=https://img-sdblog.qdappt.us.ci`（公网）+ `access_policy=2`；10 条种子封面 URL 重写为图片域名；桶改为匿名下载后封面 200（2MB jpeg）
 - 桶策略的落地方式（环境限制用不了 `mc`，Docker Hub 镜像源与 dl.min.io 均不可达）：**把开发栈已公开桶的 `.minio.sys/buckets/ruoyi` 元数据复制到演示栈**（停 MinIO → 容器内 root 复制 → 启动）
-- 遗留：`cloudflared.service` 的 token 文件仍缺失（进程在跑、重启即失效）→ 需 `sudo` 重建 `/etc/cloudflared/token` 后 restart；发布流水线 e2e（打 tag → CI → GHCR → release）待首次推送后验证
+- `cloudflared`：token 已落盘 `/etc/cloudflared/token`（249B / 600，轮换后的新 token），`systemctl restart` 后 `enabled`+`active`，三条域名仍 200
+- 发布流水线 e2e：三仓 `v0.1.1` tag → 四枚镜像 → `release.yml`（preflight 1m37s + deploy 33s）**全绿**；`deploy.sh up` 对同版本幂等（镜像 digest 未变时不会重建容器）
 
 ## 4. S29.2 待办与待决
 
