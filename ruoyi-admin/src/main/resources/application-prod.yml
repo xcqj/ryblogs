@@ -243,8 +243,8 @@ sms:
 
 --- # 三方授权
 justauth:
-  # 前端外网访问地址
-  address: http://localhost:80
+  # 前端外网访问地址（S29.1：生产必须是真实域名，否则所有回调都指向 localhost）
+  address: ${JUSTAUTH_ADDRESS:https://sdblog.us.ci}
   type:
     maxkey:
       # maxkey 服务器地址
@@ -269,10 +269,18 @@ justauth:
       client-id: 10**********6
       client-secret: 1f7d08**********5b7**********29e
       redirect-uri: ${justauth.address}/social-callback?source=weibo
+    # S29.1：生产社交登录改为 env 注入。
+    # 原 gitee 段是一对上游模板遗留的**明文**凭据（非本项目应用），已按"视为泄漏"删除；
+    # 若要在生产启用 Gitee 登录，请填自己的 OAuth App。
+    github:
+      client-id: ${GITHUB_CLIENT_ID:}
+      client-secret: ${GITHUB_CLIENT_SECRET:}
+      # 回调地址必须与 OAuth App 后台登记的**整串**完全一致（含 ?source=github，S14 实测）
+      redirect-uri: ${GITHUB_REDIRECT_URI:${justauth.address}/social-callback?source=github}
     gitee:
-      client-id: 91436b7940090d09c72c7daf85b959cfd5f215d67eea73acbf61b6b590751a98
-      client-secret: 02c6fcfd70342980cd8dd2f2c06c1a350645d76c754d7a264c4e125f9ba915ac
-      redirect-uri: ${justauth.address}/social-callback?source=gitee
+      client-id: ${GITEE_CLIENT_ID:}
+      client-secret: ${GITEE_CLIENT_SECRET:}
+      redirect-uri: ${GITEE_REDIRECT_URI:${justauth.address}/social-callback?source=gitee}
     dingtalk:
       client-id: 10**********6
       client-secret: 1f7d08**********5b7**********29e
