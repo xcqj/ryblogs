@@ -117,10 +117,33 @@ docker-compose.dev.yml（script/docker/）
 └── IDEA / Maven 3.9.x / JDK 21（sdkman）
 ```
 
-### 5.3 CI / CD 现状
+### 5.3 CI / CD 现状与目标形态
 
-三仓各有 `.github/workflows/ci.yml`（构建级：后端 `mvn compile`、两个前端 `install + build`）。
-**自动部署是唯一依赖目标服务器的一环**，S25 明确列为非目标；镜像构建与一键编排已就绪（见 S25）。
+**现状（S25/S28 交付）**：三仓各有 `.github/workflows/ci.yml`（构建级：后端 `mvn compile`、两个前端 `install + build`）；
+镜像构建与一键编排已就绪，但 compose 仍是「两份全量文件 + 带 `build:`」，且**没有任何镜像推送与自动部署**。
+
+**目标形态（S29.1，计划中，方案见 `docs/cloud-deployment.md`）**：
+
+```text
+GitHub（三仓各自 CI 门禁 + 各自 push 镜像，互不跨仓 checkout）
+  ├─ RuoYi-Vue-Plus ─tag v*─▶ ghcr.io/xcqj/sdblog-{backend,es}
+  ├─ plus-ui        ─tag v*─▶ ghcr.io/xcqj/sdblog-admin
+  └─ blog-web       ─tag v*─▶ ghcr.io/xcqj/sdblog-web
+                    │
+                    ▼
+release.yml（唯一入口 workflow_dispatch；preflight 校验四枚镜像齐备）
+                    │  自托管 runner（user01，与 appt 共用宿主机）
+                    ▼
+/srv 之外的部署目录（只有部署包：compose 分层 + SQL + 脚本，无源码）
+  deploy.sh up|adopt|down|rollback|backup|restore|status
+  docker compose -f deps -f app -f target-wsl up -d --no-build
+                    │
+                    ▼
+Cloudflare Named Tunnel（qdblog-demo）──▶ sdblog.us.ci / admin.sdblog.us.ci
+```
+
+要点：**部署机永不编译**（只 pull 不可变镜像）；回滚按 digest；DB 只前滚（无迁移框架）；
+入口与发布链解耦（隧道只依赖「应用端口不变」这一约定）。云目标（S29.2）只换 `-f` 组合，不换脚本。
 
 ## 6. 扩展边界（预留不改契约）
 

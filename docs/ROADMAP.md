@@ -1,6 +1,6 @@
 # 博客 MVP 开发路线图（ROADMAP）
 
-> 状态：v0.4 · 2026-10-15（新增 S13~S21 面试亮点切片；MVP S0–S12 已全部关闭；S14~S20 已关闭，S13 仍阻塞 D37，S21 可选待定）
+> 状态：v0.5 · 2026-10-30（新增 **S29 发布链与双目标部署**：S29.1 WSL 目标 / S29.2 云目标；**S13 并入 S29.2、S21 并入 S29.1，两编号停用**（D45）；MVP S0–S12 与 S14~S28 已关闭，S11 移动端 MVP 后启动）
 > 定位：排期文档——做什么、按什么顺序做、每一步的完成标准是什么。
 > 本文件不重复权威内容，只引用：
 >
@@ -34,7 +34,7 @@
 | S10 | 管理后台前端（博客） | §3、§7、§11、§12、§13 | 5/6/8 前端面 | 前端 | ✅ 已验收（2026-10-06，浏览器验收通过；治理页×3 + 作者发文/编辑/详情/版本 + 个人资料 tab + merge，D23/D24/D26） | 3~5d |
 | S11 | 移动端套件（uni-app） | §15 边界（复用） | — | 移动端 | 🔖 立项待启动（MVP 后，D27） | — |
 | S12 | blog-web 作者中心（发文/编辑/自助治理） | §3、§4、§11（作者侧动作） | 2/4/5 前端面 | 前端 | ✅ 已验收（2026-10-08 用户确认；发文/编辑/发布/版本链路跑通，三条交互修正回归通过；blog-web `47b9e40`/`366488d`/`28ffc36`，零后端改动） | 2~4d |
-| S13 | 线上部署与生产化 | — | — | 后端+前端 | ⏳ 待启动（D0 采购/备案先行，等待期并行 S14/S15） | 1~2d+备案 |
+| S13 | 线上部署与生产化 | — | — | 后端+前端 | ⛔ **编号停用 → 内容并入 S29.2**（未开工，2026-10-30 D45；旧引用保留作历史锚点） | — |
 | S14 | GitHub/Gitee 社交登录 | §2.8（登录，复用） | — | 后端+前端(blog-web) | ✅ 已验收（2026-10-14；后端 4 commit + blog-web 5 commit，详 §3 S14；Apifox 用例补录留人工） | 2d |
 | S15 | 阅读量 Redis 异步计数 | §5.2 | — | 后端(+blog-web 小改) | ✅ 已验收（2026-10-14 人工实测通过；后端 4 commit + blog-web 3 commit，联调期三联坑详见 §3 S15；Apifox 语义回归 2026-10-16 人工补录通过；JMeter 压测留作面试演示素材） | 1d |
 | S16 | ES 搜索替换 MySQL LIKE | §6 | — | 后端(+blog-web 高亮 UI) | ✅ 验收关闭（2026-10-14 实测 + 2026-10-16 收尾：分词/越权红线/编辑同步/对账双向/零停机/LIKE vs ES 对比/深翻页游标全部实测通过；演示数据灌入实测后已执行清理，详 §3 S16） | 3~5d |
@@ -42,14 +42,15 @@
 | S18 | 接口限流 | — | — | 后端 | ✅ 已验收（2026-10-15；三点位超限实感/无感回归/Redis 键核验人工实测通过；Apifox 三组超限用例 2026-10-16 补录通过，详 §3 S18） | 0.5d |
 | S19 | plus-ui 登录页/后台首页改版 | — | — | 前端(plus-ui) | ✅ 已完成（2026-10-15；plus-ui 5 commit 零后端改动，详 §3 S19；2026-10-16 人工视觉验收与菜单隐藏均已完成） | 0.5~1d |
 | S20 | Lenis 平滑滚动（动效收缩，D38） | — | — | 前端(blog-web) | ✅ 已验收（2026-10-15 人工确认：桌面手感/移动端跟手/reduced-motion 切换/PWA 安装态叠加全过；blog-web `bde6043` 零后端改动，详 §3 S20） | 0.5d |
-| S21 | CI/CD 补全（可选） | — | — | 后端+前端 | ⏸ 可选 | 1d |
+| S21 | CI/CD 补全（可选） | — | — | 后端+前端 | ✅ **已并入 S29.1**（编号停用，2026-10-30 D45） | — |
 | S22 | 注册即登录（去掉注册后手动登录中间态） | §2.8（登录，复用） | — | 后端+前端(blog-web) | ✅ 已验收（2026-10-16；Agent E2E 六用例 + 人工浏览器验收均通过；后端 1 commit + blog-web 1 commit，详 §3 S22） | 0.5d |
 | S23 | blog-web 全站视觉改版（方向 C） | — | — | 前端(blog-web) | ✅ 已交付并关闭（2026-10-27；P1~P4 全部完成，P5 缩水为「仅移除登录页第三方登录入口」；44 张截图全绿 + Lighthouse 95/100/100/100） | 6~8d |
 | S24 | 正文语法高亮（方案 B：保存时高亮） | — | — | 后端 + 前端(blog-web) | ✅ 已交付（2026-10-27；T25~T31 全部完成；作者端增量 74.7KB gzip，读者首屏零增量） | 1.5~2d |
 | S25 | 工程化与一键启动（部署就绪） | — | — | 三仓 + 根编排 | ✅ 已交付（2026-10-28；7 服务一键起，冒烟 12/12，三仓 README 重写） | 2d |
 | S26 | 演示数据种子（min / demo 两级） | — | — | 后端 + 编排 + blog-web | ✅ 已交付（2026-10-28；min 8 篇 / demo 52 篇，代码块带真实高亮，幂等可重放） | 0.5d |
 | S27 | 阅读体验三项（TOC / 上传前压缩 / 关于页） | — | — | 前端(blog-web) | ✅ 已交付（2026-10-28；TOC 双栏 + 上传压缩 + /about，零后端改动；50 张截图全绿） | 1d |
-| S28 | 后续增强（上一篇/下一篇 + 前端测试） | — | — | 后端 + 前端 | ⏳ 待启动（需改契约，后置） | 1.5d |
+| S28 | 后续增强（上一篇/下一篇 + 前端测试） | — | — | 后端 + 前端 | ✅ 已交付（2026-10-28；prev/next 一次带出，Vitest 19 例全过；另修掉 alpine 基础镜像的 native 崩溃） | 1.5d |
+| S29 | 发布链与双目标部署 | — | — | 三仓 + 机器 | ⏳ **S29.1 待开工（本机可验收）/ S29.2 阻塞（服务器+备案）** | S29.1 2~2.5d / S29.2 1~2d+等待 |
 
 > 与 PRD §12.1 的顺序差异：评论提前到前台站之前，保证后端 API 闭环先行；
 > S9 前台可在 S5 完成后于前端仓库并行启动（首页/列表/详情依赖 S2+S6+S8 的接口）。
@@ -317,7 +318,7 @@ S2 遗留接入（已落地）：
 - 实测：`npm run build` 全绿；`/me`、`/me/profile`、`/me/new`、`/me/{id}/edit` 均 200；作者侧代理（my / detail / create / save / versions / profile）无 cookie 均 **401**，白名单外 **405**；读者首页 SSR 无回归。
 - **验收结论（2026-10-08，用户确认）**：发文→保存→发布→编辑→历史版本→个人资料链路跑通；后续三轮为**样式与交互打磨**（对照掘金列表/写作页，见 `blog-web/docs/plan.md` §2.10），不再属于 S12 功能范围；MVP 至此 S0–S12 全部关闭，余下仅 S11（移动端，MVP 后）。
 
-### S13 线上部署与生产化 ⏳（2026-10-13 规划；D0 采购/备案先行）
+### S13 线上部署与生产化 ⛔ 已并入 S29.2（2026-10-30 D45，编号停用；本节保留作历史记录与跨切片引用锚点）
 
 背景（D33/D37）：面试项目需要"可访问"的线上环境，用户倾向优先白嫖方案。**本切片最先启动的只有采购与备案时钟**（1~2 周等待），实际配置工作在等待期内或之后进行。方案细节（规格/带宽/成本/清单）见 `docs/cloud-deployment.md`。
 
@@ -541,7 +542,7 @@ S2 遗留接入（已落地）：
 
 验收结果（2026-10-15）：agent 侧无头 Chrome 冒烟全 PASS——`html.lenis` class、wheel 平滑渐进曲线（lerp ramp 非瞬跳）、路由跳转滚到顶且实例存活、`reducedMotion=reduce` 下无 lenis class 且原生滚动可用、SW 注册态刷新无冲突、三视口零 console error/5xx；人工侧（用户 Windows 浏览器）桌面手感 / 移动端跟手 / 系统减少动效切换 / PWA 安装态叠加全部确认无问题。实现：`app/plugins/lenis.client.ts`（matchMedia 门控 + 偏好切换监听 + `stopInertiaOnNavigate` + lerp 0.1 温和默认，移动端 syncTouch 关闭保持原生跟手）+ transitions.css 官方配套规则（`lenis-smooth` 期间中和 `scroll-behavior: smooth` 防双动画）；坑位：Nuxt 4.6 unimport 会剥离 plugins 下 bare 包静态默认导入致运行时报 `Lenis is not defined` 白屏，改动态 `import('lenis')`（已记入 `blog-web/docs/plan.md` §2.17 与 README）。blog-web `bde6043`，零后端改动，细项见 `blog-web/docs/plan.md` §2.17。
 
-### S21 CI/CD 补全 ⏸（可选；1d）
+### S21 CI/CD 补全 ✅ 已并入 S29.1（2026-10-30 D45，编号停用）
 
 范围：后端 `mvn compile + test`、blog-web `typecheck + build` 的 GitHub Actions 工作流（plus-ui 已有最小 CI 可扩展）；public 仓库 Actions 免费额度无限。
 
@@ -764,10 +765,81 @@ SEED_FILE=seed-demo.sql docker compose --profile seed run --rm seed    # seed-de
 5. **关于页整页居中**：文字型页面若左对齐于 1180 容器，行长过长且右侧空一大块，故整页 `sd-measure mx-auto`。内容只写长期成立的事实，不放个人身份信息。
 6. **回归**：`shot.mjs` 页面清单加入 `about` → **50 张退出码 0、无 console error / 5xx**；`contrast.mjs` **18/18**；实测详情页 SSR 含 `id="sec-1..5"`，1440 宽屏 aside TOC 可见 5 条、390 窄屏 aside 隐藏且折叠面板可见。
 
-### S28 后续增强（上一篇/下一篇 + 前端测试）⏳（后端 + 前端；1.5d）
+### S28 后续增强（上一篇/下一篇 + 前端测试）✅ 已交付（2026-10-28；后端 + blog-web）
 
 - **上一篇/下一篇**：详情接口扩展返回 `prev` / `next`（按 `publishedAt` 相邻），一次请求带出，避免两次调用；需改 `blog-api.md` §5.2 与后端 VO
-- **前端测试**：先定框架（Vitest 组件级 + Playwright E2E），优先覆盖三处高风险——登录态 SSR 转发、发文保存链路（含换行规范化与高亮）、代码块渲染与注入时机
+- **前端测试**：先定框架，优先覆盖高风险链路
+
+**实施结果（2026-10-28 交付）**
+
+1. **prev/next 扩展详情响应而非新增接口**：详情页已有整份数据，再开 `/adjacent` 会让首屏多一次往返。`BlogPublicArticleDetailVo` 增 `prev` / `next`（各含 `articleId` + `title`，无则 `null`），老客户端忽略即可，不构成破坏性变更。改的是公共详情 VO，**作者端 `BlogArticleDetailVo` 不动**（编辑页不需要上下篇）。
+2. **两条硬约束写进 Mapper 的 SQL**（`selectPrevPublic` / `selectNextPublic`，用 `@Select` 原生 SQL 而非 `QueryBuilder`——DSL 表达不了 `(A or (B and C))` 这种 OR 嵌套）：
+   - **限定公共可见** `status='1' AND visibility='0' AND del_flag='0'`。原生 SQL 不受 `@TableLogic` 保护，`del_flag` 必须手写。不限定就会链到草稿/下线文章，读者点进去即 404；
+   - **双键排序** `published_at + article_id`，否则同秒发布的两篇顺序不确定、导航来回跳。
+3. **实测验证（不只是单测）**：
+   - 常规：20 号 → prev=19（更早）/ next=21（更晚）；
+   - 首末篇：最新 48 号 `next=null`、最早 09 号 `prev=null`；
+   - **可见性过滤**：34 号（10-20）的 prev 跳过 `08` 号（10-19 16:49，`visibility=2` 管理员下线），命中 `33` 号（10-19 09:44）——不过滤时最近的就是 08 号，证明谓词确实生效。
+4. **前端**：新增 `ArticleNav.vue`（正文末尾、66ch 列内），≥640 两栏左左/右右对齐、窄屏堆叠；标题 `truncate` 单行省略；文本性导航只靠 1px 分隔线与字重，不加卡片底/圆角/箭头（方向 C）。
+5. **前端单测（Vitest 5.0.5）**：`environment: 'node'`、不引 happy-dom 与 Nuxt 插件（被测的三个工具均无 `~/` 导入）。**19 例全过 / 3 个文件 / 151ms**：
+   - `buildToc` 8 例（层级、锚点编号、含 `<code>` 标题取纯文本、实体解码、空标题跳过、已有 id 避号、幂等、空输入）；
+   - `normalizeCodeNewlines` 7 例（单块、大小写与自闭合、多块、段落 `<br>` 不误伤、保留 pre 属性、无 pre、幂等）；
+   - `compressImage` 4 例（GIF / SVG / 无 DOM 环境均返回原对象引用）。
+   canvas 缩放分支不测——为它引 happy-dom 不划算，该路径 S27 已由浏览器实测覆盖。
+6. **回归**：`npm run build` 绿；`shot.mjs` 50 张退出码 0、无 console error / 5xx。
+7. **⚠️ 本轮附带修掉一个会炸生产的镜像缺陷（S25 遗留）**：跑登录页截图时后端容器反复 `Exited (139)`，日志 `Problematic frame: libawt.so+0x1e4e6 AnyIntIsomorphicCopy.cold`、"crash happened outside the JVM in native code"。**根因是基础镜像用了 `eclipse-temurin:21-jre-alpine`**——alpine 是 musl libc，Temurin 的 `libawt.so` 在 musl 下有已知缺陷；而 RuoYi 的图形验证码走 Java2D（`BufferedImage` + `Graphics2D`），**首次请求 `/auth/code` 就命中该 native 路径并 SIGILL**。
+   **为什么 S25 没发现**：当时验收只 `curl /` 拿到 200 就收工，从未触发验证码；一旦上线，任何人打开登录页都会把后端打死。
+   **修法**：改用 `eclipse-temurin:21-jre`（Debian/glibc）并补 `fontconfig` + `fonts-dejavu-core`（headless AWT 仍需读字体配置，缺字体则画白图），启动参数加 `-Djava.awt.headless=true`。镜像从 773MB 增至 **941MB**，用 168MB 换稳定。
+   **验证**：连续 10 次 `GET /auth/code` 全 200、容器持续 Up；随后 50 张截图回归期间容器始终存活。
+
+### S29 发布链与双目标部署 🚧（2026-10-30 立项，D45/D46；**S29.1 W0~W3 已落地，W4 阻塞于 CF token 与 runner 注册**）
+
+**背景**：S25 交付了「7 服务一键起」，但 compose 仍带 `build:`、没有任何镜像推送与部署/回滚路径；S21（CI/CD 补全，已停用）与 S13（线上部署，已并入 S29.2）各只覆盖一半。另有一个同技术栈项目的已落地方案（构建/部署解耦 + 四枚镜像 + `deploy.sh` + Named Tunnel），本项目按其**结构**改造，不照抄参数。
+
+**拆分**（与参考项目 xx.1 / xx.2 对齐）：
+
+| 子切片 | 目标 | 前置 | 状态 |
+|---|---|---|---|
+| **S29.1 发布链 + WSL 目标** | 四枚镜像进 GHCR、部署包 + `deploy.sh` 八命令、release preflight、Tunnel 双入口、备份恢复演练；**不依赖任何服务器，全部本机可验收** | 无 | 🚧 W0~W3 已落地，W4 待 CF token + runner |
+| **S29.2 云服务器目标** | 云主机 + 域名 HTTPS 上线，承接 S13 原范围与验收清单 | S29.1 全绿 + 服务器/备案 | ⛔ 阻塞 |
+
+**S29.1 波次与门禁**：
+
+| 波次 | 仓 | 交付 | 门禁 |
+|---|---|---|---|
+| W0 复勘（只读） | 机器 | runner 范围/label/服务用户、cloudflared 是否 systemd 常驻、Docker 数据盘位置、磁盘余量、19xxx 占用、`vm.max_map_count` | 产出环境事实清单；与计划不符项**先报告再动手** |
+| W1 基座 | 后端 | `deploy/` 五层 compose（deps / app / target-wsl / target-cloud / build）、`stage-sql.sh`、`redis.conf`（AOF）、`smoke.sh`、数据目录 uid 初始化 | 开发栈与 `sdblog-demo` **同机并存**；空目录起栈 31 表 / 7 博客表 / 15 菜单 |
+| W2 门禁 | plus-ui + blog-web | `ci.yml` 加 lint/test、`image.yml` 推 admin/web（含 tag 保留策略） | 两仓 Actions 绿；private 包可见 |
+| W3 发布链 | 后端 | `deploy.sh` 七命令（含 `flock` 互斥、按 `sdblog-*` 前缀 gc）、`bundle.sh`、`image.yml`（backend+es）、`release.yml`（preflight 跑在自托管 runner，复用部署机 GHCR 凭据） | `up → rollback → 前滚` 三连通过；错 tag 时 preflight 失败且**不触碰线上** |
+| W4 入口与数据 | 后端 + 机器 | `application-prod.yml` justauth 改造（env 占位 + address 走域名）、Tunnel 三条 Public Hostname、`smoke-public.sh`、备份/恢复演练、文档同步 | 公网两域名 200、社交登录通、sitemap 绝对地址正确、恢复前后行数一致 |
+
+**关键约束**（决策全文见 §6 D46，方案细节见 `docs/cloud-deployment.md`）：
+
+- 部署机**不编译、不持源码**，只 pull 镜像；SQL 与 `my.cnf` 由部署包携带（initdb 必须拿到有序脚本，否则空库 → 后端 crash loop）。
+- 四枚镜像 `sdblog-{backend,es,admin,web}`，单一 registry = **GHCR（private）**；部署机 `docker login`（**user01**，与 runner 同用户，否则 pull 401）。
+- 回滚按 **digest**；**DB 只前滚**（本项目无迁移框架），`DB_CHANGED` 记入状态，rollback 需 `--force` 才放行。
+- 端口三段：开发 8081/3000/5173、容器化开发 18081/3100/8080、演示 19081/19080/19300（deps 13306/16379/19000·19001/19200）；**容器内端口永不变**，部署态只绑 `127.0.0.1`。
+- 与 appt 共用宿主机与 runner：**禁止 `docker system prune -a`**，gc 只按 `sdblog-*` 前缀删；部署加 `flock`（GitHub concurrency 组跨仓不生效）。
+
+**顺手修掉的既有问题**：
+
+1. `application-prod.yml` 的 justauth 段不可用（`address: http://localhost:80`、**无 `github` 条目**、`gitee` 一对明文凭据）——改 env 占位后生产社交登录才可能通。
+2. `docs/cloud-deployment.md` 被 S13 引用却从未创建——本切片补齐。
+3. Redis 未开 AOF（S15-D1 ④ 的「仓库外手动步骤」）——落进部署包的 `redis.conf`。
+
+**实施结果（2026-10-30，W0~W3）**：
+
+1. **W0 复勘**：runner 为**单仓注册**（gitHubUrl 指向 appt 仓）、cloudflared 的 token 文件已不存在（重启即失效）、19xxx 全空闲、磁盘 890G、`vm.max_map_count` 达标但未持久化、可用内存仅 1.6~2.8G（IDE 占 7.5G）。结论写入 `docs/cloud-deployment.md` §3.1。
+2. **W1 编排**：新增 `deploy/`（五层 compose + `deploy.sh` 八命令 + `bundle.sh` + `stage-sql.sh` + 两个 smoke + README）。实测：空目录起栈 31 表 / 7 博客表 / 15 菜单 / web 客户端 1 条；四套 compose 项目并存零冲突；冒烟 19/19；`seed-demo` 后 52 篇（公共 47）、ES 47 文档、搜索高亮正常；**备份→删库→恢复**五项计数 52/52/200/20/8 一致。
+3. **W2 前端门禁**：plus-ui `ci.yml` 加 `pnpm lint`（本地 0 警告 0 错误）、`image.yml` 推 `sdblog-admin`；blog-web `ci.yml` 加 `npm test`（本地 19/19）、`image.yml` 推 `sdblog-web`。**vue-tsc 暂不设门禁**（S23 记录未跑过，基线未知，避免把历史报错当回归）。
+4. **W3 后端**：`ci.yml` 由 `compile` 升为 `clean verify`；`image.yml` 产 `sdblog-backend` + `sdblog-es`（ES 必须自建推送，IK zip 在仓库内）；`release.yml` 走 `workflow_dispatch`，preflight 跑自托管 runner 复用部署机 GHCR 凭据（仓库内不存 PAT）；`application-prod.yml` 的 justauth 改为 env 占位并补 `github` 条目。
+5. **两个实测坑（已修，勿回退）**：① `DATA_DIR` 子目录首次由 Docker 创建为 root，ES（uid 1000）无法写 → 无限重启；修法 = `deploy.sh init_data_dir` 用容器内 root chown（不需要 sudo）。② 种子直插 SQL 不触发应用事件，`ArticleIndexBootstrap` 只在 alias 缺失时才全量同步 → 装载种子后 ES 恒为空；修法 = `deploy.sh seed` 删索引版本 + 重启后端做确定性重建。
+6. **阻塞项（W4）**：① 需为 `ryblogs` 注册自托管 runner（label `sdblog-wsl`）；② 需在 WSL 以 user01 执行 `docker login ghcr.io`（PAT `read:packages`）；③ 需在 CF 为 `qdblog-demo` 加两条 Public Hostname，并给该隧道建独立 systemd unit + token（现有 `cloudflared.service` 的 token 文件已丢失）；④ 需 sudo 持久化 `vm.max_map_count`。
+7. **遗留（W4 发现）**：`seed` 数据的封面 URL 指向 `127.0.0.1:9000`（开发栈 MinIO），公网会破图 → 需为演示栈配图片域名（CF 第三条路由 + `sys_oss_config`），归 W4。
+
+**非目标**：云主机与备案（S29.2）、K8s、staging 多环境、灰度、异地备份。
+
+**完成标准**：干净目录解压部署包 → `deploy.sh up` → 公网两域名 200 且冒烟全绿；`rollback` 后四枚 digest 回到上一组；备份恢复后行数一致（52 篇 / 52 版本 / 200 评论 / 20 标签 / 8 用户）且搜索可用；SETUP / architecture / AGENTS 同步。
 
 ### 一次性 SQL 脚本执行状态（docs/）
 
@@ -801,6 +873,7 @@ S0 → S1 → S2 → S3 → S4 → S5 → S6 → S7 → S8   （后端关键路�
 - S2 是最大风险点（事务编排 + 权限 + 版本），如超 3 天先拆解再继续。
 - 切片间不允许功能倒灌：S5 之前的 Article 保存不得夹带 hide/admin-hide 逻辑。
 - **亮点阶段（v0.4 起，S13~S21）**：D0 采购/备案先行（等待期并行 S14/S15）→ S16 ES 主菜 → S17/S18/S19 → S20/S21 待定/可选。节奏 15h/周 ≈ 2 人日/周，核心（S13~S19）约 10.5~12.5 人日，预计 6~7 周（2026-11 底~12 月初完成核心）。S16 是亮点阶段最大风险点（IK 安装 / 同步一致性 / D36 契约变更），第一步先验证 IK 可行性。
+- **发布链阶段（v0.5 起，S29）**：S29.1（发布链 + WSL 目标，不依赖服务器、本机可验收）→ S29.2（云目标，阻塞于服务器/备案）。S29.1 是 S29.2 的唯一前置；S29.2 不回头改 compose 分层结构，只新增 `compose.target-cloud.yml` 与入口方案。
 
 ## 5. 通用完成定义（每个切片都要满足）
 
@@ -892,13 +965,15 @@ S0 → S1 → S2 → S3 → S4 → S5 → S6 → S7 → S8   （后端关键路�
 | 2026-10-27 | D42（博客域上传接口，起因：作者传封面返回 403「没有访问权限，请联系管理员授权」）：① **新增 `POST /blog/oss/upload`**（`org.dromara.system.controller.blog.BlogOssController`），**只要求登录、不设按钮权限**，内部转调 `ISysOssService.upload(file, null)` 返回 `SysOssUploadVo`；② 根因实锤——`SysRegisterService.register()` 只调 `userService.registerUser`，**不写 `sys_user_role`**，博客用户默认零权限；而 `SysOssController.upload` 带 `@SaCheckPermission("system:oss:upload")`，复用后台接口必然 403（封面与正文插图同链路）；③ **否决**「给角色配 `system:oss:upload`」：每来一个新用户都要手工授权，不可持续，且给普通读者授予后台「文件管理」权限语义不成立；④ 前端仅改 Nitro 代理的转发目标（`server/api/resource/oss/upload.post.ts`），浏览器端路径 `/api/resource/oss/upload` 与所有组件零改动；plus-ui **不随本决策变更**（其使用者是管理员，持有该权限）；⑤ 合规说明：接口只做「登录校验 + 转调」，**未新建对象存储实现**，符合 AGENTS.md「复用 RuoYi OSS 能力，不重复实现」；`ruoyi-api` 的 `OssService` 接口未改，避免动跨模块契约 | blog-api.md §2.4 / architecture.md 请求链 / blog-web/docs/plan.md §2.8 / plus-ui/docs/frontend-plan.md |
 | 2026-10-27 | D43（S23 关闭 + S24 立项：正文语法高亮走方案 B「保存时高亮」）：① **S23 正式关闭**——三仓工作区干净、构建全绿、44 张截图 + Lighthouse 95/100/100/100 留档；P5 缩水为「仅移除 plus-ui 登录页第三方登录入口」（后台首页按用户拍板不改）；② 代码块语法高亮单开 **S24**（后端 + blog-web，1.5~2d），方案由用户选定 **B：编辑器保存前用 shiki 高亮、带标记的 HTML 入库**——读时零成本、SEO 带高亮、无 FOUC；**明确接受「历史文章无高亮」这一代价**（不批量重刷，作者重新保存即自然生效）；③ 方案 A（客户端高亮，不改契约、历史文章自动生效，约 +85KB gzip）与 C（Nitro 层高亮）不采用，三方案对比存档于 §3 S24；④ 高亮标记倾向 **class（`tok-*`）而非 inline style**：jsoup 白名单只需校验 `^tok-[a-z0-9]+$`，可彻底规避 `style` 注入面（`url()`、`position:fixed` 等）；⑤ **D5 验证已完成（2026-10-27，本地最小页面 + WangEditor UMD 包，未用登录态也未写库）**——实测四组：`span.tok-*` 被 Slate **剥掉**、`code.language-*` **保留**、`pre[data-lang]` **丢失**、`<br>` 读回时**被吃掉**（`a<br>b` → `ab`）。结论 **方案 B 成立**：language 存活即可按 textContent 重建高亮，span 被剥反而让幂等更简单（编辑器内永远是纯文本，不存在嵌套）。**同时暴露一个既有缺陷**：代码块换行往返不一致（`getHtml` 输出 `<br>`、`setHtml` 不认 `<br>`），意味着「作者打开编辑页 → 再保存」会把多行代码压平；方案 B 每次保存都要往返，故须在 S24 内一并修（blog-web plan T26-a：入库统一用 `\n`，渲染靠 `white-space: pre`）；⑥ plus-ui 暂不同步（其编辑器保存的文章无高亮），后续可复用同一工具函数 | 本文件 §2/§3 S24 / blog-web/docs/plan.md §2.22 / blog-api.md §3.1 |
 | 2026-10-28 | D44（S25~S28 立项：工程化优先于体验增补，并厘清 CD 的阻塞边界）：① 用户拍板「一键启动为将来部署做准备」，故按**生产形态**设计（固定镜像 tag、`env_file` 密钥、healthcheck、nginx 反代），不做成仅便利本地开发的玩具；② **概念澄清**——打镜像属于构建产物、一键启动属于运行时编排，二者都不是 CD；真正的 CD 是「push → 自动构建 → 推 registry → 目标机拉取重启」，也是**唯一依赖目标服务器的一环**，故 S25 把它列为非目标，等有服务器再单开；③ 现状审查：`script/docker/docker-compose.dev.yml` 已有四件套（mysql / redis / minio / **自建 IK 的 es**）与 blog-web 镜像（`profiles:["web"]` 门控、构建上下文跨仓 `../../blog-web`），**缺后端与 plus-ui 容器**，且 blog-web 用 `host.docker.internal:8081` 指向宿主机后端——部署形态下必须改为容器间服务名 `backend:8081`；④ **假数据时机判断**：不在功能变动期造（表结构或契约一变就得重写），绑定到「compose 可一键起之后」的初始化流程，分 `seed-min`（开发用，8 篇覆盖有封面/无封面、有代码块/纯文、草稿/已发布/已隐藏各分支）与 `seed-demo`（演示用，50 篇 + 200 评论撑满版式）两级，同 schema 不同量，靠 `seed` profile 切换；⑤ README 现状：blog-web 已项目化，**后端与 plus-ui 仍是 RuoYi 框架自带内容**（Gitee logo / 平台简介），新人会误以为是框架 fork，S25 P5 必须整段替换 | 本文件 §2/§3 S25~S28 / script/docker/ |
+| 2026-10-30 | D45（S29 立项与切片拆分 + 编号治理 + 多仓同会话，用户确认）：① 新增 **S29「发布链与双目标部署」**，按同技术栈参考项目（已落地）的分片法拆两个子切片：**S29.1 发布链 + WSL 目标**（不依赖任何服务器、全部本机可验收）与 **S29.2 云服务器目标**（依赖服务器 + 备案时钟）；② **S13 未开工，内容整体并入 S29.2、编号停用**（总览表保留行 + 正文标题标注；S14/S15/S16/S17/S18 中「留 S13 生产环境验证」的句子不改写，作历史锚点，避免改动已关闭切片的记录）；③ **S21 并入 S29.1 后关闭**（其「CI 补全」诉求正是 S29.1 的 W2/W3）；④ **修订 D32 的「一次会话只动一个仓库」**：同一开发切片内允许多仓同会话修改，但**每仓独立 commit、独立可回滚**、提交信息统一标切片号；跨切片仍禁止混做，两个 Agent 仍不得同时改同一工作区。理由：部署链天然横跨三仓（后端 compose + 两个前端的 CI 与镜像 workflow），强行拆会话只会让同一切片分两次落地、中间态不自洽 | 本文件 §2/§3 S29 / `docs/cloud-deployment.md` / AGENTS.md §10 |
+| 2026-10-30 | D46（发布链形态冻结：参考同技术栈已落地方案 + 本项目实测约束）：① **构建与部署解耦**——CI 只产不可变镜像，部署机只 `pull`，永不编译、不持源码、不持构建缓存；② **compose 分层**：`compose.deps.yml`（四个中间件）/ `compose.app.yml`（三应用）/ `compose.target-{wsl,cloud}.yml`（端口与数据目录差异）/ `compose.build.yml`（仅本地演示、含跨仓 `build.context`、**永不进部署包**）；切换目标只换 `-f` 组合；多 `-f` 时相对路径以**第一个文件所在目录**为基准，故五份必须同目录；③ **四枚镜像、单一 registry = GHCR（private）**：`sdblog-{backend,es,admin,web}`，tag `vX.Y.Z` + `sha-<7>` + `latest`；因私有，部署机须 `docker login ghcr.io`（**user01**，与 runner 同用户，否则 job 内 pull 401），**preflight 跑在自托管 runner 上复用该凭据**，仓库内不存 PAT secret；④ **回滚按 digest 不按 tag**：`.state/{current,previous}` 记四枚镜像 digest；**DB 只前滚**（本项目无迁移框架），`DB_CHANGED` 入状态、rollback 需 `--force`；⑤ **端口三段**（容器内端口永不变）：开发 8081/3000/5173、容器化开发 18081/3100/8080、演示 19081/19080/19300（deps 13306/16379/19000·19001/19200），部署态一律只绑 `127.0.0.1`；不照抄参考的「开发 8xxx / 演示 18xxx」——18xxx 已被 S25 的容器化开发端口占用，整体搬迁收益低于文档与脚本 churn；⑥ **多栈共存**：删掉全部写死的 `container_name`，项目名显式化（开发默认 `docker` / 演示 `sdblog-demo`），数据目录用绝对路径 `${DATA_DIR}` 并加「有部署记录但数据目录为空则拒绝启动」守卫；演示栈空库 initdb + `seed-demo`，开发命名卷一行不动；⑦ **入口与发布链解耦**：Cloudflare Named Tunnel（`qdblog-demo`，已存在）承载 `sdblog.us.ci` 与 `admin.sdblog.us.ci` 两条 Public Hostname（**admin 公网直开，不加 CF Access**），`www` 用 Redirect Rule 301 到裸域，**不设 `api.` 子域**，后端与四个中间件不公网；⑧ **备份**：mysqldump（`--single-transaction`）+ MinIO 目录打包进 `deploy.sh`，**ES 不备份**（alias 缺失时 `ArticleIndexBootstrap` 启动即全量重建），恢复以行数一致为完成标准；⑨ **与 appt 共用宿主机的约束**：`deploy.sh gc` 只按 `sdblog-*` 前缀删镜像、**禁止 `docker system prune -a`**，部署加 `flock` 宿主机互斥（GitHub concurrency 组跨仓不生效） | 本文件 §3 S29 / `docs/cloud-deployment.md` / AGENTS.md §8 |
 
 ### 待决策
 
 | # | 决策 | 建议 | 截止 |
 |---|------|------|------|
 | D25 | 版本只读接口（§4.1/§4.2，`BlogArticleController.versions/version`）的管理员判定用 `LoginHelper.isSuperAdmin()`，比契约 §4.1「作者本人、管理员」更严——非超管但持 `blog:article:query` 的自定义治理角色能看 §11.2 详情（`getInfo` 硬编 `admin=true`）却看不了版本历史。S10 详情抽屉已兜底提示不白屏，超管验收不受影响 | 若后续把治理权授给非超管角色，将版本接口判定从 `isSuperAdmin()` 放宽为「作者本人 或 有 `blog:article:query`」，与 §11.2 详情口径对齐 | 出现非超管治理角色前 |
-| D37 | S13 部署资源选型：白嫖（Oracle Always Free 4C/24G，需信用卡、有回收风险）vs 国内轻量付费（约 50~150/年、需备案、最稳）vs 香港节点（免备案、线路波动） | 演示期可白嫖 Oracle + 域名自持；**挂简历前落付费轻量**（面试前被回收的代价高于一年费用）；细节见 `docs/cloud-deployment.md` §2 | S13 采购时（D0） |
+| D37 | S29.2 部署资源选型：白嫖（Oracle Always Free 4C/24G，需信用卡、有回收风险）vs 国内轻量付费（约 50~150/年、需备案、最稳）vs 香港节点（免备案、线路波动） | 演示期可白嫖 Oracle + 域名自持；**挂简历前落付费轻量**（面试前被回收的代价高于一年费用）；细节见 `docs/cloud-deployment.md` §2；**另需拍板 2C4G 是否上 ES**（不上则 `blog.search.engine=mysql`） | S29.2 采购时（D0） |
 
 > **D7 说明（摘要，全文见 AGENTS.md §8）**：单测只覆盖"不碰数据库、不启 Spring 容器就能算对错的纯逻辑"——
 > ① 标签规范化（`"Python 爬虫"` → `python-爬虫` 等契约 §18.10 规则）；

@@ -97,6 +97,7 @@ Generator 定位是生成 RuoYi 风格骨架，不是完成博客业务。Entity
   不能用父目录 `sd-blog/`——那里有游离 `target/`，会把几百 MB 塞进上下文（`.dockerignore` 只对仓库根生效）。
   跨仓构建由 compose 的 `build.context` 显式指定（`../../blog-web`、`../../../plus-ui`），依赖三仓同级 clone。
 - ⚠️ 同理，前端构建（`npm` / `pnpm`）只在各自前端仓库目录内执行，也不要在父目录跑（D32 抬升为通用约束）。
+- ⚠️ **部署链不编译**：发布走「CI 产不可变镜像 → 部署机 `pull`」，部署机上不跑 `mvn` / `npm` / `docker build`，也不 clone 源码；部署包（分层 compose + SQL + 脚本）随 Release 产物分发，方案见 `docs/cloud-deployment.md`（S29.1）。
 
 测试策略（切片级约定）：
 
@@ -122,7 +123,7 @@ Generator 定位是生成 RuoYi 风格骨架，不是完成博客业务。Entity
 ```
 
 - 一次只实现一个明确 Feature，一个 feature 一个小步 commit；修改代码前建立 Git checkpoint；不要让两个 Agent 同时修改同一工作区；关键权限/删除逻辑人工复核。
-- 一次 Agent 会话原则上只动**一个仓库**：跨仓联调拆成多步、各自独立提交，避免一次改动横跨多个 Git 仓库而无法原子回滚（D32）。
+- **同一开发切片内可一次动多个仓库**（如 S29.1 同时改后端 compose 与两个前端 CI），但必须**每仓独立 commit、独立可回滚**，提交信息统一标切片号；跨切片仍不得混做，两个 Agent 不得同时改同一工作区（D45 修订 D32）。
 - 开发切片顺序、功能需求编号、MVP 验收标准以 PRD §5 / §12.1 / §14 为准；每个切片闭环：数据库/后端 → Apifox → 前端 → 联调 → 浏览器验收。
 - MVP 范围与"明确不做"清单以 PRD §2.3 / §15 为准（ES、多级缓存、PWA、第三方登录、点赞/收藏/关注、多级评论、评论前置审核、版本恢复、回收站、定时发布、AI 功能等，除需求文档明确加入外不主动实现）。
 - 发现设计与现有代码冲突时，先明确指出冲突，不要默默改变设计；文档冲突时先识别冲突并报告，由最新明确决定裁决。
@@ -140,6 +141,7 @@ Generator 定位是生成 RuoYi 风格骨架，不是完成博客业务。Entity
 | `docs/database-design-v0.1.md` | 数据库设计：字段语义、约束、索引、生命周期、实体映射 | 文中表名为 `blog_*` 逻辑命名 |
 | `docs/blog_schema_v0.1.sql` | 实际建表 SQL | **表前缀 `sd_blog_`，以此与实际库为准** |
 | `docs/session-template.md` | 新会话上下文模板（Agent 指令书）：用户最小输入、必读清单按性质分叉、通用红线、本机环境事实、协作方式 | 三仓 AGENTS.md §10 均有指针指向它；新会话按它组织上下文 |
+| `docs/cloud-deployment.md` | 部署方案备忘（S29）：双目标拓扑、公网入口、资源选型（D37）、端口/备份/回滚口径、S29.1 实测表与待决项 | 部署类任务必读；命令权威在落地后的 `deploy/README.md` |
 | `../AGENTS.md`（父目录 `sd-blog/`） | 跨仓路由枢纽：仓库地图、权威源指针、跨仓环境红线 | Agent 会话根在父目录时的入口；属**本机工具接线层不入库**，其每条约定须与本文 + `SETUP.md` §10.5 双向登记，否则视为失效（D32） |
 | `.codex/skills/ruoyi-plus-ai-coding/` | 编码规范 skill（SKILL.md + references）；`.qoder/skills/` 与 `.dsh/skills/` 下同名条目是指向它的符号链接（Qoder / DSH 自动加载用，勿复制出第二份） | 后端/前端任务动手前先读对应 reference |
 | `.claude/agents/backend-*.md` | 后端任务型子代理规则 | 按任务类型选用 |

@@ -36,6 +36,8 @@ docker compose up -d --build
 | web | 自建 `blog-web` | 3000 | Nuxt SSR；`NUXT_API_BASE=http://backend:8081` |
 | admin | 自建 `sd-admin` | 8080 | nginx + 静态产物；`/prod-api` 反代到 backend |
 
+> ⚠️ **本节是开发形态**。部署形态（WSL 演示栈：分层 compose 去 build、端口 19xxx、绝对路径数据目录、与本节开发栈**并存**）由 S29.1 提供，方案见 `docs/cloud-deployment.md`。在该切片落地前，不要把本节端口直接接隧道或当作发布环境。
+
 ### 2.2 只起中间件（本机日常开发）
 
 ```bash
