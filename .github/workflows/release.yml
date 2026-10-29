@@ -1,0 +1,137 @@
+name: Release
+
+# =============================================================================
+# 发布唯一入口（S29.1 / D46）
+#
+# 前置（一次性）：
+#   1. 本仓已注册自托管 runner，label 含 `sdblog-wsl`（与 appt 的 runner 并存，互不干扰）。
+#      appt 的 runner 是**单仓注册**（gitHubUrl 指向 qd-appt-showcase），本仓用不了。
+#   2. 部署机（WSL）已以 user01 执行 `docker login ghcr.io`（PAT 只需 read:packages）。
+#      私有包的 preflight 依赖这份凭据，因此 preflight 也跑在自托管 runner 上，
+#      仓库里不需要存任何 PAT secret。
+#
+# 语义：
+#   - preflight 校验版本号 + 四枚镜像确实在 registry → 缺一枚就拒绝，杜绝"半个版本"上线
+#   - 部署只解包 + 调 deploy.sh，不编译（部署机无源码、无 ~/.m2）
+# =============================================================================
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '要部署的版本号（四枚镜像须已在 GHCR，如 v0.1.0）'
+        required: true
+      target:
+        description: '部署目标'
+        type: choice
+        options: [wsl, cloud]
+        default: wsl
+      action:
+        description: '操作（rollback 忽略 version，回上一组 digest）'
+        type: choice
+        options: [up, rollback]
+        default: up
+      skip_smoke:
+        description: '跳过公网冒烟'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: sdblog-release
+  cancel-in-progress: false
+
+env:
+  IMAGES: sdblog-backend sdblog-es sdblog-admin sdblog-web
+
+jobs:
+  preflight:
+    if: inputs.target == 'wsl'
+    runs-on: [self-hosted, linux, sdblog-wsl]
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 校验版本号与四枚镜像
+        id: check
+        run: |
+          set -euo pipefail
+          V="${{ inputs.version }}"
+          if ! [[ "$V" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::版本号必须形如 v1.2.3（当前: $V）"; exit 1
+          fi
+          for img in $IMAGES; do
+            ref="ghcr.io/${{ github.repository_owner }}/$img:$V"
+            if docker manifest inspect "$ref" >/dev/null 2>&1; then
+              echo "✓ $ref"
+            else
+              echo "::error::镜像不存在或未登录 GHCR：$ref"; exit 1
+            fi
+          done
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+
+      - name: 打部署包
+        run: ./deploy/bundle.sh "${{ inputs.version }}"
+
+      - name: 上传部署包
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-bundle
+          path: deploy/dist/deploy-*.tar.gz
+          retention-days: 30
+
+  deploy:
+    needs: preflight
+    if: inputs.target == 'wsl'
+    runs-on: [self-hosted, linux, sdblog-wsl]
+    steps:
+      - name: 下载部署包
+        uses: actions/download-artifact@v4
+        with:
+          name: deploy-bundle
+          path: /tmp/sdblog-bundle
+
+      - name: 解包并部署
+        run: |
+          set -euo pipefail
+          VER="${{ needs.preflight.outputs.version }}"
+          # 固定部署目录：.env 与 .state 必须跨版本保留，所以用 --strip-components=1 覆盖脚本，
+          # 而不是每次解到 deploy-<版本>/ 新目录
+          DEPLOY_DIR="${SDBLOG_DEPLOY_DIR:-$HOME/sdblog/current}"
+          mkdir -p "$DEPLOY_DIR"
+          tar xzf "/tmp/sdblog-bundle/deploy-$VER.tar.gz" -C "$DEPLOY_DIR" --strip-components=1
+
+          cd "$DEPLOY_DIR"
+          if [ ! -f .env ]; then
+            echo "::error::缺少 $DEPLOY_DIR/.env —— 首次部署请先 cp .env.example .env 并填写"
+            exit 1
+          fi
+          chmod 600 .env || true
+
+          if [ "${{ inputs.action }}" = "rollback" ]; then
+            ./deploy.sh rollback
+          else
+            ./deploy.sh up --version "$VER"
+          fi
+
+      - name: 公网冒烟
+        if: ${{ !inputs.skip_smoke }}
+        run: |
+          set -euo pipefail
+          DEPLOY_DIR="${SDBLOG_DEPLOY_DIR:-$HOME/sdblog/current}"
+          cd "$DEPLOY_DIR"
+          ./smoke-public.sh
+
+  # 云目标尚未实施（S29.2）：显式失败，避免有人误以为它已可用
+  cloud-not-implemented:
+    if: inputs.target == 'cloud'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 拒绝执行
+        run: |
+          echo "::error::云目标属 S29.2，尚未实施（见 docs/cloud-deployment.md §4）"
+          exit 1

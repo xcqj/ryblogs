@@ -1,0 +1,103 @@
+name: Image
+
+# 后端仓负责两枚镜像：sdblog-backend（ruoyi-admin fat jar）与 sdblog-es（ES + IK 分词）。
+# ES 必须自己构建并推 registry —— 它的构建依赖仓库内 4.3MB 的 IK zip，
+# 若留给部署机构建，就等于把"部署机不编译"这条红线破掉（S16-D1：直连 GitHub release 404）。
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '版本号，须与两个前端仓一致（如 v0.1.0）'
+        required: true
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  OWNER: ${{ github.repository_owner }}
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      sha: ${{ steps.meta.outputs.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 校验版本号
+        id: meta
+        run: |
+          REF="${{ github.event.inputs.tag || github.ref_name }}"
+          if ! [[ "$REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "版本号必须形如 v1.2.3（当前: $REF）" >&2
+            exit 1
+          fi
+          echo "version=$REF" >> "$GITHUB_OUTPUT"
+          echo "sha=sha-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+  backend:
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 登录 GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 构建上下文必须是仓库根（父目录有游离 target/，且 .dockerignore 只对仓库根生效）
+      # -Pprod 在 Dockerfile 内固化；运行层是 Debian/glibc + fontconfig（alpine 会在验证码处 SIGILL）
+      - name: Build & Push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ env.OWNER }}/sdblog-backend:${{ needs.prepare.outputs.version }}
+            ghcr.io/${{ env.OWNER }}/sdblog-backend:${{ needs.prepare.outputs.sha }}
+            ghcr.io/${{ env.OWNER }}/sdblog-backend:latest
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+  es:
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 登录 GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & Push es
+        uses: docker/build-push-action@v6
+        with:
+          context: ./script/docker/es
+          file: ./script/docker/es/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ env.OWNER }}/sdblog-es:${{ needs.prepare.outputs.version }}
+            ghcr.io/${{ env.OWNER }}/sdblog-es:${{ needs.prepare.outputs.sha }}
+            ghcr.io/${{ env.OWNER }}/sdblog-es:latest
+          cache-from: type=gha,scope=es
+          cache-to: type=gha,mode=max,scope=es

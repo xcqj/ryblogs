@@ -2,6 +2,7 @@ name: CI
 
 on:
   push:
+    branches: [6.X]
   pull_request:
 
 jobs:
@@ -18,5 +19,7 @@ jobs:
           distribution: temurin
           cache: maven
 
-      - name: Compile
-        run: ./mvnw -B -ntp compile
+      # 门禁从"能编译"升为"编译 + 全部单测"：
+      # sd-blog 11 个测试类（净化/限流/搜索/状态机/阅读量…）+ ruoyi-admin 社交账号命名
+      - name: Compile & Test
+        run: ./mvnw -B -ntp clean verify
