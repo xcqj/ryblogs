@@ -27,16 +27,36 @@ sql() {
   compose exec -T -e MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql \
     mysql -uroot -N --default-character-set=utf8mb4 "${MYSQL_DATABASE:-ry-vue}" -e "$1" 2>/dev/null
 }
-code() { curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$1"; }
+# 容器刚重建时会有两类瞬时失败，必须重试：
+#   ① 后端首个请求 JIT/连接池冷启动；② nginx 的 resolver 缓存 10s，容器换 IP 后短期 502
+code() {
+  local url="$1" i out=""
+  for i in 1 2 3 4 5; do
+    out=$(curl -s --noproxy '*' -o /dev/null -w '%{http_code}' --max-time 15 "$url" 2>/dev/null || true)
+    [[ "$out" == "200" ]] && break
+    sleep 3
+  done
+  printf '%s' "$out"
+}
+# 同上，返回响应体（用于断言 envelope 结构）
+fetch() {
+  local url="$1" i out=""
+  for i in 1 2 3 4 5; do
+    out=$(curl -s --noproxy '*' --max-time 15 "$url" 2>/dev/null || true)
+    grep -q '"code":200' <<<"$out" && break
+    sleep 3
+  done
+  printf '%s' "$out"
+}
 
 pass=0; fail=0
 ok()   { printf '  \033[32m✓\033[0m %s\n' "$1"; pass=$((pass + 1)); }
 bad()  { printf '  \033[31m✗\033[0m %s\n' "$1"; fail=$((fail + 1)); }
 warn() { printf '  \033[33m!\033[0m %s\n' "$1"; }
-head() { printf '\n\033[1m%s\033[0m\n' "$1"; }
+section() { printf '\n\033[1m%s\033[0m\n' "$1"; }
 
 if [[ "${1:-}" == "--wait" ]]; then
-  head "等待容器健康（最多 300s）"
+  section "等待容器健康（最多 300s）"
   for _ in $(seq 1 100); do
     bad_n=0
     for cid in $(compose ps -q); do
@@ -48,7 +68,7 @@ if [[ "${1:-}" == "--wait" ]]; then
   done
 fi
 
-head "1. 容器"
+section "1. 容器"
 for svc in mysql redis minio es backend web admin; do
   cid=$(compose ps -q "$svc" 2>/dev/null || true)
   if [[ -z "$cid" ]]; then bad "$svc 未运行"; continue; fi
@@ -56,7 +76,7 @@ for svc in mysql redis minio es backend web admin; do
   case "$st" in healthy|running) ok "$svc ($st)" ;; *) bad "$svc ($st)" ;; esac
 done
 
-head "2. 数据库初始化"
+section "2. 数据库初始化"
 total=$(sql "select count(*) from information_schema.tables where table_schema='${MYSQL_DATABASE:-ry-vue}'")
 blog=$(sql "select count(*) from information_schema.tables where table_schema='${MYSQL_DATABASE:-ry-vue}' and table_name like 'sd_blog%'")
 menus=$(sql "select count(*) from sys_menu where perms like 'blog:%' or path like 'blog%'")
@@ -66,28 +86,28 @@ client=$(sql "select count(*) from sys_client where client_key='web'")
 [[ "${menus:-0}" -ge 10 ]] && ok "博客菜单 ${menus} 条" || bad "博客菜单只有 ${menus} 条"
 [[ "${client:-0}" -eq 1 ]] && ok "web 客户端 1 条" || bad "web 客户端缺失（前台登录会报「客户端不存在」）"
 
-head "3. 后端直连"
+section "3. 后端直连"
 [[ "$(code "http://127.0.0.1:${BACKEND_PORT:-19081}/auth/code")" == "200" ]] \
   && ok "GET /auth/code 200（DB + Redis 连通）" || bad "GET /auth/code 失败"
 [[ "$(code "http://127.0.0.1:${BACKEND_PORT:-19081}/blog/public/articles?pageNum=1&pageSize=1")" == "200" ]] \
   && ok "GET /blog/public/articles 200" || bad "公共文章列表失败"
 
-head "4. 后台反代"
-body=$(curl -s --max-time 10 "http://127.0.0.1:${ADMIN_PORT:-19080}/prod-api/auth/code" || true)
-grep -q '"code":200' <<<"$body" && ok "/prod-api/auth/code 反代正常" || bad "/prod-api 反代异常：$(head -c 120 <<<"$body")"
+section "4. 后台反代"
+body=$(fetch "http://127.0.0.1:${ADMIN_PORT:-19080}/prod-api/auth/code")
+grep -q '"code":200' <<<"$body" && ok "/prod-api/auth/code 反代正常" || bad "/prod-api 反代异常：${body:0:120}"
 [[ "$(code "http://127.0.0.1:${ADMIN_PORT:-19080}/healthz")" == "200" ]] \
   && ok "后台 /healthz 200" || bad "后台 /healthz 失败"
 
-head "5. 前台 SSR"
+section "5. 前台 SSR"
 home=$(curl -s --max-time 15 "http://127.0.0.1:${WEB_PORT:-19300}/" || true)
 [[ "$(code "http://127.0.0.1:${WEB_PORT:-19300}/")" == "200" ]] && ok "GET / 200" || bad "GET / 失败"
 grep -q 'Stack Depth' <<<"$home" && ok "首屏含站点名（SSR 渲染成功）" || bad "首屏内容异常"
 
-head "6. 搜索"
+section "6. 搜索"
 [[ "$(code "http://127.0.0.1:${BACKEND_PORT:-19081}/blog/public/search?keyword=Java&pageNum=1&pageSize=1")" == "200" ]] \
   && ok "GET /blog/public/search 200" || bad "搜索接口失败"
 
-head "7. ES 索引（不阻塞交付）"
+section "7. ES 索引（不阻塞交付）"
 alias_n=$(compose exec -T es curl -s 'http://127.0.0.1:9200/_cat/aliases/blog_article' 2>/dev/null | wc -l)
 if [[ "${alias_n:-0}" -ge 1 ]]; then ok "alias blog_article 已就绪"; else warn "alias 尚未就绪（搜索会降级 MySQL LIKE，索引重建中）"; fi
 
