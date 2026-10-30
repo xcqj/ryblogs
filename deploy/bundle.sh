@@ -33,7 +33,7 @@ install -m 0644 compose.deps.yml          "$STAGE/"
 install -m 0644 compose.app.yml           "$STAGE/"
 install -m 0644 compose.target-wsl.yml    "$STAGE/"
 install -m 0644 compose.target-cloud.yml  "$STAGE/"
-install -m 0755 deploy.sh stage-sql.sh smoke.sh smoke-public.sh "$STAGE/"
+install -m 0755 deploy.sh stage-sql.sh smoke.sh smoke-public.sh db-audit.sh "$STAGE/"
 install -m 0644 .env.example README.md    "$STAGE/"
 install -m 0755 bundle.sh                 "$STAGE/"
 
