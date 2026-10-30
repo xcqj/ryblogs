@@ -184,7 +184,15 @@ public class OssClientConfig implements Config<OssClientConfig, OssClientConfig.
      * @return 访问站点URL地址
      */
     public String getEndpointUrl() {
-        return BucketUrlUtil.rebuildUrlHeader(useHttps, getEndpoint());
+        String endpoint = getEndpoint();
+        // endpoint 自带协议时以它为准：这是"内网明文 http 传文件 + 公网 https 出链接"的唯一可行组合。
+        // 否则 is_https 会同时改客户端协议与 URL 前缀，二者不可兼得：
+        //   填 Y → 客户端对明文 MinIO 说 TLS，Netty 抛 NotSslRecordException（上传 500）；
+        //   填 N → 返回的图片 URL 是 http://，在 https 页面里属于混合内容（S29.1 实测踩过）。
+        if (endpoint.startsWith("http://") || endpoint.startsWith("https://")) {
+            return endpoint;
+        }
+        return BucketUrlUtil.rebuildUrlHeader(useHttps, endpoint);
     }
 
     /**

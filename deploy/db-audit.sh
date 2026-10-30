@@ -125,13 +125,13 @@ if [[ -n "${IMG_PUBLIC_URL:-}" && -n "${MINIO_ROOT_USER:-}" && -n "${MINIO_ROOT_
   oss_ok=$(sqlx "$LIVE_DB" "
     select count(*) from sys_oss_config
     where config_key in ('minio','image')
-      and endpoint = 'minio:9000'
+      and endpoint = 'http://minio:9000'
       and bucket_name = '${MINIO_BUCKET:-ruoyi}'
       and access_key = '${MINIO_ROOT_USER}'
       and secret_key = '${MINIO_ROOT_PASSWORD}'
       and ifnull(domain_url,'') = '${IMG_PUBLIC_URL%/}'
       and ifnull(access_policy,0) = 2
-      and is_https = 'N';")
+      and is_https = 'Y';")
   if [[ "$oss_ok" == "2" ]]; then
     ok "OSS 环境配置与 .env 一致（endpoint/bucket/凭据/域名/policy）"
   else

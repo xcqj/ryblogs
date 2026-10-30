@@ -167,37 +167,37 @@ apply_env_config() {
     return 0
   fi
   # 六件事必须一起改，缺一条就出错：
-  #   ① endpoint 走容器内服务名（不能是 127.0.0.1）
+  #   ① endpoint 带 http:// 前缀走容器内服务名（不能是 127.0.0.1）——
+  #      本版本已改为"endpoint 自带协议优先"，这样客户端走明文、返回的 URL 仍可用 https
   #   ② 凭据用本栈 MinIO 的（模板里是 ruoyi/ruoyi123 → 上传 403
   #      "The Access Key Id you provided does not exist in our records"）
   #   ③ bucket_name
   #   ④ domain_url **只写域名，不带桶名**：本版本上传返回的 url 是
   #      domain + "/" + bucket + "/" + key，带桶名会变成 /ruoyi/ruoyi/...（404）
   #   ⑤ access_policy=2 → 公有读，URL 不带签名
-  #   ⑥ is_https 必须为 **N**：这个字段同时决定 S3 客户端协议（OssClientConfig.getEndpointUrl
-  #      会 rebuildUrlHeader(useHttps, endpoint)），而 MinIO 内网是明文 http。
-  #      填 Y 会让客户端对 MinIO 说 TLS → MinIO 回明文 400 → NotSslRecordException → 上传 500。
-  #      代价：返回的图片 URL 是 http://（现代浏览器会把 https 页面里的 http 图片自动升级，仍可显示）；
-  #      根治需改 OssClientConfig 尊重 endpoint 自带协议，见 docs/cloud-deployment.md 待办。
+  #   ⑥ is_https=Y：只用于生成**公网 URL** 的协议前缀；客户端协议由 endpoint 自带前缀决定
+  #      （OssClientConfig.getEndpointUrl 已改为「endpoint 带协议时优先」）。
+  #      历史坑：之前 is_https 同时控制客户端协议，填 Y 会让 Netty 对明文 MinIO 说 TLS
+  #      （NotSslRecordException → 上传 500）；填 N 则 URL 变成 http://，https 页面里属混合内容。
   local dom="${img%/}"
   compose exec -T -e MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql \
     mysql -uroot --default-character-set=utf8mb4 "${MYSQL_DATABASE:-ry-vue}" -e "
       update sys_oss_config
-         set endpoint = 'minio:9000',
+         set endpoint = 'http://minio:9000',
              bucket_name = '${bucket}',
              access_key = '${muser}',
              secret_key = '${mpass}',
              domain_url = '${dom}',
              access_policy = 2,
-             is_https = 'N'
+             is_https = 'Y'
        where config_key in ('minio','image')
-         and (endpoint <> 'minio:9000'
+         and (endpoint <> 'http://minio:9000'
               or bucket_name <> '${bucket}'
               or access_key <> '${muser}'
               or secret_key <> '${mpass}'
               or ifnull(domain_url,'') <> '${dom}'
               or ifnull(access_policy,0) <> 2
-              or is_https <> 'N');" >/dev/null 2>&1 \
+              or is_https <> 'Y');" >/dev/null 2>&1 \
     && info "OSS 配置已对齐（endpoint=minio:9000 / bucket=${bucket} / domain=${dom} / is_https=N）" \
     || warn "OSS 配置注入失败（不影响起栈，可手动 update sys_oss_config 修正）"
 
