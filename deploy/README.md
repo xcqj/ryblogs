@@ -122,6 +122,7 @@ DEPLOYED_AT=2026-10-30T21:00:00+08:00
 | 前台登录报「客户端不存在」 | 库里缺 `web` 客户端 | 确认 `sql/03-blog-web-client.sql` 已进 initdb |
 | 公网 000 / `TLS handshake failure` | Hostname 建在了**别的 zone** 里，被拼成 4 段名（如 `sdblog.us.ci.qdappt.us.ci`），免费证书不覆盖 | 在**该域名自己的 zone** 里建 Public Hostname；先 `dig NS <域名>` 确认已指向 Cloudflare |
 | 改了 `.env` 但容器里仍是旧值 | `docker compose restart` 只重启容器，**不重读 `.env`** | 用 `docker compose up -d`（按新 env 重建）或 `deploy.sh up --version <当前版本>` |
+| 改了 `sys_oss_config` 但上传/图片行为没变 | RuoYi 把 OSS 配置缓存在 Redis（`global:sys_oss:default_config`、`sys_oss_config`），**重启后端不清缓存** | `redis-cli --scan --pattern '*oss*' \| xargs -r redis-cli del` 后重启 backend；`deploy.sh up` 已自动清 |
 | 公网大响应卡住/超时、小响应正常 | 本机到 CF 的国际链路抖动（晚高峰实测 CF 基线也会掉到 4KB/s） | 换时段/换网络复测；这不是应用问题（本地 30ms） |
 | 本机自检随机返回 000、但浏览器正常 | shell 里有 `https_proxy`，代理对这些域名 TLS 抖动 | 自检一律 `curl --noproxy '*'`（`smoke-public.sh` 已内置） |
 | 封面图 403（`application/xml`） | 桶是私有的；`mc` 拉不到时无法直接设策略 | OSS 配置 `access_policy=2` + 桶匿名下载；无 `mc` 时可用「复制已公开桶的 `.minio.sys/buckets/<bucket>` 元数据」实现（停 MinIO → 容器内 root 复制 → 启动） |
