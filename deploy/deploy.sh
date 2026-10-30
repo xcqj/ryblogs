@@ -174,7 +174,11 @@ apply_env_config() {
   #   ④ domain_url **只写域名，不带桶名**：本版本上传返回的 url 是
   #      domain + "/" + bucket + "/" + key，带桶名会变成 /ruoyi/ruoyi/...（404）
   #   ⑤ access_policy=2 → 公有读，URL 不带签名
-  #   ⑥ is_https=Y → 否则拼出来是 http://，浏览器在 https 页面里会被拦
+  #   ⑥ is_https 必须为 **N**：这个字段同时决定 S3 客户端协议（OssClientConfig.getEndpointUrl
+  #      会 rebuildUrlHeader(useHttps, endpoint)），而 MinIO 内网是明文 http。
+  #      填 Y 会让客户端对 MinIO 说 TLS → MinIO 回明文 400 → NotSslRecordException → 上传 500。
+  #      代价：返回的图片 URL 是 http://（现代浏览器会把 https 页面里的 http 图片自动升级，仍可显示）；
+  #      根治需改 OssClientConfig 尊重 endpoint 自带协议，见 docs/cloud-deployment.md 待办。
   local dom="${img%/}"
   compose exec -T -e MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql \
     mysql -uroot --default-character-set=utf8mb4 "${MYSQL_DATABASE:-ry-vue}" -e "
@@ -185,7 +189,7 @@ apply_env_config() {
              secret_key = '${mpass}',
              domain_url = '${dom}',
              access_policy = 2,
-             is_https = 'Y'
+             is_https = 'N'
        where config_key in ('minio','image')
          and (endpoint <> 'minio:9000'
               or bucket_name <> '${bucket}'
@@ -193,7 +197,7 @@ apply_env_config() {
               or secret_key <> '${mpass}'
               or ifnull(domain_url,'') <> '${dom}'
               or ifnull(access_policy,0) <> 2
-              or is_https <> 'Y');" >/dev/null 2>&1 \
+              or is_https <> 'N');" >/dev/null 2>&1 \
     && info "OSS 配置已对齐（endpoint=minio:9000 / bucket=${bucket} / domain=${dom} / https）" \
     || warn "OSS 配置注入失败（不影响起栈，可手动 update sys_oss_config 修正）"
 }
