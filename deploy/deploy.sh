@@ -351,6 +351,27 @@ cmd_seed() {
   local file="${1:-${SEED_FILE:-seed-demo.sql}}"
   load_env
   take_lock
+  # 种子配图：抽象 SVG（assets/covers/）上传到 MinIO 的 seed/covers/ 前缀。
+  # 为什么放对象存储而不是前端静态目录：种子里的封面/正文图统一走图片域名，
+  # 换一台部署机只要跑 seed 就能自包含；用真实照片则既有版权问题又太重（单张 2~4MB）。
+  if [[ -d assets/covers ]]; then
+    local svg up=0
+    for svg in assets/covers/*.svg; do
+      [[ -f "$svg" ]] || continue
+      if curl -fsS --aws-sigv4 "aws:amz:us-east-1:s3" \
+           --user "${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}" \
+           -H 'Content-Type: image/svg+xml' -T "$svg" -o /dev/null \
+           "http://127.0.0.1:${MINIO_PORT:-19000}/${MINIO_BUCKET:-ruoyi}/seed/covers/$(basename "$svg")"; then
+        up=$((up + 1))
+      else
+        warn "上传 ${svg} 失败（图片将 404）"
+      fi
+    done
+    info "已上传 ${up} 张种子配图到 MinIO（seed/covers/）"
+  else
+    warn "assets/covers 不存在，跳过种子配图上传（正文/封面图会 404）"
+  fi
+
   info "装载种子 ${file}（幂等，可重放）"
   SEED_FILE="$file" compose --profile seed run --rm seed
 

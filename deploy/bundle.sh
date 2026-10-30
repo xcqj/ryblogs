@@ -38,6 +38,8 @@ install -m 0644 .env.example README.md    "$STAGE/"
 install -m 0755 bundle.sh                 "$STAGE/"
 
 mkdir -p "$STAGE/sql" "$STAGE/mysql" "$STAGE/redis" "$STAGE/seed"
+mkdir -p "$STAGE/assets/covers"
+install -m 0644 assets/covers/*.svg "$STAGE/assets/covers/"
 install -m 0644 sql/*.sql       "$STAGE/sql/"
 install -m 0644 mysql/my.cnf    "$STAGE/mysql/"
 install -m 0644 redis/redis.conf "$STAGE/redis/"

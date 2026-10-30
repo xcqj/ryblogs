@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675" width="1200" height="675" role="img" aria-label="示意图 3">
+<rect width="1200" height="675" fill="#F2F0E6"/>
+<rect x="120" y="505" width="96" height="60" fill="#23282E" fill-opacity="0.18"/><rect x="250" y="459" width="96" height="106" fill="#5C7A6B" fill-opacity="0.32"/><rect x="380" y="413" width="96" height="152" fill="#23282E" fill-opacity="0.46"/><rect x="510" y="367" width="96" height="198" fill="#5C7A6B" fill-opacity="0.6000000000000001"/><rect x="640" y="321" width="96" height="244" fill="#23282E" fill-opacity="0.74"/><rect x="48" y="48" width="1104" height="579" fill="none" stroke="#23282E" stroke-opacity="0.22" stroke-width="1.5"/>
+<rect width="1200" height="675" fill="url(#v)"/>
+<defs><linearGradient id="v" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.05"/></linearGradient></defs>
+</svg>
