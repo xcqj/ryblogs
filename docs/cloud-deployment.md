@@ -25,11 +25,13 @@ S29.2 云服务器目标（承接已停用的 S13）
 
 | 域名 | 隧道目标 | 说明 |
 |---|---|---|
-| `sdblog.qdappt.us.ci` | `127.0.0.1:19300`（blog-web） | 读者站 + 作者中心；`/api/**` 由 Nitro 内部转 `backend:8081` |
-| `admin-sdblog.qdappt.us.ci` | `127.0.0.1:19080`（plus-ui） | **公网直开**（2026-10-30 决定，不加 Cloudflare Access）；`/prod-api/*` 反代后端 |
-| `img-sdblog.qdappt.us.ci` | `127.0.0.1:19000`（MinIO） | 封面/正文图；桶 `ruoyi` 需匿名下载策略 |
+| `sdblog.us.ci` | `127.0.0.1:19300`（blog-web） | 读者站 + 作者中心；`/api/**` 由 Nitro 内部转 `backend:8081` |
+| `admin.sdblog.us.ci` | `127.0.0.1:19080`（plus-ui） | **公网直开**（2026-10-30 决定，不加 Cloudflare Access）；`/prod-api/*` 反代后端 |
+| `img.sdblog.us.ci` | `127.0.0.1:19000`（MinIO） | 封面/正文图；桶 `ruoyi` 需匿名下载策略 |
 
-> **为什么不用 `sdblog.us.ci` / `admin.sdblog.us.ci`**：zone 是 `qdappt.us.ci`，这两条是**两层子域**，Cloudflare 免费 Universal SSL 只覆盖「apex + 一层通配 `*.qdappt.us.ci`」，实测 TLS handshake failure（000）。改单层后全部 200。`admin.sdblog.qdappt.us.ci` 同样是两层，故用连字符 `admin-sdblog`。
+> **域名归属（2026-10-30 更正）**：`sdblog.us.ci` 是**独立 zone**（NS `ian.ns.cloudflare.com` / `anahi.ns.cloudflare.com`），与另一项目的 `qdappt.us.ci` 平级。
+> 早前出现的 `sdblog.us.ci.qdappt.us.ci` 这种 4 段名，是因为把整串域名填进了 **qdappt 的 zone** —— Cloudflare 的 Public Hostname 是「label + 当前 zone」，整串会被当成 label 再拼一次 zone，结果落在 `*.qdappt.us.ci` 证书覆盖范围之外。
+> 正确做法：在**该域名自己的 zone** 里建 Public Hostname（现已按此配置，三条域名全部 200）。
 
 - **不设 `api.` 子域**：两个前端各自反代后端；后端一旦有公网入口，鉴权面与限流面都要重新评估。
 - 后端 / MySQL / Redis / MinIO / ES 一律不公网，端口只绑 `127.0.0.1`。
@@ -89,8 +91,8 @@ S29.2 云服务器目标（承接已停用的 S13）
 
 - 三条 Public Hostname 改单层子域后：前台 200 / 后台 200 / 图片域 200；`smoke-public.sh` **8/8**
 - 后台 `/prod-api/auth/code` 返回 envelope 200（隧道 → nginx → backend 全链路通）
-- sitemap 内链接为 `https://sdblog.qdappt.us.ci`，robots 声明 sitemap，详情页 SSR 正常
-- **图片链路**：OSS 配置改为 `endpoint=minio:9000`（容器内）+ `domain_url=https://img-sdblog.qdappt.us.ci`（公网）+ `access_policy=2`；10 条种子封面 URL 重写为图片域名；桶改为匿名下载后封面 200（2MB jpeg）
+- sitemap 内链接为 `https://sdblog.us.ci`，robots 声明 sitemap，详情页 SSR 正常
+- **图片链路**：OSS 配置改为 `endpoint=minio:9000`（容器内）+ `domain_url=https://img.sdblog.us.ci`（公网）+ `access_policy=2`；10 条种子封面 URL 重写为图片域名；桶改为匿名下载后封面 200（2MB jpeg）
 - 桶策略的落地方式（环境限制用不了 `mc`，Docker Hub 镜像源与 dl.min.io 均不可达）：**把开发栈已公开桶的 `.minio.sys/buckets/ruoyi` 元数据复制到演示栈**（停 MinIO → 容器内 root 复制 → 启动）
 - `cloudflared`：token 已落盘 `/etc/cloudflared/token`（249B / 600，轮换后的新 token），`systemctl restart` 后 `enabled`+`active`，三条域名仍 200
 - 发布流水线 e2e：三仓 `v0.1.1` tag → 四枚镜像 → `release.yml`（preflight 1m37s + deploy 33s）**全绿**；`deploy.sh up` 对同版本幂等（镜像 digest 未变时不会重建容器）

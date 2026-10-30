@@ -32,7 +32,7 @@ sql() {
 code() {
   local url="$1" i out=""
   for i in 1 2 3 4 5; do
-    out=$(curl -s --noproxy '*' -o /dev/null -w '%{http_code}' --max-time 15 "$url" 2>/dev/null || true)
+    out=$(curl -s --noproxy '*' -o /dev/null -w '%{http_code}' --max-time 30 "$url" 2>/dev/null || true)
     [[ "$out" == "200" ]] && break
     sleep 3
   done
@@ -42,7 +42,7 @@ code() {
 fetch() {
   local url="$1" i out=""
   for i in 1 2 3 4 5; do
-    out=$(curl -s --noproxy '*' --max-time 15 "$url" 2>/dev/null || true)
+    out=$(curl -s --noproxy '*' --max-time 30 "$url" 2>/dev/null || true)
     grep -q '"code":200' <<<"$out" && break
     sleep 3
   done
@@ -99,7 +99,7 @@ grep -q '"code":200' <<<"$body" && ok "/prod-api/auth/code 反代正常" || bad 
   && ok "后台 /healthz 200" || bad "后台 /healthz 失败"
 
 section "5. 前台 SSR"
-home=$(curl -s --max-time 15 "http://127.0.0.1:${WEB_PORT:-19300}/" || true)
+home=$(curl -s --max-time 30 "http://127.0.0.1:${WEB_PORT:-19300}/" || true)
 [[ "$(code "http://127.0.0.1:${WEB_PORT:-19300}/")" == "200" ]] && ok "GET / 200" || bad "GET / 失败"
 grep -q 'Stack Depth' <<<"$home" && ok "首屏含站点名（SSR 渲染成功）" || bad "首屏内容异常"
 

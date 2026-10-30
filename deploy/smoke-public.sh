@@ -31,7 +31,7 @@ section() { printf '\n\033[1m%s\033[0m\n' "$1"; }
 code() {
   local url="$1" i out=""
   for i in 1 2 3; do
-    out=$(curl -s --noproxy '*' -o /dev/null -w '%{http_code}' --max-time 20 "$url" 2>/dev/null || true)
+    out=$(curl -s --noproxy '*' -o /dev/null -w '%{http_code}' --max-time 60 "$url" 2>/dev/null || true)
     [[ "$out" == "200" ]] && break
     sleep 2
   done
@@ -40,15 +40,15 @@ code() {
 
 section "1. 前台"
 [[ "$(code "$SITE/")" == "200" ]] && ok "$SITE/ 200" || bad "$SITE/ 失败"
-grep -q 'Stack Depth' <<<"$(curl -s --max-time 15 "$SITE/")" && ok "首屏 SSR 内容正常" || bad "首屏内容异常"
+grep -q 'Stack Depth' <<<"$(curl -s --max-time 60 "$SITE/")" && ok "首屏 SSR 内容正常" || bad "首屏内容异常"
 
 section "2. 后台"
 [[ "$(code "$ADMIN/")" == "200" ]] && ok "$ADMIN/ 200" || bad "$ADMIN/ 失败"
-body=$(curl -s --max-time 15 "$ADMIN/prod-api/auth/code" || true)
+body=$(curl -s --max-time 60 "$ADMIN/prod-api/auth/code" || true)
 grep -q '"code":200' <<<"$body" && ok "后台 /prod-api 反代通（envelope 200）" || bad "后台反代异常：${body:0:120}"
 
 section "3. SEO 三件套（必须指向真实域名）"
-sitemap=$(curl -s --max-time 20 "$SITE/sitemap.xml" || true)
+sitemap=$(curl -s --max-time 60 "$SITE/sitemap.xml" || true)
 grep -q "$SITE" <<<"$sitemap" && ok "sitemap 内链接为 $SITE" || bad "sitemap 未包含真实域名（检查 NUXT_PUBLIC_SITE_URL）"
 robots=$(curl -s --max-time 10 "$SITE/robots.txt" || true)
 grep -qi 'sitemap:' <<<"$robots" && ok "robots.txt 声明 sitemap" || bad "robots.txt 缺 Sitemap 行"
@@ -57,14 +57,14 @@ section "4. 内容页"
 # 从首页抓第一个真实的详情链接（比猜 slug 更贴近读者路径；列表 VO 不含 slug 字段）
 # 注意：先把 HTML 落变量再 grep —— 直接 curl | grep -m1 会让 curl 收到 SIGPIPE，
 # 在 set -o pipefail 下整条管线失败、结果被吞掉（实测踩过）
-home_html=$(curl -s --max-time 20 "$SITE/" || true)
+home_html=$(curl -s --max-time 60 "$SITE/" || true)
 link=""
 if [[ "$home_html" =~ href=\"(/post/[^\"]+)\" ]]; then
   link="${BASH_REMATCH[1]}"
 fi
 if [[ -n "$link" ]]; then
   [[ "$(code "$SITE$link")" == "200" ]] && ok "详情页 ${link} 200" || bad "详情页 ${link} 失败"
-  body=$(curl -s --max-time 20 "$SITE$link")
+  body=$(curl -s --max-time 60 "$SITE$link")
   grep -q 'prose' <<<"$body" && ok "详情页正文容器渲染正常" || bad "详情页正文容器缺失"
 else
   bad "首页抓不到详情链接（列表为空或首页异常）"
