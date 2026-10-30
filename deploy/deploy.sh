@@ -157,6 +157,24 @@ init_data_dir() {
   fi
 }
 
+# OSS 公网域名属环境配置（WSL 与云目标不同），不写进基础 SQL：
+# 每次发布按 .env 的 IMG_PUBLIC_URL 幂等注入，避免"新库图片指向 127.0.0.1:9000"
+apply_env_config() {
+  local img="${IMG_PUBLIC_URL:-}"
+  if [[ -z "$img" ]]; then
+    warn "IMG_PUBLIC_URL 未设置，跳过 OSS 公网域名注入（读者端封面会指向内网地址）"
+    return 0
+  fi
+  compose exec -T -e MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql \
+    mysql -uroot --default-character-set=utf8mb4 "${MYSQL_DATABASE:-ry-vue}" -e "
+      update sys_oss_config
+         set domain_url = '${img}', access_policy = 2
+       where config_key in ('minio','image')
+         and (ifnull(domain_url,'') <> '${img}' or ifnull(access_policy,0) <> 2);" >/dev/null 2>&1 \
+    && info "OSS 公网域名已对齐 ${img}" \
+    || warn "OSS 配置注入失败（不影响起栈，可手动 update sys_oss_config 修正）"
+}
+
 wait_healthy() {
   local timeout="${1:-300}" start now st bad cid
   start=$(date +%s)
@@ -240,6 +258,7 @@ cmd_deploy() {
   info "起栈（无 build）"
   compose up -d --no-build --remove-orphans
   wait_healthy
+  apply_env_config
 
   ok "已部署 ${RELEASE_VERSION:-local}"
   if (( ! no_smoke )); then
