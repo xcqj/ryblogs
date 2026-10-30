@@ -198,8 +198,16 @@ apply_env_config() {
               or ifnull(domain_url,'') <> '${dom}'
               or ifnull(access_policy,0) <> 2
               or is_https <> 'N');" >/dev/null 2>&1 \
-    && info "OSS 配置已对齐（endpoint=minio:9000 / bucket=${bucket} / domain=${dom} / https）" \
+    && info "OSS 配置已对齐（endpoint=minio:9000 / bucket=${bucket} / domain=${dom} / is_https=N）" \
     || warn "OSS 配置注入失败（不影响起栈，可手动 update sys_oss_config 修正）"
+
+  # RuoYi 把 sys_oss_config 缓存在 Redis（global:sys_oss:default_config / sys_oss_config），
+  # **重启后端不会清 Redis** → 只改库会继续用旧配置（实测：is_https 改成 N 后仍走 TLS）。
+  # 所以注入后必须清缓存，否则改动看起来"没生效"。
+  compose exec -T -e REDISCLI_AUTH="${REDIS_PASSWORD:-}" redis \
+    sh -c 'redis-cli --scan --pattern "*oss*" | xargs -r redis-cli del' >/dev/null 2>&1 \
+    && info "已清理 Redis 中的 OSS 配置缓存" \
+    || warn "清理 OSS 缓存失败（配置未生效时手动删 *oss* 键并重启 backend）"
 }
 
 wait_healthy() {
