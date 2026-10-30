@@ -160,18 +160,37 @@ init_data_dir() {
 # OSS 公网域名属环境配置（WSL 与云目标不同），不写进基础 SQL：
 # 每次发布按 .env 的 IMG_PUBLIC_URL 幂等注入，避免"新库图片指向 127.0.0.1:9000"
 apply_env_config() {
-  local img="${IMG_PUBLIC_URL:-}"
-  if [[ -z "$img" ]]; then
-    warn "IMG_PUBLIC_URL 未设置，跳过 OSS 公网域名注入（读者端封面会指向内网地址）"
+  local img="${IMG_PUBLIC_URL:-}" muser="${MINIO_ROOT_USER:-}" mpass="${MINIO_ROOT_PASSWORD:-}"
+  local bucket="${MINIO_BUCKET:-ruoyi}"
+  if [[ -z "$img" || -z "$muser" || -z "$mpass" ]]; then
+    warn "IMG_PUBLIC_URL / MINIO_ROOT_USER / MINIO_ROOT_PASSWORD 有缺项，跳过 OSS 配置注入"
     return 0
   fi
+  # domain_url 必须带桶名：RuoYi 取 domainUrl 的 path 作为 basePath 再拼 key，
+  # 写成 https://img.xxx 会生成 /2026/10/x.jpg（MinIO 找不到桶）→ 404
+  local dom="${img%/}/${bucket}"
+  # 四件事必须一起改，缺一条就上传失败：
+  #   endpoint 走容器内服务名（不能是 127.0.0.1）、凭据用本栈 MinIO 的、
+  #   公网域名给读者看图、access_policy=2 让 URL 不带签名
+  # 踩过：基础 SQL 里是模板凭据 ruoyi/ruoyi123，与演示栈 MinIO 不一致
+  #       → 上传返回 500，日志 "The Access Key Id you provided does not exist in our records"
   compose exec -T -e MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql \
     mysql -uroot --default-character-set=utf8mb4 "${MYSQL_DATABASE:-ry-vue}" -e "
       update sys_oss_config
-         set domain_url = '${img}', access_policy = 2
+         set endpoint = 'minio:9000',
+             bucket_name = '${bucket}',
+             access_key = '${muser}',
+             secret_key = '${mpass}',
+             domain_url = '${dom}',
+             access_policy = 2
        where config_key in ('minio','image')
-         and (ifnull(domain_url,'') <> '${img}' or ifnull(access_policy,0) <> 2);" >/dev/null 2>&1 \
-    && info "OSS 公网域名已对齐 ${img}" \
+         and (endpoint <> 'minio:9000'
+              or bucket_name <> '${bucket}'
+              or access_key <> '${muser}'
+              or secret_key <> '${mpass}'
+              or ifnull(domain_url,'') <> '${dom}'
+              or ifnull(access_policy,0) <> 2);" >/dev/null 2>&1 \
+    && info "OSS 配置已对齐（endpoint=minio:9000 / bucket=${bucket} / domain=${dom}）" \
     || warn "OSS 配置注入失败（不影响起栈，可手动 update sys_oss_config 修正）"
 }
 

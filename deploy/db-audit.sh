@@ -118,20 +118,27 @@ cmp_rows "sys_dict_data（type/label/value/sort）"     "select dict_type, dict_
 cmp_rows "sys_role（key/status）"                     "select role_key, status from sys_role order by role_key;"
 cmp_rows "sys_dept（id/name/parent）"                 "select dept_id, dept_name, parent_id from sys_dept order by dept_id;"
 cmp_rows "sys_oss_config（key/bucket）"                "select config_key, bucket_name from sys_oss_config order by config_key;"
-# domain_url / access_policy 属**环境配置**（WSL 与云目标不同），由 deploy.sh 从 .env 注入，
-# 不写进基础 SQL；这里只断言运行库与 .env 一致
-if [[ -n "${IMG_PUBLIC_URL:-}" ]]; then
-  oss_dom=$(sqlx "$LIVE_DB" "select distinct domain_url from sys_oss_config where config_key in ('minio','image');")
-  oss_pol=$(sqlx "$LIVE_DB" "select distinct access_policy from sys_oss_config where config_key in ('minio','image');")
-  if [[ "$oss_dom" == "$IMG_PUBLIC_URL" && "$oss_pol" == "2" ]]; then
-    ok "OSS 公网域名与 .env 一致（$IMG_PUBLIC_URL / access_policy=2）"
+# endpoint / 凭据 / domain_url / access_policy 属**环境配置**（各栈 MinIO 不同、域名不同），
+# 由 deploy.sh 的 apply_env_config 从 .env 幂等注入，不写进基础 SQL；
+# 这里断言运行库与 .env 一致（凭据只比相等性，不打印内容）
+if [[ -n "${IMG_PUBLIC_URL:-}" && -n "${MINIO_ROOT_USER:-}" && -n "${MINIO_ROOT_PASSWORD:-}" ]]; then
+  oss_ok=$(sqlx "$LIVE_DB" "
+    select count(*) from sys_oss_config
+    where config_key in ('minio','image')
+      and endpoint = 'minio:9000'
+      and bucket_name = '${MINIO_BUCKET:-ruoyi}'
+      and access_key = '${MINIO_ROOT_USER}'
+      and secret_key = '${MINIO_ROOT_PASSWORD}'
+      and ifnull(domain_url,'') = '${IMG_PUBLIC_URL%/}/${MINIO_BUCKET:-ruoyi}'
+      and ifnull(access_policy,0) = 2;")
+  if [[ "$oss_ok" == "2" ]]; then
+    ok "OSS 环境配置与 .env 一致（endpoint/bucket/凭据/域名/policy）"
   else
-    printf '\033[31m✗ OSS 配置与 .env 不一致：domain_url=%s policy=%s（期望 %s / 2）\033[0m\n' \
-      "$oss_dom" "$oss_pol" "$IMG_PUBLIC_URL"
+    printf '\033[31m✗ OSS 环境配置与 .env 不一致（命中 %s/2 条）——跑一次 deploy.sh up 让它注入\033[0m\n' "$oss_ok"
     fail=1
   fi
 else
-  warn "IMG_PUBLIC_URL 未设置，跳过 OSS 公网域名断言"
+  warn "IMG_PUBLIC_URL / MINIO_* 未设置，跳过 OSS 环境配置断言"
 fi
 
 printf '\n\033[1m3. 菜单（含博客治理）\033[0m\n'
