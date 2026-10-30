@@ -98,6 +98,9 @@ Generator 定位是生成 RuoYi 风格骨架，不是完成博客业务。Entity
   跨仓构建由 compose 的 `build.context` 显式指定（`../../blog-web`、`../../../plus-ui`），依赖三仓同级 clone。
 - ⚠️ 同理，前端构建（`npm` / `pnpm`）只在各自前端仓库目录内执行，也不要在父目录跑（D32 抬升为通用约束）。
 - ⚠️ **部署链不编译**：发布走「CI 产不可变镜像 → 部署机 `pull`」，部署机上不跑 `mvn` / `npm` / `docker build`，也不 clone 源码；部署包（分层 compose + SQL + 脚本）随 Release 产物分发，方案见 `docs/cloud-deployment.md`（S29.1）。
+- ⚠️ **数据库手工变更必须回流脚本**：任何在开发库里直接执行的 SQL（改 `sys_client`、补菜单/父目录、加字典、调配置），必须在同一次提交里回流到 `docs/*.sql` 或 `script/sql/`，否则新环境必然缺失。S29.1 已踩两次：① `web` 客户端缺 `social` 授权类型（dev 是后台手工勾的）→ 社交登录报 `Auth grant type error`；② 「博客管理」父目录菜单从未入脚本 → 新库治理页入口整组不显示。
+  **自检方法**：用同一套脚本在临时库重放（`create database ry_verify` + 顺序执行 `deploy/sql/01..13`），再与开发库比对 `sys_menu / sys_client / sys_config / sys_dict_* / sys_role / sys_dept / sys_oss_config` 的行数与差集，必须零差异（S29.1 收尾时实测 31 张表结构一致、8 张配置表零差异）。
+  **注意**：`deploy/sql/` 是暂存副本，改 `docs/*.sql` 后要在**源码目录**跑 `./stage-sql.sh` 刷新；部署包内执行该脚本会跳过（无源码可拷）。
 
 测试策略（切片级约定）：
 

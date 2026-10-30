@@ -133,3 +133,21 @@ DEPLOYED_AT=2026-10-30T21:00:00+08:00
 - 部署机**不编译**：没有 `compose.build.yml`、没有源码、没有 `~/.m2`。
 - **禁止** `docker system prune -a`（同机还有 appt 栈）；`gc` 只按前缀删。
 - 同机多栈部署用 `flock` 互斥（`/tmp/sdblog-deploy.lock`），GitHub 的 concurrency 组跨仓库不生效。
+- 改 `docs/*.sql` 后要在**源码目录**跑 `./stage-sql.sh` 刷新暂存副本；在部署包目录执行会跳过（无源码可拷）。
+
+## 10. 重启后自检（WSL / 主机重启）
+
+主机重启后应**无需人工干预**自动恢复，按下面顺序确认（实测 2026-10-30 全通过）：
+
+```bash
+systemctl is-active docker cloudflared-qdblog cloudflared-qdappt-demo    # active ×3
+systemctl --user is-active actions-runner-sdblog sdblog-backup.timer     # active ×2
+sysctl -n vm.max_map_count                                              # 262144
+docker ps --format '{{.Names}}' | wc -l                                 # 22（含 appt 与开发栈）
+cd ~/sdblog/current && ./deploy.sh status | head -4 && ./smoke-public.sh
+```
+
+- 隧道重连需 1~2 分钟，期间公网 502 属正常，别急着判故障；
+- 容器靠 `restart: unless-stopped` 拉起；没起来先看 `systemctl is-active docker`；
+- `sdblog-backup.timer` 是**用户级**单元，依赖 `loginctl enable-linger user01`（已设置）；
+- 公网冒烟若个别项失败，先看是否为链路超时（内容正确 ≠ 传输成功），错峰复测。
