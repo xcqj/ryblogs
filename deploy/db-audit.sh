@@ -143,9 +143,9 @@ else
 fi
 
 printf '\n\033[1m3. 菜单（含博客治理）\033[0m\n'
-cmp_rows "sys_menu 全量（id/父/类型/路径/组件/权限/可见）" "
+cmp_rows "sys_menu 全量（id/父/类型/路径/组件/权限/可见/内外链/缓存）" "
   select menu_id, ifnull(parent_id,0), menu_name, menu_type, ifnull(path,''), ifnull(component,''),
-         ifnull(perms,''), visible, status
+         ifnull(perms,''), visible, status, ifnull(is_frame,''), ifnull(is_cache,'')
   from sys_menu order by menu_id;"
 cmp_count "菜单总数" sys_menu
 cmp_rows "孤儿菜单（应为空）" "

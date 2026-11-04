@@ -25,9 +25,9 @@ DELETE FROM sys_menu WHERE menu_id IN (2105090000000000101, 2105090000000000102,
 -- ---------------------------------------------------------
 INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
 VALUES
-(2105090000000000101, '文章治理', 2103854919354421249, 1, 'adminArticle', 'blog/adminArticle/index', NULL, 1, 0, 'C', '0', '0', 'blog:article:list',  '#', 103, 1, sysdate(), '契约§11 管理员文章治理页'),
-(2105090000000000102, '标签治理', 2103854919354421249, 2, 'adminTag',     'blog/adminTag/index',     NULL, 1, 0, 'C', '0', '0', 'blog:tag:list',      '#', 103, 1, sysdate(), '契约§13 管理员标签治理页'),
-(2105090000000000103, '评论治理', 2103854919354421249, 3, 'adminComment', 'blog/adminComment/index', NULL, 1, 0, 'C', '0', '0', 'blog:comment:list',  '#', 103, 1, sysdate(), '契约§12 管理员评论治理页');
+(2105090000000000101, '文章治理', 2103854919354421249, 1, 'adminArticle', 'blog/adminArticle/index', NULL, 'N', 0, 'C', '0', '0', 'blog:article:list',  '#', 103, 1, sysdate(), '契约§11 管理员文章治理页'),
+(2105090000000000102, '标签治理', 2103854919354421249, 2, 'adminTag',     'blog/adminTag/index',     NULL, 'N', 0, 'C', '0', '0', 'blog:tag:list',      '#', 103, 1, sysdate(), '契约§13 管理员标签治理页'),
+(2105090000000000103, '评论治理', 2103854919354421249, 3, 'adminComment', 'blog/adminComment/index', NULL, 'N', 0, 'C', '0', '0', 'blog:comment:list',  '#', 103, 1, sysdate(), '契约§12 管理员评论治理页');
 
 -- ---------------------------------------------------------
 -- ③ 验证

@@ -19,8 +19,8 @@ DELETE FROM sys_menu WHERE menu_id IN (2105090000000000021, 2105090000000000022)
 -- ---------------------------------------------------------
 INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
 VALUES
-(2105090000000000021, '评论管理列表', 2103854919354421249, 40, '', NULL, NULL, 1, 0, 'F', '0', '0', 'blog:comment:list',   '#', 103, 1, sysdate(), '契约§12.1'),
-(2105090000000000022, '评论删除',     2103854919354421249, 41, '', NULL, NULL, 1, 0, 'F', '0', '0', 'blog:comment:remove', '#', 103, 1, sysdate(), '契约§12.2');
+(2105090000000000021, '评论管理列表', 2103854919354421249, 40, '', NULL, NULL, 'N', 0, 'F', '0', '0', 'blog:comment:list',   '#', 103, 1, sysdate(), '契约§12.1'),
+(2105090000000000022, '评论删除',     2103854919354421249, 41, '', NULL, NULL, 'N', 0, 'F', '0', '0', 'blog:comment:remove', '#', 103, 1, sysdate(), '契约§12.2');
 
 -- ---------------------------------------------------------
 -- ③ 清理已停用生成 Controller 的菜单（D12：blogComment；D16：blogUserProfile）

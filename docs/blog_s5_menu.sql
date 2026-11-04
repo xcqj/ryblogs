@@ -14,7 +14,7 @@
 --          所有 C/F 菜单变成孤儿节点 → 后台侧边栏不显示「博客管理」，治理页进不去。
 -- ---------------------------------------------------------
 INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
-SELECT 2103854919354421249, '博客管理', 0, 3, 'blog', NULL, NULL, 1, 0, 'M', '0', '0', '', 'documentation', 103, 1, sysdate(), '博客菜单父目录（治理页入口的容器）'
+SELECT 2103854919354421249, '博客管理', 0, 3, 'blog', NULL, NULL, 'N', 0, 'M', '0', '0', '', 'documentation', 103, 1, sysdate(), '博客菜单父目录（治理页入口的容器）'
 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_id = 2103854919354421249);
 
@@ -29,10 +29,10 @@ DELETE FROM sys_menu WHERE menu_id IN (2105090000000000001, 2105090000000000002,
 -- ---------------------------------------------------------
 INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
 VALUES
-(2105090000000000001, '文章治理查询', 2103854919354421249, 20, '', NULL, NULL, 1, 0, 'F', '0', '0', 'blog:article:query',    '#', 103, 1, sysdate(), '契约§11.1/11.2 管理员列表与详情'),
-(2105090000000000002, '文章下线',     2103854919354421249, 21, '', NULL, NULL, 1, 0, 'F', '0', '0', 'blog:article:adminHide',  '#', 103, 1, sysdate(), '契约§11.3 管理员下线'),
-(2105090000000000003, '文章恢复',     2103854919354421249, 22, '', NULL, NULL, 1, 0, 'F', '0', '0', 'blog:article:adminRestore','#', 103, 1, sysdate(), '契约§11.4 管理员恢复'),
-(2105090000000000004, '文章治理列表', 2103854919354421249, 23, '', NULL, NULL, 1, 0, 'F', '0', '0', 'blog:article:list',       '#', 103, 1, sysdate(), '契约§11.1 管理员文章列表');
+(2105090000000000001, '文章治理查询', 2103854919354421249, 20, '', NULL, NULL, 'N', 0, 'F', '0', '0', 'blog:article:query',    '#', 103, 1, sysdate(), '契约§11.1/11.2 管理员列表与详情'),
+(2105090000000000002, '文章下线',     2103854919354421249, 21, '', NULL, NULL, 'N', 0, 'F', '0', '0', 'blog:article:adminHide',  '#', 103, 1, sysdate(), '契约§11.3 管理员下线'),
+(2105090000000000003, '文章恢复',     2103854919354421249, 22, '', NULL, NULL, 'N', 0, 'F', '0', '0', 'blog:article:adminRestore','#', 103, 1, sysdate(), '契约§11.4 管理员恢复'),
+(2105090000000000004, '文章治理列表', 2103854919354421249, 23, '', NULL, NULL, 'N', 0, 'F', '0', '0', 'blog:article:list',       '#', 103, 1, sysdate(), '契约§11.1 管理员文章列表');
 
 -- ---------------------------------------------------------
 -- ③ 清理已停用 SdBlogArticleController 的菜单（D12：C 菜单 + 5 个 F 按钮）
