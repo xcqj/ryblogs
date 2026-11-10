@@ -7,7 +7,7 @@
 
 - 基于 **RuoYi-Vue-Plus 6.X** 的后端仓库，构建**多用户 / 多作者技术博客 / 内容平台**。
 - 博客业务通过独立 Maven 模块 `sd-blog` 接入，Java 包名 `org.dromara.blog`。
-- 前端有两个独立仓库：`plus-ui`（PLUS-UI 6.X-Vue，管理后台）与 `blog-web`（PC 博客前台，S9）；均与本仓库**同级 clone**（布局与工作区见 `docs/SETUP.md` §10）。本仓库只负责后端（含 generator 前端模板产物），移动端暂不纳入（ROADMAP D21）。
+- 前端有两个独立仓库：`plus-ui`（PLUS-UI 6.X-Vue，管理后台）与 `blog-web`（PC 博客前台，S9）；均与本仓库**同级 clone**（布局与工作区见 `docs/SETUP.md` §10）。本仓库只负责后端（含 generator 前端模板产物），移动端暂不纳入（ROADMAP D21）。另有第四个同级目录 `overview`（远端 `blogs-overview`，**Public 纯文档仓**，D47）：只做项目导航与演示入口，不参与构建与 CI。
 - 策略：先完成可真实运行的博客 MVP；ES、多级缓存、PWA、SEO、CI/CD 等 MVP 后再决定，不为"面试亮点"提前写死非 MVP 技术。
 
 ## 2. 工具链
@@ -25,7 +25,7 @@
 | Java 包 | `org.dromara.blog` |
 | Mapper XML | `sd-blog/src/main/resources/mapper/blog/` |
 | 数据库表前缀 | `sd_blog_`（以 `docs/blog_schema_v0.1.sql` 与实际库为准） |
-| IDE 工作区文件 | `tooling/blog.code-workspace`（多根工作区**唯一权威副本**，由本仓库托管；新增前端仓库时向其 `folders` 追加，不在父目录另存一份） |
+| IDE 工作区文件 | `tooling/blog.code-workspace`（多根工作区**唯一权威副本**，由本仓库托管；新增仓库（前端或文档仓）时向其 `folders` 追加，不在父目录另存一份） |
 | 父目录路由枢纽 | `../AGENTS.md`（父目录 `sd-blog/AGENTS.md`）：Agent 会话根落在父目录时的跨仓路由入口，**只做地图 / 指针 / 跨仓红线，不重复本文已有规则**；与本文冲突时以本文件为准（D32） |
 
 Maven 接入点（三处必须同时一致，已配置完成）：根 `pom.xml` 的 `<dependencyManagement>`、`ruoyi-modules/pom.xml` 的 `<modules>`、`ruoyi-admin/pom.xml` 的 `<dependencies>`。

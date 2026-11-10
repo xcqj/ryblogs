@@ -119,13 +119,14 @@ IDEA 默认用 Bundled Maven，与命令行 sdkman Maven 不同源会出现"命�
 ### 10.1 必须同级 clone（硬性前提）
 
 后端与各前端仓库是**各自独立的 Git 仓库**，交叉引用全部走相对路径（如 `plus-ui/AGENTS.md` 指向 `../RuoYi-Vue-Plus/docs/blog-api.md`）。
-因此它们必须是**同一父目录下的兄弟目录**，布局不对则跨仓库引用直接失效（MVP 期先按下面两个 clone）：
+因此它们必须是**同一父目录下的兄弟目录**，布局不对则跨仓库引用直接失效（三个业务仓 + 一个只读文档仓，按下面四个 clone）：
 
 ```bash
 mkdir -p ~/projects/sd-blog && cd ~/projects/sd-blog
-git clone git@github.com:xcqj/ryblogs.git     RuoYi-Vue-Plus
-git clone git@github.com:xcqj/ryblogs-ui.git  plus-ui
-git clone git@github.com:xcqj/blogs-web.git   blog-web
+git clone git@github.com:xcqj/ryblogs.git         RuoYi-Vue-Plus
+git clone git@github.com:xcqj/ryblogs-ui.git      plus-ui
+git clone git@github.com:xcqj/blogs-web.git       blog-web
+git clone git@github.com:xcqj/blogs-overview.git  overview   # 纯文档仓，可选（D47）
 ```
 
 | 本地目录 | origin | 当前分支 | upstream（跟官方） |
@@ -133,16 +134,19 @@ git clone git@github.com:xcqj/blogs-web.git   blog-web
 | `RuoYi-Vue-Plus` | `github.com:xcqj/ryblogs` | `6.X` | `gitee.com/dromara/RuoYi-Vue-Plus` |
 | `plus-ui` | `github.com:xcqj/ryblogs-ui` | `6.X-Vue` | `gitee.com/JavaLionLi/plus-ui` |
 | `blog-web` | `github.com:xcqj/blogs-web` | `main` | —（自建仓，不跟上游） |
+| `overview` | `github.com:xcqj/blogs-overview` | `main` | —（自建纯文档仓，**Public**，不参与构建） |
 
 ### 10.2 工作区文件
 
 **唯一权威副本：`tooling/blog.code-workspace`（随本仓库版本化）。**
 
-打开方式：IDE 菜单 `File → Open Workspace from File…`，选中该文件；当前两个 folder 会分别显示为
-`backend · RuoYi-Vue-Plus` 与 `admin · plus-ui`（新增前端仓库后自动多一个）。
+打开方式：IDE 菜单 `File → Open Workspace from File…`，选中该文件；当前四个 folder 显示为
+`backend · RuoYi-Vue-Plus`、`admin · plus-ui`、`web · blog-web`、`overview · blogs-overview`（新增仓库时按 §10.4 追加）。
+其中 `overview` 是**公开的项目总览文档仓**（D47），只提供仓库与演示导航，**不参与构建、不进 CI、不被 compose 引用**：
+动它不会触发任何业务构建，反之亦然。
 
 - `folders[].path` 是**相对该 workspace 文件所在目录**解析的（本文件在 `tooling/` 下，故为 `..` 与 `../../plus-ui`），
-  且要求 §10.1 的同级布局。换布局就改这两条路径，新增前端仓库则在此**追加 folder**（§10.4），不要在别处再存第二份副本 —— 多份副本必然漂移。
+  且要求 §10.1 的同级布局。换布局就改这些路径，新增仓库（前端或文档仓）则在此**追加 folder**（§10.4），不要在别处再存第二份副本 —— 多份副本必然漂移。
 - 文件内另带 `search.exclude`（排 `**/target`、`**/node_modules`、`**/dist`、`*.log`、`*.log.gz`）与
   `files.watcherExclude`（同族 + `**/logs/**`），只是 IDE 检索/监听体验配置，**不影响构建与 `.gitignore` 语义**。
 - 采用严格 JSON（无注释），便于任何工具直接解析；配置理由记在本节，不写进配置文件。
@@ -174,6 +178,7 @@ git clone git@github.com:xcqj/blogs-web.git   blog-web
 | 后端 | `RuoYi-Vue-Plus`（`ryblogs`） | ✅ 已存在，已验收至 S8 | ROADMAP §2 |
 | 管理后台 | `plus-ui`（`ryblogs-ui`） | ✅ 已存在 | ROADMAP S1~S8 |
 | PC 博客前台 | `blog-web`（`blogs-web`，2026-10-06 定名） | ✅ **已建仓并同级 clone（2026-10-06 S9 开工：Nuxt 4.5.2 脚手架 + Nitro 代理/cookie 认证 + 首页对接 §5.1/§7.1/§7.2 已跑通）** | ROADMAP S9 + D21；**范围=响应式（PC + 移动浏览器一套代码，D27）；技术栈=Nuxt 4 SSR（D28）**；依赖 S2+S6+S8，只调公共层 + 登录作者自助层（`/blog/article|user/**`）；作者中心（发文/编辑/自助治理自己的文章）在 blog-web（D29 修订 D24），平台治理仍属 plus-ui |
+| 项目总览（文档） | `overview`（`blogs-overview`） | ✅ 已建仓并同级 clone（2026-11-11，D47）；**Public、纯文档** | 只做仓库 / 演示入口 / 技术方案导航，不含业务代码；**不参与构建、不进 CI、不被 compose 引用**；公开前必须过其 `SECURITY_REVIEW.md` 的四条红线（无 env/配置/脚本/SQL/日志、无账号口令、无个人路径与基础设施标识、措辞不越级） |
 | 移动端 | —（仓库名待建仓时定） | 🔖 **已立项 S11，MVP 后启动**（2026-10-06 决定，D27；接回 D21 预留口子） | uni-app，目标平台微信小程序 / H5 / App；范围基线=读者套件（列表/详情/搜索/评论），无发文；复用公共接口零后端改动，详见 ROADMAP S11 |
 
 > 客观事实备案：`script/sql/ry_vue.sql` 的 `sys_client` 已预置两条客户端记录——`pc`（clientKey `e5cd7e48...`，
@@ -188,7 +193,7 @@ git clone git@github.com:xcqj/blogs-web.git   blog-web
 
 | 概念 | 谁在用 | 位置 |
 |---|---|---|
-| IDE 多根工作区 | VS Code / Cursor 可视化同时打开三仓 | `RuoYi-Vue-Plus/tooling/blog.code-workspace`（唯一权威副本，由本仓库托管） |
+| IDE 多根工作区 | VS Code / Cursor 可视化同时打开三业务仓 + 总览文档仓 | `RuoYi-Vue-Plus/tooling/blog.code-workspace`（唯一权威副本，由本仓库托管） |
 | Agent 会话根 | WorkBuddy 等 harness 的工作目录 | 父目录 `sd-blog/`（非 Git 仓库，见 §10.3） |
 | 跨仓路由枢纽 | 会话根落在父目录时的入口 | `sd-blog/AGENTS.md`（hub，只做路由） |
 | 各仓领域权威 | 单独打开某一个仓库时 | 该仓 `AGENTS.md` + `.codex/skills/` + `.claude/agents/` |

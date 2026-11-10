@@ -2,7 +2,8 @@
   "folders": [
     { "name": "backend · RuoYi-Vue-Plus", "path": ".." },
     { "name": "admin · plus-ui", "path": "../../plus-ui" },
-    { "name": "web · blog-web", "path": "../../blog-web" }
+    { "name": "web · blog-web", "path": "../../blog-web" },
+    { "name": "overview · blogs-overview", "path": "../../overview" }
   ],
   "settings": {
     "search.exclude": {
