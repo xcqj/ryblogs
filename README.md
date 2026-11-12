@@ -31,8 +31,11 @@
 ```bash
 cd script/docker
 cp .env.example .env          # 至少改掉 MYSQL_ROOT_PASSWORD / REDIS_PASSWORD / MINIO_ROOT_PASSWORD
+./gen-secrets.sh              # 生成 JWT 密钥与两对接口加密密钥，写入 .env（幂等，已有值不覆盖）
 docker compose up -d --build
 ```
+
+应用密钥**不入库**：`jwt-secret-key` 与 `api-decrypt` 公私钥在 `application*.yml` 里只留 `${ENV}` 占位，缺失时后端启动直接失败，不会回落到默认值。
 
 七个服务全部起来后：
 
@@ -82,8 +85,11 @@ docker compose -f docker-compose.dev.yml up -d      # 只起 4 个中间件
 然后：
 
 1. 按 [`docs/SETUP.md`](docs/SETUP.md) §3 导入两个 SQL
-2. IDEA 启动 `DromaraApplication`（dev profile），地址 http://localhost:8081
-3. Swagger：http://localhost:8081/swagger-ui/index.html
+2. 运行 `./gen-secrets.sh`（若尚无 `.env`），并在 IDEA 运行配置的 Environment variables 里注入
+   `.env` 中的 `JWT_SECRET_KEY` / `API_DECRYPT_PRIVATE_KEY` / `API_DECRYPT_PUBLIC_KEY`
+   —— 缺失时 `CryptoFilter` / Sa-Token 会在启动阶段直接失败，这是刻意的 fail-fast
+3. IDEA 启动 `DromaraApplication`（dev profile），地址 http://localhost:8081
+4. Swagger：http://localhost:8081/swagger-ui/index.html
 
 需要整体联调（不想开三个终端）时：
 
@@ -103,6 +109,11 @@ dev 形态把后端映射到 **18081**（避开 IDE 占用的 8081）、前台 3
 | `SPRING_DATA_REDIS_HOST` / `_PASSWORD` | Redis 地址与密码 | `redis` / `ruoyi123` |
 | `BLOG_ES_ADDRESS` | ES 地址（自定义键 `blog.es.address`，**不是**标准 `spring.elasticsearch`） | `es:9200` |
 | `JAVA_OPTS` | 堆大小 | `-Xms512m -Xmx1024m` |
+| `JWT_SECRET_KEY` | Sa-Token 签名密钥 | **无默认值**，由 `gen-secrets.sh` 生成 |
+| `API_DECRYPT_PRIVATE_KEY` / `API_DECRYPT_PUBLIC_KEY` | 接口加密密钥对（私钥解密请求、公钥加密响应） | **无默认值**，由 `gen-secrets.sh` 生成 |
+| `NUXT_RSA_PUBLIC_KEY` / `NUXT_RSA_PRIVATE_KEY` | 上面那对密钥的「前端那一半」，读者站运行时读取、管理后台构建期内联 | 由 `gen-secrets.sh` 自动填写 |
+
+> 换密钥要同时做三件事：重跑 `gen-secrets.sh` 前先清空 `.env` 里对应值 → 重建后端与管理后台镜像（后台是构建期注入）→ 同步管理端仓库的 GitHub Actions Secrets（`VITE_APP_RSA_PUBLIC_KEY` / `VITE_APP_RSA_PRIVATE_KEY`）。
 | `MYSQL_ROOT_PASSWORD` / `REDIS_PASSWORD` / `MINIO_ROOT_PASSWORD` | 中间件凭据 | 见 `.env.example` |
 
 ## 目录结构

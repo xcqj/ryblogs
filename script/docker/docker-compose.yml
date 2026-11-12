@@ -151,6 +151,10 @@ services:
       # 博客搜索：自定义键 blog.es.address（@Value 绑定，非标准 spring.elasticsearch）
       BLOG_ES_ADDRESS: es:9200
       JAVA_OPTS: ${JAVA_OPTS:--Xms512m -Xmx1024m}
+      # 应用密钥：由 .env 注入（必填，缺失时后端启动即失败，不会回落到仓库里的默认值）
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-}
+      API_DECRYPT_PUBLIC_KEY: ${API_DECRYPT_PUBLIC_KEY:-}
+      API_DECRYPT_PRIVATE_KEY: ${API_DECRYPT_PRIVATE_KEY:-}
     ports:
       - "${BACKEND_PORT:-8081}:8081"
     depends_on:
@@ -208,6 +212,11 @@ services:
     build:
       context: ../../../plus-ui
       dockerfile: Dockerfile
+      # RSA 密钥是构建期内联（VITE_ 前缀），换密钥必须重建镜像；
+      # 取自 .env 的 NUXT_RSA_*（与读者站共用同一对，避免两端各自维护）
+      args:
+        VITE_APP_RSA_PUBLIC_KEY: ${NUXT_RSA_PUBLIC_KEY:-}
+        VITE_APP_RSA_PRIVATE_KEY: ${NUXT_RSA_PRIVATE_KEY:-}
     restart: unless-stopped
     environment:
       TZ: Asia/Shanghai

@@ -16,8 +16,9 @@ sa-token:
   # 不共用 Token
   is-share: false
 
-  # jwt秘钥
-  jwt-secret-key: abcdefghijklmnopqrstuvwxyz
+  # jwt秘钥：必须由环境变量注入，仓库内不保留默认值（缺失时启动报错）
+  # 生成参考：script/docker/gen-secrets.sh 或 openssl rand -base64 48
+  jwt-secret-key: ${JWT_SECRET_KEY:}
 
 --- # 监控中心配置
 spring.boot.admin.client:
