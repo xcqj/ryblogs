@@ -120,6 +120,7 @@ DEPLOYED_AT=2026-10-30T21:00:00+08:00
 | 端口被占 | 19xxx 已被别的进程/栈占用 | 改 `.env` 的端口变量，别改 compose |
 | 后台 502 | 后端未健康 | `./deploy.sh status`；看 `docker compose logs backend` |
 | 前台登录报「客户端不存在」 | 库里缺 `web` 客户端 | 确认 `sql/03-blog-web-client.sql` 已进 initdb |
+| 后台登不进，口令像是被改回默认 | 重建/清空 MySQL 数据卷后 initdb 会重放种子里生成的管理员初始口令（手工改过的口令不持久） | 用 BCrypt 重设：`update sys_user set password='<新 hash>' where user_name='admin';`；不要把明文口令写进 SQL 或文档 |
 | 公网 000 / `TLS handshake failure` | Hostname 建在了**别的 zone** 里，被拼成 4 段名（如 `sdblog.us.ci.qdappt.us.ci`），免费证书不覆盖 | 在**该域名自己的 zone** 里建 Public Hostname；先 `dig NS <域名>` 确认已指向 Cloudflare |
 | 改了 `.env` 但容器里仍是旧值 | `docker compose restart` 只重启容器，**不重读 `.env`** | 用 `docker compose up -d`（按新 env 重建）或 `deploy.sh up --version <当前版本>` |
 | 后台登录后卡在「登录中…」，控制台 `Invalid path "xxx"` | 菜单 `is_frame` 值域写错（本版本是 `'Y'/'N'`，不是 `1/0`）：顶层目录不补前导 `/`，vue-router 构建动态路由失败 | `update sys_menu set is_frame='N' where menu_type in ('M','C');` 后刷新；新建菜单时 `is_frame` 一律填 `N` |
@@ -132,6 +133,7 @@ DEPLOYED_AT=2026-10-30T21:00:00+08:00
 
 ## 9. 纪律
 
+- **应用密钥只在 `.env`**：`JWT_SECRET_KEY` / `API_DECRYPT_PUBLIC_KEY` / `API_DECRYPT_PRIVATE_KEY` 与前端那两个值不再入库，仓库里是 `${ENV}` 占位，缺失时后端启动即失败。`.env` 丢失需重跑 `gen-secrets.sh` 并**重建管理端镜像**（密钥在构建期内联）。
 - 部署机**不编译**：没有 `compose.build.yml`、没有源码、没有 `~/.m2`。
 - **禁止** `docker system prune -a`（同机还有 appt 栈）；`gc` 只按前缀删。
 - 同机多栈部署用 `flock` 互斥（`/tmp/sdblog-deploy.lock`），GitHub 的 concurrency 组跨仓库不生效。
