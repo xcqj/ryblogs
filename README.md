@@ -42,7 +42,7 @@ docker compose up -d --build
 | 入口 | 地址 | 说明 |
 |---|---|---|
 | 前台 | http://localhost:3000 | 读者站 |
-| 后台 | http://localhost:8080 | 管理后台，默认账号 `admin` / `admin123` |
+| 后台 | http://localhost:8080 | 管理后台（初始管理员口令在部署机本地记录，仓库不写口令） |
 | 后端 | http://localhost:8081 | 接口与 Swagger |
 | MinIO 控制台 | http://localhost:9001 | `ruoyi` / `ruoyi123` |
 
@@ -71,7 +71,7 @@ docker exec blog-redis redis-cli -a ruoyi123 --no-auth-warning \
   GET "global:captcha_codes:<uuid>"
 ```
 
-实测（2026-10-28，**全新数据卷**）：admin / admin123 + 该验证码 → 跳转 `/index`，localStorage 出现 `Admin-Token`，全链路涵盖 RSA 请求加密、`client_id` 校验、BCrypt 密码与验证码。
+实测（2026-10-28，**全新数据卷**）：初始管理员 + 该验证码 → 跳转 `/index`，localStorage 出现 `Admin-Token`，全链路涵盖 RSA 请求加密、`client_id` 校验、BCrypt 密码与验证码。
 
 ## 本地开发
 
@@ -155,8 +155,8 @@ SEED_FILE=seed-demo.sql docker compose --profile seed run --rm seed    # demo：
 - **封面克制**：约 10 篇有封面（复用 MinIO 现有图），其余走无封面降级版式
 - **时间与关联自洽**：发布时间分散在近 90 天，评论时间全部晚于文章
 
-**演示账号**：`chenyu` / `linshen` / `suwan` / `zhoumu` / `hexi`，密码统一 `admin123`。
-⚠️ 仅演示用，生产禁止沿用。
+**演示账号**：5 个虚构作者（用户名见种子脚本），口令为随机值，只保存在部署机本地记录，按需私下发放。
+⚠️ 仅演示用，禁止沿用任何示例值。
 
 ### 三个 `.mjs` 是什么（种子源码）
 

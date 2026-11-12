@@ -4,8 +4,8 @@
 --       零代码，纯配置。id 列序对齐 script/sql/ry_vue.sql sys_client 定义。
 -- 特性：幂等可重跑（NOT EXISTS 守卫）；执行后必须跑文末验证段。
 -- 执行方式：docker exec -i blog-mysql mysql ... ry-vue 库（照 SETUP §3 惯例）
--- 注意：client_secret 'web123' 为开发配置（与 pc123/app123 同级强度，仅限本地），
---       生产环境必须更换。
+-- 注意：client_secret 为随机值，明文不入库（存部署机私有记录）；样例文件只保留占位说明。
+--       首次部署请用部署机记录的值，仓库内不出现可用的客户端密钥。
 -- ----------------------------------------------------------------------------
 
 -- 1. 幂等插入 web 客户端
@@ -13,7 +13,7 @@ insert into sys_client
 select 1762000000000000003,
        'f38076e6bb30a1170b9ea3fbebac0815',
        'web',
-       'web123',
+       'change_me_web_client_secret',
        'password,social',
        'pc',
        null,

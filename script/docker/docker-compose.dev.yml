@@ -39,13 +39,13 @@ services:
     image: redis:8.6.3
     container_name: blog-redis
     restart: unless-stopped
-    command: redis-server --requirepass ruoyi123
+    command: redis-server --requirepass change_me
     ports:
       - "6379:6379"
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "ruoyi123", "ping"]
+      test: ["CMD", "redis-cli", "-a", "change_me", "ping"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -57,7 +57,7 @@ services:
     environment:
       TZ: Asia/Shanghai
       MINIO_ROOT_USER: ruoyi
-      MINIO_ROOT_PASSWORD: ruoyi123
+      MINIO_ROOT_PASSWORD: change_me
     command: server --address ":9000" --console-address ":9001" /data
     ports:
       - "9000:9000"
@@ -115,7 +115,7 @@ services:
       SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_PASSWORD: root
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: "6379"
-      SPRING_DATA_REDIS_PASSWORD: ruoyi123
+      SPRING_DATA_REDIS_PASSWORD: change_me
       BLOG_ES_ADDRESS: es:9200
     ports:
       # 18081 而非 8081：本机开发时 IDE 里的后端常占着 8081
