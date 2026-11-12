@@ -36,6 +36,10 @@ services:
       BLOG_ES_ADDRESS: es:9200
       # 图床上传地址由数据库 sys_oss_config 决定，不在镜像里
       JAVA_OPTS: ${JAVA_OPTS:--Xms256m -Xmx512m}
+      # 应用密钥（2026-11-13 起由环境变量注入，镜像内无默认值；缺失则启动失败）
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      API_DECRYPT_PUBLIC_KEY: ${API_DECRYPT_PUBLIC_KEY}
+      API_DECRYPT_PRIVATE_KEY: ${API_DECRYPT_PRIVATE_KEY}
       # 社交登录（prod justauth 已改为 env 读取，S29.1 W3）
       JUSTAUTH_ADDRESS: ${JUSTAUTH_ADDRESS:-https://sdblog.us.ci}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
