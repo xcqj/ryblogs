@@ -44,7 +44,7 @@ docker compose up -d --build
 | 前台 | http://localhost:3000 | 读者站 |
 | 后台 | http://localhost:8080 | 管理后台（初始管理员口令在部署机本地记录，仓库不写口令） |
 | 后端 | http://localhost:8081 | 接口与 Swagger |
-| MinIO 控制台 | http://localhost:9001 | `ruoyi` / `ruoyi123` |
+| MinIO 控制台 | http://localhost:9001 | 账号与口令取自 `script/docker/.env`（示例文件里是占位值） |
 
 首次数分钟（要下 Maven 依赖 + 构建三个镜像）；之后 `up -d` 十秒级。
 
@@ -67,7 +67,7 @@ docker compose up -d --build
 
 ```bash
 # 登录页加载时请求 /auth/code 拿到 uuid，再用 uuid 读答案
-docker exec blog-redis redis-cli -a ruoyi123 --no-auth-warning \
+docker exec blog-redis redis-cli -a "$REDIS_PASSWORD" --no-auth-warning \
   GET "global:captcha_codes:<uuid>"
 ```
 
@@ -106,7 +106,7 @@ dev 形态把后端映射到 **18081**（避开 IDE 占用的 8081）、前台 3
 | 变量 | 作用 | 默认 |
 |---|---|---|
 | `SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_URL` | 数据源（dynamic-datasource 嵌套键，relaxed binding 覆盖） | `jdbc:mysql://mysql:3306/ry-vue` |
-| `SPRING_DATA_REDIS_HOST` / `_PASSWORD` | Redis 地址与密码 | `redis` / `ruoyi123` |
+| `SPRING_DATA_REDIS_HOST` / `_PASSWORD` | Redis 地址与密码 | `redis` / 必填（`.env` 注入） |
 | `BLOG_ES_ADDRESS` | ES 地址（自定义键 `blog.es.address`，**不是**标准 `spring.elasticsearch`） | `es:9200` |
 | `JAVA_OPTS` | 堆大小 | `-Xms512m -Xmx1024m` |
 | `JWT_SECRET_KEY` | Sa-Token 签名密钥 | **无默认值**，由 `gen-secrets.sh` 生成 |
