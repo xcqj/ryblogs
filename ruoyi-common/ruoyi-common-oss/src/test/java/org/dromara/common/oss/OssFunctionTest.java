@@ -59,10 +59,28 @@ class OssFunctionTest {
         assertTrue(config.useHttps());
         assertTrue(config.usePathStyleAccess());
         assertEquals(Region.US_EAST_1, config.region().orElseThrow());
-        assertEquals("https://minio.example.com", config.getEndpointUrl());
+        // endpoint 自带协议时以 endpoint 为准（客户端走明文 http），
+        // 但对外桶地址仍由 is_https 决定（公网出链 https）——S29.1 实测的唯一可行组合
+        assertEquals("http://minio.example.com", config.getEndpointUrl());
         assertEquals("https://minio.example.com/images", config.getBucketUrl());
         assertTrue(config.accessControlPolicyConfig().enabled());
         assertEquals(AccessPolicy.PUBLIC_READ, config.accessControlPolicyConfig().accessPolicy());
+    }
+
+    /**
+     * 验证 endpoint 未带协议时，协议由 is_https 推断。
+     */
+    @Test
+    @DisplayName("endpoint 缺少协议时按 is_https 推断")
+    void shouldInferSchemeFromIsHttpsWhenEndpointHasNoProtocol() {
+        OssProperties properties = properties("minio.example.com", null, "images");
+        properties.setIsHttps("Y");
+
+        OssClientConfig config = OssClientConfig.formProperties(properties);
+
+        assertTrue(config.useHttps());
+        assertEquals("https://minio.example.com", config.getEndpointUrl());
+        assertEquals("https://minio.example.com/images", config.getBucketUrl());
     }
 
     /**
