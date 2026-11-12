@@ -67,7 +67,7 @@ docker compose up -d --build
 
 ```bash
 # 登录页加载时请求 /auth/code 拿到 uuid，再用 uuid 读答案
-docker exec blog-redis redis-cli -a "$REDIS_PASSWORD" --no-auth-warning \
+docker exec blog-redis redis-cli -a "$(grep -E '^REDIS_PASSWORD=' script/docker/.env | cut -d= -f2)" --no-auth-warning \
   GET "global:captcha_codes:<uuid>"
 ```
 
